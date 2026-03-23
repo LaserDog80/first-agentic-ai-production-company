@@ -81,6 +81,19 @@ class Orchestrator:
         self.agent_timeout: int = self.config["pipeline"].get(
             "agent_timeout_seconds", 60
         )
+        self._event_callback: Any = None
+
+    def set_event_callback(self, callback: Any) -> None:
+        """Set a callback function for real-time pipeline events."""
+        self._event_callback = callback
+
+    def _emit(self, event: dict) -> None:
+        """Emit an event to the callback if set."""
+        if self._event_callback:
+            try:
+                self._event_callback(event)
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------
     # Public API
@@ -112,6 +125,14 @@ class Orchestrator:
         outputs: dict[str, Any] = {"brief": brief}
 
         # Step 1 — SP Phase A: brief -> ProducerBrief
+        self._emit({
+            "type": "agent_start",
+            "agent": "series_producer",
+            "phase": "phase_a",
+            "step": 1,
+            "total_steps": 9,
+            "message": "Reading the brief and shaping editorial vision...",
+        })
         start = time.time()
         sp_a_result = self._run_agent(
             name="series_producer",
@@ -131,8 +152,22 @@ class Orchestrator:
             model_tier=self.config["agents"]["series_producer"]["model_tier"],
         )
         outputs["producer_brief"] = producer_brief
+        self._emit({
+            "type": "agent_done",
+            "agent": "series_producer",
+            "phase": "phase_a",
+            "message": "Editorial vision set. Producer brief ready.",
+        })
 
         # Step 2 — Producer Briefing: ProducerBrief -> 3 specialist briefs
+        self._emit({
+            "type": "agent_start",
+            "agent": "producer",
+            "phase": "briefing",
+            "step": 2,
+            "total_steps": 9,
+            "message": "Creating briefs for the specialist team...",
+        })
         start = time.time()
         briefing_result = self._run_agent(
             name="producer",
@@ -153,23 +188,105 @@ class Orchestrator:
         outputs["research_brief"] = specialist_briefs["research_brief"]
         outputs["director_brief"] = specialist_briefs["director_brief"]
         outputs["pm_brief"] = specialist_briefs["pm_brief"]
+        self._emit({
+            "type": "agent_done",
+            "agent": "producer",
+            "phase": "briefing",
+            "message": "Specialist briefs dispatched to the team.",
+        })
 
         # Step 3 — Researcher: ResearchBrief -> ResearchPack
+        self._emit({
+            "type": "agent_start",
+            "agent": "researcher",
+            "phase": "research",
+            "step": 3,
+            "total_steps": 9,
+            "message": "Searching the web for facts, competitors, and locations...",
+        })
         outputs = self._run_researcher(outputs)
+        self._emit({
+            "type": "agent_done",
+            "agent": "researcher",
+            "phase": "research",
+            "message": "Research pack compiled.",
+        })
 
         # Step 4 — Director: DirectorBrief + ResearchPack -> CreativeTreatment
+        self._emit({
+            "type": "agent_start",
+            "agent": "director",
+            "phase": "treatment",
+            "step": 4,
+            "total_steps": 9,
+            "message": "Crafting the narrative arc and visual style...",
+        })
         outputs = self._run_director(outputs)
+        self._emit({
+            "type": "agent_done",
+            "agent": "director",
+            "phase": "treatment",
+            "message": "Creative treatment complete.",
+        })
 
         # Step 5 — PM: PMBrief + ResearchPack + CreativeTreatment -> Feasibility
+        self._emit({
+            "type": "agent_start",
+            "agent": "production_manager",
+            "phase": "feasibility",
+            "step": 5,
+            "total_steps": 9,
+            "message": "Calculating budget, crew, and logistics...",
+        })
         outputs = self._run_production_manager(outputs)
+        self._emit({
+            "type": "agent_done",
+            "agent": "production_manager",
+            "phase": "feasibility",
+            "message": "Feasibility assessment done.",
+        })
 
         # Step 6 — Producer Collation: all outputs -> EpisodePackage
+        self._emit({
+            "type": "agent_start",
+            "agent": "producer",
+            "phase": "collation",
+            "step": 6,
+            "total_steps": 9,
+            "message": "Collating all outputs into episode package...",
+        })
         outputs = self._run_producer_collation(outputs)
+        self._emit({
+            "type": "agent_done",
+            "agent": "producer",
+            "phase": "collation",
+            "message": "Episode package assembled.",
+        })
 
         # Step 7 — SP Phase B (with rework loop)
+        self._emit({
+            "type": "agent_start",
+            "agent": "series_producer",
+            "phase": "phase_b",
+            "step": 7,
+            "total_steps": 9,
+            "message": "Reviewing the episode package...",
+        })
         outputs = self._run_sp_phase_b_loop(outputs)
+        self._emit({
+            "type": "agent_done",
+            "agent": "series_producer",
+            "phase": "phase_b",
+            "message": "Pitch deck approved!",
+        })
 
         # Step 9 — Evidence: Log -> EvidencePack
+        self._emit({
+            "type": "status",
+            "step": 9,
+            "total_steps": 9,
+            "message": "Generating evidence trail...",
+        })
         outputs = self._run_evidence(outputs)
 
         return outputs
@@ -418,6 +535,7 @@ class Orchestrator:
                     model=model,
                     max_iterations=max_iterations,
                     timeout=self.agent_timeout,
+                    event_callback=self._event_callback,
                 )
                 return runtime.run(user_message)
             except Exception as exc:
@@ -516,6 +634,13 @@ class Orchestrator:
         """Re-run the target agent with rework notes, then cascade."""
         target = rework.get("agent", "")
         notes = rework.get("notes", "")
+        self._emit({
+            "type": "rework",
+            "target": target,
+            "notes": notes,
+            "cycle": self.rework_count,
+            "message": f"Series Producer requests rework from {target}: {notes[:80]}",
+        })
 
         # Re-run the target agent
         if target == "researcher":

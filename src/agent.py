@@ -34,6 +34,7 @@ class AgentRuntime:
         model: str,
         max_iterations: int,
         timeout: int | None = None,
+        event_callback: Any = None,
     ) -> None:
         self.name = name
         self.system_prompt = system_prompt
@@ -43,6 +44,7 @@ class AgentRuntime:
         self.max_iterations = max_iterations
         self.timeout = timeout
         self.tool_schemas = get_openai_tools_schema(tools) if tools else []
+        self._event_callback = event_callback
 
     def run(self, user_message: str) -> AgentResult:
         """Execute the ReAct loop for the given user message.
@@ -104,6 +106,17 @@ class AgentRuntime:
                 for tc in message.tool_calls:
                     tool_name = tc.function.name
                     tool_args = json.loads(tc.function.arguments)
+                    if self._event_callback:
+                        try:
+                            self._event_callback({
+                                "type": "tool_call",
+                                "agent": self.name,
+                                "tool": tool_name,
+                                "args": tool_args,
+                                "message": f"Using {tool_name}...",
+                            })
+                        except Exception:
+                            pass
                     tool_result = execute_tool(tool_name, tool_args, self.tools)
 
                     tool_calls_log.append({

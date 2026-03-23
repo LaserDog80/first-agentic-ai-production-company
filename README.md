@@ -5,6 +5,7 @@
 ## Status
 
 Phase 1 (Engine) — built, pending live testing with API keys.
+Phase 2 (Frontend) — pixel art web UI with real-time WebSocket updates.
 
 ## What It Does
 
@@ -49,6 +50,23 @@ python -m src.main "Your show idea here" --output output/run1
 ```
 
 ## Usage
+
+### Web UI (recommended)
+
+```bash
+# Start the web server
+python app.py
+# Open http://localhost:8000 in your browser
+```
+
+The web UI features:
+- **Pixel art characters** standing in a row — one for each agent role
+- **Speech bubbles** showing what each agent is currently doing or generating
+- **Live status bar** with progress tracking and step counter
+- **Event log** with timestamped updates as the pipeline runs
+- **Result overlay** displaying the final pitch deck
+
+### CLI
 
 ```bash
 # Basic usage
