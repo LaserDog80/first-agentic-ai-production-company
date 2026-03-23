@@ -295,14 +295,19 @@ class Orchestrator:
         return outputs
 
     def _run_sp_phase_b_loop(self, outputs: dict) -> dict:
-        """Step 7-8: SP reviews, possibly requests rework, produces PitchDeck."""
+        """Step 7-8: SP reviews, possibly requests rework, produces PitchDeck.
+
+        SP Phase B uses no tools — the model outputs either a PitchDeck JSON
+        (= approval) or a rework request JSON with a 'rework_request' key.
+        This avoids tool-calling compatibility issues across models.
+        """
         while True:
             start = time.time()
             sp_b_result = self._run_agent(
                 name="series_producer",
                 system_prompt=series_producer.build_phase_b_prompt(),
                 user_message=json.dumps(outputs["episode_package"]),
-                tools=[request_rework],
+                tools=[],
                 model_tier=self.config["agents"]["series_producer"][
                     "model_tier"
                 ],
@@ -314,20 +319,26 @@ class Orchestrator:
                 duration_ms=duration_ms,
             )
 
-            # Check for rework request
-            rework = self._detect_rework(sp_b_result)
-            if rework is not None:
+            # Parse the output to check for rework request
+            try:
+                cleaned = _strip_markdown_json(sp_b_result.output)
+                parsed = json.loads(cleaned)
+            except json.JSONDecodeError:
+                parsed = {}
+
+            # Check if this is a rework request (has 'rework_request' key)
+            if "rework_request" in parsed and self.rework_count < self.max_rework_cycles:
+                rework = parsed["rework_request"]
                 self.rework_count += 1
                 outputs = self._handle_rework(rework, outputs)
-                # Loop back to SP Phase B
                 continue
 
-            # No rework = implicit approval — parse the PitchDeck
+            # Treat as approval — validate as PitchDeck
             pitch_deck = self._parse_and_validate(
                 sp_b_result.output, PitchDeck, "series_producer",
                 system_prompt=series_producer.build_phase_b_prompt(),
                 user_message=json.dumps(outputs["episode_package"]),
-                tools=[request_rework],
+                tools=[],
                 model_tier=self.config["agents"]["series_producer"][
                     "model_tier"
                 ],

@@ -230,21 +230,9 @@ def _make_approve_response() -> MagicMock:
 
 
 def _make_rework_response(agent: str, notes: str) -> MagicMock:
-    """Create a mock API response that calls the request_rework tool."""
-    msg = MagicMock()
-    msg.content = '{"status": "requesting rework"}'
-    tool_call = MagicMock()
-    tool_call.id = "call_rework"
-    tool_call.function.name = "request_rework"
-    tool_call.function.arguments = json.dumps({"agent": agent, "notes": notes})
-    msg.tool_calls = [tool_call]
-    choice = MagicMock()
-    choice.message = msg
-    choice.finish_reason = "tool_calls"
-    response = MagicMock()
-    response.choices = [choice]
-    response.usage = MagicMock(prompt_tokens=500, completion_tokens=300)
-    return response
+    """Create a mock API response with a JSON rework request (no tools)."""
+    rework_json = json.dumps({"rework_request": {"agent": agent, "notes": notes}})
+    return _make_simple_response(rework_json)
 
 
 # ---------------------------------------------------------------------------
@@ -264,9 +252,8 @@ class TestFullPipelineNoRework:
           4. Director (has ref_research)   -> simple response (no tool use)
           5. PM (has lookup_rates)         -> simple response (no tool use)
           6. Producer Collation (flag_gap) -> simple response (no tool use)
-          7. SP Phase B call 1             -> approve tool call
-          8. SP Phase B call 2             -> final content after tool execution
-          9. Evidence (no tools)           -> simple response
+          7. SP Phase B (no tools)         -> PitchDeck JSON (implicit approval)
+          8. Evidence (no tools)           -> simple response
         """
         mock_responses = [
             _make_simple_response(SP_PHASE_A_RESPONSE),         # 1 SP Phase A
@@ -275,9 +262,8 @@ class TestFullPipelineNoRework:
             _make_simple_response(DIRECTOR_RESPONSE),           # 4 Director
             _make_simple_response(PM_RESPONSE),                 # 5 PM
             _make_simple_response(COLLATION_RESPONSE),          # 6 Producer Collation
-            _make_approve_response(),                           # 7 SP Phase B (tool call)
-            _make_simple_response(SP_PHASE_B_RESPONSE),         # 8 SP Phase B (final)
-            _make_simple_response(EVIDENCE_RESPONSE),           # 9 Evidence
+            _make_simple_response(SP_PHASE_B_RESPONSE),         # 7 SP Phase B (PitchDeck)
+            _make_simple_response(EVIDENCE_RESPONSE),           # 8 Evidence
         ]
 
         mock_client = MagicMock()
@@ -320,8 +306,8 @@ class TestFullPipelineNoRework:
         # No rework should have occurred
         assert orch.rework_count == 0
 
-        # All 9 API calls should have been made
-        assert mock_client.chat.completions.create.call_count == 9
+        # All 8 API calls should have been made
+        assert mock_client.chat.completions.create.call_count == 8
 
 
 class TestFullPipelineWithRework:
@@ -360,21 +346,19 @@ class TestFullPipelineWithRework:
             _make_simple_response(DIRECTOR_RESPONSE),           # 4
             _make_simple_response(PM_RESPONSE),                 # 5
             _make_simple_response(COLLATION_RESPONSE),          # 6
-            # SP Phase B - rework (calls 7-8)
+            # SP Phase B - rework (JSON-based, 1 call)
             _make_rework_response(
                 "researcher", "Need more detail on automation history",
             ),                                                  # 7
-            _make_simple_response('{"status": "rework sent"}'), # 8
-            # Rework cascade (calls 9-12)
-            _make_simple_response(RESEARCH_RESPONSE),           # 9
-            _make_simple_response(DIRECTOR_RESPONSE),           # 10
-            _make_simple_response(PM_RESPONSE),                 # 11
-            _make_simple_response(COLLATION_RESPONSE),          # 12
-            # SP Phase B - approve (calls 13-14)
-            _make_approve_response(),                           # 13
-            _make_simple_response(SP_PHASE_B_RESPONSE),         # 14
-            # Evidence (call 15)
-            _make_simple_response(EVIDENCE_RESPONSE),           # 15
+            # Rework cascade (calls 8-11)
+            _make_simple_response(RESEARCH_RESPONSE),           # 8
+            _make_simple_response(DIRECTOR_RESPONSE),           # 9
+            _make_simple_response(PM_RESPONSE),                 # 10
+            _make_simple_response(COLLATION_RESPONSE),          # 11
+            # SP Phase B - approve (JSON PitchDeck, 1 call)
+            _make_simple_response(SP_PHASE_B_RESPONSE),         # 12
+            # Evidence (call 13)
+            _make_simple_response(EVIDENCE_RESPONSE),           # 13
         ]
 
         mock_client = MagicMock()
@@ -398,16 +382,8 @@ class TestFullPipelineWithRework:
         # Rework should have happened once
         assert orch.rework_count == 1
 
-        # More log entries than no-rework path (8 base + 5 rework-related)
-        # Rework adds: researcher, director, PM, collation, phase_b = 5 extra
-        # Plus the first phase_b = total 13 log entries
+        # More log entries than no-rework path
         assert len(result.log) > 8
-        assert len(result.log) == 13
-
-        # Verify rework was flagged in log
-        rework_entries = [e for e in result.log if e.get("rework_requested")]
-        assert len(rework_entries) == 1
-        assert rework_entries[0]["rework_target"] == "researcher"
 
         # All 15 API calls should have been made
-        assert mock_client.chat.completions.create.call_count == 15
+        assert mock_client.chat.completions.create.call_count == 13

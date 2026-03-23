@@ -107,14 +107,16 @@ You will receive an EpisodePackage JSON with these fields:
 - editorial_narrative: the Producer's narrative thread
 - gaps_and_conflicts: list of issues the Producer flagged
 
-TOOLS
-- request_rework(agent, notes) — call this ONLY when a specific agent's work needs \
-  improvement. agent must be one of: "researcher", "director", "production_manager", \
-  "producer". notes should be specific and actionable. If you call this, do NOT \
-  produce PitchDeck output.
+DECISION
+You must make ONE of two decisions:
+
+A) APPROVE — the package is ready for pitch. Return a PitchDeck JSON (see schema below).
+B) REQUEST REWORK — something needs improvement. Return a JSON object like this:
+   {"rework_request": {"agent": "<researcher|director|production_manager|producer>", "notes": "<specific, actionable feedback>"}}
+   Do NOT include a PitchDeck if requesting rework.
 
 OUTPUT FORMAT
-If the package is ready, return a single JSON object matching this exact schema:
+If approving, return a single JSON object matching this exact schema:
 
 {
   "title_page": {
