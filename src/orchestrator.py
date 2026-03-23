@@ -1,9 +1,12 @@
 """Orchestrator — runs the full multi-agent pipeline from brief to pitch deck."""
 import json
+import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from src.provider import load_config, create_client, get_model_name
 from src.agent import AgentRuntime, AgentResult
@@ -41,6 +44,19 @@ CASCADE_GRAPH: dict[str, list[str]] = {
 }
 
 
+def _strip_markdown_json(text: str) -> str:
+    """Strip markdown code fences from JSON output."""
+    text = text.strip()
+    if text.startswith("```"):
+        # Remove first line (```json or ```)
+        lines = text.split("\n")
+        lines = lines[1:]  # remove opening fence
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]  # remove closing fence
+        text = "\n".join(lines)
+    return text.strip()
+
+
 class Orchestrator:
     """Runs the full multi-agent pipeline: brief in, pitch deck out.
 
@@ -62,6 +78,9 @@ class Orchestrator:
         self.log: list[LogEntry] = []
         self.rework_count: int = 0
         self.max_rework_cycles: int = self.config["pipeline"]["max_rework_cycles"]
+        self.agent_timeout: int = self.config["pipeline"].get(
+            "agent_timeout_seconds", 60
+        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -93,6 +112,7 @@ class Orchestrator:
         outputs: dict[str, Any] = {"brief": brief}
 
         # Step 1 — SP Phase A: brief -> ProducerBrief
+        start = time.time()
         sp_a_result = self._run_agent(
             name="series_producer",
             system_prompt=series_producer.build_phase_a_prompt(),
@@ -100,13 +120,20 @@ class Orchestrator:
             tools=[],
             model_tier=self.config["agents"]["series_producer"]["model_tier"],
         )
-        self._log_step("series_producer", "phase_a", brief, sp_a_result)
+        duration_ms = int((time.time() - start) * 1000)
+        self._log_step("series_producer", "phase_a", brief, sp_a_result,
+                        duration_ms=duration_ms)
         producer_brief = self._parse_and_validate(
             sp_a_result.output, ProducerBrief, "series_producer",
+            system_prompt=series_producer.build_phase_a_prompt(),
+            user_message=brief,
+            tools=[],
+            model_tier=self.config["agents"]["series_producer"]["model_tier"],
         )
         outputs["producer_brief"] = producer_brief
 
         # Step 2 — Producer Briefing: ProducerBrief -> 3 specialist briefs
+        start = time.time()
         briefing_result = self._run_agent(
             name="producer",
             system_prompt=producer.build_briefing_prompt(),
@@ -114,11 +141,15 @@ class Orchestrator:
             tools=[],
             model_tier=self.config["agents"]["producer"]["model_tier"],
         )
+        duration_ms = int((time.time() - start) * 1000)
         self._log_step(
             "producer", "briefing",
             json.dumps(producer_brief)[:200], briefing_result,
+            duration_ms=duration_ms,
         )
-        specialist_briefs = json.loads(briefing_result.output)
+        specialist_briefs = json.loads(
+            _strip_markdown_json(briefing_result.output)
+        )
         outputs["research_brief"] = specialist_briefs["research_brief"]
         outputs["director_brief"] = specialist_briefs["director_brief"]
         outputs["pm_brief"] = specialist_briefs["pm_brief"]
@@ -145,6 +176,7 @@ class Orchestrator:
 
     def _run_researcher(self, outputs: dict) -> dict:
         """Step 3: Researcher produces a ResearchPack."""
+        start = time.time()
         research_result = self._run_agent(
             name="researcher",
             system_prompt=researcher.build_prompt(),
@@ -152,12 +184,18 @@ class Orchestrator:
             tools=[web_search],
             model_tier=self.config["agents"]["researcher"]["model_tier"],
         )
+        duration_ms = int((time.time() - start) * 1000)
         self._log_step(
             "researcher", "research",
             json.dumps(outputs["research_brief"])[:200], research_result,
+            duration_ms=duration_ms,
         )
         research_pack = self._parse_and_validate(
             research_result.output, ResearchPack, "researcher",
+            system_prompt=researcher.build_prompt(),
+            user_message=json.dumps(outputs["research_brief"]),
+            tools=[web_search],
+            model_tier=self.config["agents"]["researcher"]["model_tier"],
         )
         outputs["research_pack"] = research_pack
         return outputs
@@ -169,6 +207,7 @@ class Orchestrator:
             "director_brief": outputs["director_brief"],
             "research_pack": outputs["research_pack"],
         })
+        start = time.time()
         director_result = self._run_agent(
             name="director",
             system_prompt=director.build_prompt(),
@@ -176,12 +215,18 @@ class Orchestrator:
             tools=[ref_research],
             model_tier=self.config["agents"]["director"]["model_tier"],
         )
+        duration_ms = int((time.time() - start) * 1000)
         self._log_step(
             "director", "treatment",
             director_input[:200], director_result,
+            duration_ms=duration_ms,
         )
         treatment = self._parse_and_validate(
             director_result.output, CreativeTreatment, "director",
+            system_prompt=director.build_prompt(),
+            user_message=director_input,
+            tools=[ref_research],
+            model_tier=self.config["agents"]["director"]["model_tier"],
         )
         outputs["treatment"] = treatment
         return outputs
@@ -193,6 +238,7 @@ class Orchestrator:
             "research_pack": outputs["research_pack"],
             "creative_treatment": outputs["treatment"],
         })
+        start = time.time()
         pm_result = self._run_agent(
             name="production_manager",
             system_prompt=production_manager.build_prompt(),
@@ -200,12 +246,18 @@ class Orchestrator:
             tools=[lookup_rates],
             model_tier=self.config["agents"]["production_manager"]["model_tier"],
         )
+        duration_ms = int((time.time() - start) * 1000)
         self._log_step(
             "production_manager", "feasibility",
             pm_input[:200], pm_result,
+            duration_ms=duration_ms,
         )
         feasibility = self._parse_and_validate(
             pm_result.output, FeasibilityAssessment, "production_manager",
+            system_prompt=production_manager.build_prompt(),
+            user_message=pm_input,
+            tools=[lookup_rates],
+            model_tier=self.config["agents"]["production_manager"]["model_tier"],
         )
         outputs["feasibility"] = feasibility
         return outputs
@@ -218,6 +270,7 @@ class Orchestrator:
             "treatment": outputs["treatment"],
             "feasibility": outputs["feasibility"],
         })
+        start = time.time()
         collation_result = self._run_agent(
             name="producer",
             system_prompt=producer.build_collation_prompt(),
@@ -225,12 +278,18 @@ class Orchestrator:
             tools=[flag_gap],
             model_tier=self.config["agents"]["producer"]["model_tier"],
         )
+        duration_ms = int((time.time() - start) * 1000)
         self._log_step(
             "producer", "collation",
             collation_input[:200], collation_result,
+            duration_ms=duration_ms,
         )
         episode_package = self._parse_and_validate(
             collation_result.output, EpisodePackage, "producer",
+            system_prompt=producer.build_collation_prompt(),
+            user_message=collation_input,
+            tools=[flag_gap],
+            model_tier=self.config["agents"]["producer"]["model_tier"],
         )
         outputs["episode_package"] = episode_package
         return outputs
@@ -238,17 +297,37 @@ class Orchestrator:
     def _run_sp_phase_b_loop(self, outputs: dict) -> dict:
         """Step 7-8: SP reviews, possibly requests rework, produces PitchDeck."""
         while True:
+            start = time.time()
             sp_b_result = self._run_agent(
                 name="series_producer",
                 system_prompt=series_producer.build_phase_b_prompt(),
                 user_message=json.dumps(outputs["episode_package"]),
                 tools=[approve, request_rework],
-                model_tier=self.config["agents"]["series_producer"]["model_tier"],
+                model_tier=self.config["agents"]["series_producer"][
+                    "model_tier"
+                ],
             )
+            duration_ms = int((time.time() - start) * 1000)
             self._log_step(
                 "series_producer", "phase_b",
                 json.dumps(outputs["episode_package"])[:200], sp_b_result,
+                duration_ms=duration_ms,
             )
+
+            # Conflict guard: if both approve and rework appear, rework wins
+            has_approve = any(
+                tc.get("name") == "approve"
+                for tc in sp_b_result.tool_calls
+            )
+            has_rework = any(
+                tc.get("name") == "request_rework"
+                for tc in sp_b_result.tool_calls
+            )
+            if has_approve and has_rework:
+                logger.warning(
+                    "SP Phase B returned both approve and request_rework; "
+                    "treating as rework."
+                )
 
             rework = self._detect_rework(sp_b_result)
             if rework is not None:
@@ -260,6 +339,12 @@ class Orchestrator:
             # Approved — parse the PitchDeck
             pitch_deck = self._parse_and_validate(
                 sp_b_result.output, PitchDeck, "series_producer",
+                system_prompt=series_producer.build_phase_b_prompt(),
+                user_message=json.dumps(outputs["episode_package"]),
+                tools=[approve, request_rework],
+                model_tier=self.config["agents"]["series_producer"][
+                    "model_tier"
+                ],
             )
             outputs["pitch_deck"] = pitch_deck
             break
@@ -269,6 +354,7 @@ class Orchestrator:
     def _run_evidence(self, outputs: dict) -> dict:
         """Step 9: Evidence generator summarises the pipeline log."""
         log_data = [entry.model_dump(mode="json") for entry in self.log]
+        start = time.time()
         evidence_result = self._run_agent(
             name="series_producer",  # utility model, uses SP config as fallback
             system_prompt=evidence.build_prompt(),
@@ -276,9 +362,11 @@ class Orchestrator:
             tools=[],
             model_tier="utility",
         )
+        duration_ms = int((time.time() - start) * 1000)
         self._log_step(
             "evidence_generator", "evidence",
             f"Pipeline log ({len(self.log)} entries)", evidence_result,
+            duration_ms=duration_ms,
         )
         try:
             evidence_pack = self._parse_and_validate(
@@ -316,6 +404,7 @@ class Orchestrator:
                     client=self.client,
                     model=model,
                     max_iterations=max_iterations,
+                    timeout=self.agent_timeout,
                 )
                 return runtime.run(user_message)
             except Exception:
@@ -349,6 +438,7 @@ class Orchestrator:
         phase: str,
         input_summary: str,
         result: AgentResult,
+        duration_ms: int = 0,
     ) -> None:
         """Record a log entry for a completed agent step."""
         tool_call_logs = [
@@ -367,7 +457,7 @@ class Orchestrator:
             input_summary=input_summary[:200],
             output_summary=(result.output or "")[:200],
             token_usage=result.token_usage,
-            duration_ms=0,  # Not tracked per-step in this implementation
+            duration_ms=duration_ms,
             tool_calls=tool_call_logs,
             rework_requested=any(
                 tc.get("name") == "request_rework" for tc in result.tool_calls
@@ -448,20 +538,69 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def _parse_and_validate(
-        self, output: str, model_class: type, agent_name: str,
+        self,
+        output: str,
+        model_class: type,
+        agent_name: str,
+        system_prompt: str | None = None,
+        user_message: str | None = None,
+        tools: list | None = None,
+        model_tier: str | None = None,
     ) -> dict:
         """Parse JSON output and validate against a Pydantic model.
 
-        Returns the validated dict. On validation failure, raises ValueError
-        (caller may retry with a correction prompt).
+        On failure, retries once with a correction prompt that includes the
+        validation error. If the second attempt also fails, returns the raw
+        dict (or empty dict) and logs a warning.
         """
-        try:
-            data = json.loads(output)
-        except json.JSONDecodeError as exc:
-            raise ValueError(
-                f"{agent_name} returned invalid JSON: {exc}"
-            ) from exc
+        cleaned = _strip_markdown_json(output)
+        error_msg: str | None = None
 
-        # Validate with Pydantic (raises ValidationError on failure)
-        model_class.model_validate(data)
-        return data
+        # First attempt
+        try:
+            data = json.loads(cleaned)
+            model_class.model_validate(data)
+            return data
+        except (json.JSONDecodeError, Exception) as exc:
+            error_msg = str(exc)
+
+        # Retry with correction prompt if we have context to re-run
+        if system_prompt and user_message and model_tier:
+            correction = (
+                f"Your previous output failed validation with this error:\n"
+                f"{error_msg}\n\n"
+                f"Please return ONLY valid JSON matching the required schema."
+            )
+            retry_result = self._run_agent(
+                name=agent_name,
+                system_prompt=system_prompt,
+                user_message=f"{user_message}\n\n{correction}",
+                tools=tools or [],
+                model_tier=model_tier,
+            )
+            retry_cleaned = _strip_markdown_json(retry_result.output)
+            try:
+                data = json.loads(retry_cleaned)
+                model_class.model_validate(data)
+                return data
+            except (json.JSONDecodeError, Exception) as exc2:
+                logger.warning(
+                    "%s: retry also failed validation (%s). "
+                    "Accepting raw output.",
+                    agent_name, exc2,
+                )
+                try:
+                    return json.loads(retry_cleaned)
+                except json.JSONDecodeError:
+                    return {}
+
+        # No retry context — fall back to raw/empty
+        logger.warning(
+            "%s: parse/validation failed (%s) and no retry context. "
+            "Accepting raw output.",
+            agent_name, error_msg,
+        )
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            return {}

@@ -42,9 +42,9 @@ You will receive:
   contributor_usage, special_requirements
 
 TOOLS
-- lookup_rates(category) — use this to look up current production rates and \
-  costs (e.g. crew day rates, equipment hire, travel costs). Use this tool to \
-  ground your estimates rather than guessing.
+- lookup_rates(role, region) — use this to look up current daily rates for a \
+  specific TV production role in a region (e.g. role="camera operator", \
+  region="UK"). Use this tool to ground your estimates rather than guessing.
 
 OUTPUT FORMAT
 Return a single JSON object matching this exact schema:

@@ -33,6 +33,7 @@ class AgentRuntime:
         client: Any,
         model: str,
         max_iterations: int,
+        timeout: int | None = None,
     ) -> None:
         self.name = name
         self.system_prompt = system_prompt
@@ -40,6 +41,7 @@ class AgentRuntime:
         self.client = client
         self.model = model
         self.max_iterations = max_iterations
+        self.timeout = timeout
         self.tool_schemas = get_openai_tools_schema(tools) if tools else []
 
     def run(self, user_message: str) -> AgentResult:
@@ -68,6 +70,8 @@ class AgentRuntime:
             }
             if self.tool_schemas:
                 kwargs["tools"] = self.tool_schemas
+            if self.timeout is not None:
+                kwargs["timeout"] = self.timeout
 
             response = self.client.chat.completions.create(**kwargs)
 

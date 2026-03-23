@@ -39,8 +39,9 @@ You will receive:
   characters, key_facts, archive_sources, locations, risks_and_sensitivities
 
 TOOLS
-- reference_research(query) — use this to pull specific details from the \
-  research pack. Reference the research rather than inventing material.
+- reference_research(section) — use this to pull a specific section from the \
+  research pack (e.g. "characters", "locations", "key_facts"). Reference the \
+  research rather than inventing material.
 
 OUTPUT FORMAT
 Return a single JSON object matching this exact schema:

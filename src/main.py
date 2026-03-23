@@ -45,8 +45,14 @@ def main():
                 json.dumps(result.evidence, indent=2)
             )
             (out_dir / "log.json").write_text(
-                json.dumps([entry.model_dump() for entry in result.log],
-                           indent=2, default=str)
+                json.dumps(
+                    [
+                        entry.model_dump() if hasattr(entry, "model_dump")
+                        else entry
+                        for entry in result.log
+                    ],
+                    indent=2, default=str,
+                )
             )
             print(f"\nResults saved to {out_dir}/")
     else:
