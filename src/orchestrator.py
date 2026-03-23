@@ -302,7 +302,7 @@ class Orchestrator:
                 name="series_producer",
                 system_prompt=series_producer.build_phase_b_prompt(),
                 user_message=json.dumps(outputs["episode_package"]),
-                tools=[approve, request_rework],
+                tools=[request_rework],
                 model_tier=self.config["agents"]["series_producer"][
                     "model_tier"
                 ],
@@ -314,21 +314,7 @@ class Orchestrator:
                 duration_ms=duration_ms,
             )
 
-            # Conflict guard: if both approve and rework appear, rework wins
-            has_approve = any(
-                tc.get("name") == "approve"
-                for tc in sp_b_result.tool_calls
-            )
-            has_rework = any(
-                tc.get("name") == "request_rework"
-                for tc in sp_b_result.tool_calls
-            )
-            if has_approve and has_rework:
-                logger.warning(
-                    "SP Phase B returned both approve and request_rework; "
-                    "treating as rework."
-                )
-
+            # Check for rework request
             rework = self._detect_rework(sp_b_result)
             if rework is not None:
                 self.rework_count += 1
@@ -336,12 +322,12 @@ class Orchestrator:
                 # Loop back to SP Phase B
                 continue
 
-            # Approved — parse the PitchDeck
+            # No rework = implicit approval — parse the PitchDeck
             pitch_deck = self._parse_and_validate(
                 sp_b_result.output, PitchDeck, "series_producer",
                 system_prompt=series_producer.build_phase_b_prompt(),
                 user_message=json.dumps(outputs["episode_package"]),
-                tools=[approve, request_rework],
+                tools=[request_rework],
                 model_tier=self.config["agents"]["series_producer"][
                     "model_tier"
                 ],
@@ -407,7 +393,11 @@ class Orchestrator:
                     timeout=self.agent_timeout,
                 )
                 return runtime.run(user_message)
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "%s: agent call failed (attempt %d): %s",
+                    name, attempt + 1, exc,
+                )
                 if attempt == 0:
                     time.sleep(1)
                     continue

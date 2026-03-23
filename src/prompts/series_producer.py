@@ -93,9 +93,10 @@ Review the EpisodePackage carefully. Check for:
 4. Feasibility — is this actually makeable?
 5. Gaps and conflicts flagged by the Producer
 
-If you are satisfied, call the approve() tool and then produce a PitchDeck JSON.
+If you are satisfied, produce a PitchDeck JSON as your final output.
 If something needs improvement, call request_rework(agent, notes) specifying \
-which agent should redo their work and what needs to change.
+which agent should redo their work and what needs to change. Do NOT produce a \
+PitchDeck if you are requesting rework.
 
 INPUTS
 You will receive an EpisodePackage JSON with these fields:
@@ -107,13 +108,13 @@ You will receive an EpisodePackage JSON with these fields:
 - gaps_and_conflicts: list of issues the Producer flagged
 
 TOOLS
-- approve() — call this when you are satisfied the package is ready for pitch.
-- request_rework(agent, notes) — call this when a specific agent's work needs \
+- request_rework(agent, notes) — call this ONLY when a specific agent's work needs \
   improvement. agent must be one of: "researcher", "director", "production_manager", \
-  "producer". notes should be specific and actionable.
+  "producer". notes should be specific and actionable. If you call this, do NOT \
+  produce PitchDeck output.
 
 OUTPUT FORMAT
-After calling approve(), return a single JSON object matching this exact schema:
+If the package is ready, return a single JSON object matching this exact schema:
 
 {
   "title_page": {
