@@ -301,12 +301,23 @@ class Orchestrator:
         (= approval) or a rework request JSON with a 'rework_request' key.
         This avoids tool-calling compatibility issues across models.
         """
+        rework_exhausted = False
         while True:
+            # Build user message — add constraint if rework cap is hit
+            user_msg = json.dumps(outputs["episode_package"])
+            if rework_exhausted:
+                user_msg += (
+                    "\n\nIMPORTANT: You have used all available rework cycles. "
+                    "You MUST produce a PitchDeck JSON now with the best "
+                    "available material. Note any remaining concerns in the "
+                    "'unresolved_concerns' field."
+                )
+
             start = time.time()
             sp_b_result = self._run_agent(
                 name="series_producer",
                 system_prompt=series_producer.build_phase_b_prompt(),
-                user_message=json.dumps(outputs["episode_package"]),
+                user_message=user_msg,
                 tools=[],
                 model_tier=self.config["agents"]["series_producer"][
                     "model_tier"
@@ -327,11 +338,16 @@ class Orchestrator:
                 parsed = {}
 
             # Check if this is a rework request (has 'rework_request' key)
-            if "rework_request" in parsed and self.rework_count < self.max_rework_cycles:
-                rework = parsed["rework_request"]
-                self.rework_count += 1
-                outputs = self._handle_rework(rework, outputs)
-                continue
+            if "rework_request" in parsed:
+                if self.rework_count < self.max_rework_cycles:
+                    rework = parsed["rework_request"]
+                    self.rework_count += 1
+                    outputs = self._handle_rework(rework, outputs)
+                    continue
+                else:
+                    # Cap hit — force the SP to produce a PitchDeck
+                    rework_exhausted = True
+                    continue
 
             # Treat as approval — validate as PitchDeck
             pitch_deck = self._parse_and_validate(
