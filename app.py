@@ -6,16 +6,33 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.orchestrator import Orchestrator
+from src.pptx_exporter import export_pitch_deck
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="The Agentic Production Company")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Track generated PPTX files by run ID
+_generated_files: dict[str, Path] = {}
+
+
+@app.get("/download/{run_id}")
+async def download_pptx(run_id: str):
+    """Download a generated PPTX file."""
+    path = _generated_files.get(run_id)
+    if not path or not path.exists():
+        return JSONResponse(status_code=404, content={"error": "File not found"})
+    return FileResponse(
+        str(path),
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        filename="pitch_deck.pptx",
+    )
 
 
 @app.get("/")
@@ -69,10 +86,21 @@ async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
         result = await loop.run_in_executor(None, run_blocking)
 
         if result.success:
+            # Generate PPTX
+            import hashlib
+            run_id = hashlib.md5(brief.encode()).hexdigest()[:12]
+            pptx_dir = Path("output/web")
+            pptx_dir.mkdir(parents=True, exist_ok=True)
+            pptx_path = pptx_dir / f"{run_id}.pptx"
+            if result.pitch_deck:
+                export_pitch_deck(result.pitch_deck, str(pptx_path))
+                _generated_files[run_id] = pptx_path
+
             await emit({
                 "type": "pipeline_complete",
                 "pitch_deck": result.pitch_deck,
                 "evidence": result.evidence,
+                "download_url": f"/download/{run_id}" if result.pitch_deck else None,
             })
         else:
             await emit({
