@@ -83,3 +83,31 @@ def test_characters_table_slide(sample_pitch_deck, tmp_path):
     expected_rows = 1 + len(sample_pitch_deck["key_characters"])
     assert len(table.rows) == expected_rows
     assert len(table.columns) == 4
+
+
+def test_narrative_arc_slide(sample_pitch_deck, tmp_path):
+    """Slide 7 contains narrative arc sections."""
+    output = tmp_path / "deck.pptx"
+    export_pitch_deck(sample_pitch_deck, str(output))
+    prs = Presentation(str(output))
+    slide = prs.slides[6]
+    slide_text = " ".join(
+        shape.text for shape in slide.shapes if shape.has_text_frame
+    )
+    arc = sample_pitch_deck["episode_breakdown"]["narrative_arc"]
+    # Check that at least the opening is present
+    assert arc["opening"][:40] in slide_text
+
+
+def test_sequences_table_slide(sample_pitch_deck, tmp_path):
+    """Slide 8 contains a table of key sequences."""
+    output = tmp_path / "deck.pptx"
+    export_pitch_deck(sample_pitch_deck, str(output))
+    prs = Presentation(str(output))
+    slide = prs.slides[7]
+    tables = [s for s in slide.shapes if s.has_table]
+    assert len(tables) == 1
+    table = tables[0].table
+    sequences = sample_pitch_deck["episode_breakdown"]["key_sequences"]
+    assert len(table.rows) == 1 + len(sequences)
+    assert len(table.columns) == 4

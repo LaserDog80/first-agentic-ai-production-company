@@ -57,6 +57,11 @@ def export_pitch_deck(pitch_deck: dict, output_path: str) -> Path:
     _add_competitors_slide(prs, pitch_deck.get("competitive_landscape", []))
     _add_characters_slide(prs, pitch_deck.get("key_characters", []))
 
+    episode = pitch_deck.get("episode_breakdown", {})
+    _add_narrative_arc_slide(prs, episode)
+    _add_sequences_slide(prs, episode.get("key_sequences", []))
+    _add_visual_approach_slide(prs, episode)
+
     prs.save(str(path))
     return path
 
@@ -240,6 +245,101 @@ def _add_characters_slide(prs: Presentation, characters: list[dict]) -> None:
         ["Name", "Role", "Access", "Story Angle"],
         rows,
     )
+
+
+def _add_narrative_arc_slide(prs: Presentation, episode: dict) -> None:
+    """Slide 7: Narrative Arc — four labelled text blocks."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    ep_title = episode.get("episode_title", "Episode Breakdown")
+    _add_slide_heading(slide, f"Narrative Arc: {ep_title}")
+
+    arc = episode.get("narrative_arc", {})
+    sections = [
+        ("Opening", arc.get("opening", "")),
+        ("Development", arc.get("development", "")),
+        ("Climax", arc.get("climax", "")),
+        ("Resolution", arc.get("resolution", "")),
+    ]
+
+    txbox = slide.shapes.add_textbox(
+        LEFT_MARGIN, TOP_MARGIN, CONTENT_WIDTH, CONTENT_HEIGHT
+    )
+    tf = txbox.text_frame
+    tf.word_wrap = True
+
+    for i, (label, content) in enumerate(sections):
+        # Label paragraph (bold)
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.text = label
+        p.font.size = SMALL_SIZE
+        p.font.bold = True
+        p.font.color.rgb = DARK_BLUE
+        p.space_before = Pt(8) if i > 0 else Pt(0)
+
+        # Content paragraph
+        p2 = tf.add_paragraph()
+        p2.text = _truncate(content, 300)
+        p2.font.size = SMALL_SIZE
+        p2.font.color.rgb = DARK_GREY
+        p2.space_after = Pt(6)
+
+
+def _add_sequences_slide(prs: Presentation, sequences: list[dict]) -> None:
+    """Slide 8: Key Sequences — table."""
+    rows = [
+        [
+            s.get("name", ""),
+            s.get("description", ""),
+            s.get("visual_style", ""),
+            str(s.get("duration_mins", "")),
+        ]
+        for s in sequences
+    ]
+    _add_table_slide(
+        prs, "Key Sequences",
+        ["Name", "Description", "Visual Style", "Duration (min)"],
+        rows,
+    )
+
+
+def _add_visual_approach_slide(prs: Presentation, episode: dict) -> None:
+    """Slide 9: Visual Approach — tone + visual approach text."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_slide_heading(slide, "Visual Approach")
+
+    tone = episode.get("overall_tone", "")
+    approach = episode.get("visual_approach", "")
+
+    txbox = slide.shapes.add_textbox(
+        LEFT_MARGIN, TOP_MARGIN, CONTENT_WIDTH, CONTENT_HEIGHT
+    )
+    tf = txbox.text_frame
+    tf.word_wrap = True
+
+    # Tone
+    p = tf.paragraphs[0]
+    p.text = "Overall Tone"
+    p.font.size = BODY_SIZE
+    p.font.bold = True
+    p.font.color.rgb = DARK_BLUE
+
+    p2 = tf.add_paragraph()
+    p2.text = tone
+    p2.font.size = BODY_SIZE
+    p2.font.color.rgb = DARK_GREY
+    p2.space_after = Pt(18)
+
+    # Visual approach
+    p3 = tf.add_paragraph()
+    p3.text = "Visual Approach"
+    p3.font.size = BODY_SIZE
+    p3.font.bold = True
+    p3.font.color.rgb = DARK_BLUE
+
+    p4 = tf.add_paragraph()
+    p4.text = approach
+    p4.font.size = BODY_SIZE
+    p4.font.color.rgb = DARK_GREY
 
 
 def _add_why_now_slide(prs: Presentation, why_now: str) -> None:
