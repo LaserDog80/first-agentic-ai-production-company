@@ -32,3 +32,10 @@ def test_websocket_rejects_empty_brief(client):
         data = ws.receive_json()
         assert data["type"] == "error"
         assert "No brief" in data["message"]
+
+
+def test_download_returns_404_when_no_file():
+    """Download endpoint returns 404 when no PPTX exists."""
+    client = TestClient(app)
+    response = client.get("/download/nonexistent-run")
+    assert response.status_code == 404

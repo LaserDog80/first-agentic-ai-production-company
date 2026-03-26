@@ -8,6 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from src.orchestrator import Orchestrator
+from src.pptx_exporter import export_pitch_deck
 
 
 def main():
@@ -54,6 +55,12 @@ def main():
                     indent=2, default=str,
                 )
             )
+            # Generate PPTX
+            if result.pitch_deck:
+                pptx_path = export_pitch_deck(
+                    result.pitch_deck, str(out_dir / "pitch_deck.pptx")
+                )
+                print(f"PowerPoint saved to {pptx_path}")
             print(f"\nResults saved to {out_dir}/")
     else:
         print(f"\nPipeline failed: {result.error}", file=sys.stderr)
