@@ -34,3 +34,22 @@ def test_title_slide_content(sample_pitch_deck, tmp_path):
     texts = [shape.text for shape in first_slide.shapes if shape.has_text_frame]
     all_text = " ".join(texts)
     assert sample_pitch_deck["title_page"]["working_title"] in all_text
+
+
+def test_text_slides_present(sample_pitch_deck, tmp_path):
+    """Slides 2-4 and 11 contain logline, format, audience, and why_now text."""
+    output = tmp_path / "deck.pptx"
+    export_pitch_deck(sample_pitch_deck, str(output))
+    prs = Presentation(str(output))
+
+    def slide_text(index):
+        return " ".join(
+            shape.text for shape in prs.slides[index].shapes if shape.has_text_frame
+        )
+
+    # Slide 2: logline
+    assert sample_pitch_deck["logline"][:50] in slide_text(1)
+    # Slide 3: format_and_tone
+    assert sample_pitch_deck["format_and_tone"]["genre"] in slide_text(2)
+    # Slide 4: target_audience
+    assert sample_pitch_deck["target_audience"][:50] in slide_text(3)

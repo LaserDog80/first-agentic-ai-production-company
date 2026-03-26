@@ -51,6 +51,9 @@ def export_pitch_deck(pitch_deck: dict, output_path: str) -> Path:
     prs.slide_height = SLIDE_HEIGHT
 
     _add_title_slide(prs, pitch_deck.get("title_page", {}))
+    _add_logline_slide(prs, pitch_deck.get("logline", ""))
+    _add_format_slide(prs, pitch_deck.get("format_and_tone", {}))
+    _add_audience_slide(prs, pitch_deck.get("target_audience", ""))
 
     prs.save(str(path))
     return path
@@ -78,6 +81,92 @@ def _add_text_box(
     p.font.bold = bold
     p.font.color.rgb = color
     p.alignment = alignment
+
+
+def _add_slide_heading(slide, text: str) -> None:
+    """Add a heading at the top of a content slide."""
+    _add_text_box(
+        slide,
+        left=LEFT_MARGIN,
+        top=Inches(0.4),
+        width=CONTENT_WIDTH,
+        height=Inches(0.7),
+        text=text,
+        font_size=HEADING_SIZE,
+        bold=True,
+        color=DARK_BLUE,
+    )
+
+
+def _add_logline_slide(prs: Presentation, logline: str) -> None:
+    """Slide 2: Logline — prominent centered text."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_slide_heading(slide, "Logline")
+    _add_text_box(
+        slide,
+        left=LEFT_MARGIN,
+        top=Inches(2.0),
+        width=CONTENT_WIDTH,
+        height=Inches(4.0),
+        text=logline,
+        font_size=SUBTITLE_SIZE,
+        color=DARK_GREY,
+        alignment=PP_ALIGN.CENTER,
+    )
+
+
+def _add_format_slide(prs: Presentation, format_and_tone: dict) -> None:
+    """Slide 3: Format & Tone — bullet list."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_slide_heading(slide, "Format & Tone")
+
+    items = [
+        f"Series Length: {format_and_tone.get('series_length', 'N/A')}",
+        f"Genre: {format_and_tone.get('genre', 'N/A')}",
+        f"Tone: {format_and_tone.get('tone', 'N/A')}",
+    ]
+
+    txbox = slide.shapes.add_textbox(
+        LEFT_MARGIN, TOP_MARGIN, CONTENT_WIDTH, CONTENT_HEIGHT
+    )
+    tf = txbox.text_frame
+    tf.word_wrap = True
+    for i, item in enumerate(items):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.text = item
+        p.font.size = BODY_SIZE
+        p.font.color.rgb = DARK_GREY
+        p.space_after = Pt(12)
+
+
+def _add_audience_slide(prs: Presentation, target_audience: str) -> None:
+    """Slide 4: Target Audience — text block."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_slide_heading(slide, "Target Audience")
+    _add_text_box(
+        slide,
+        left=LEFT_MARGIN,
+        top=TOP_MARGIN,
+        width=CONTENT_WIDTH,
+        height=CONTENT_HEIGHT,
+        text=target_audience,
+        font_size=BODY_SIZE,
+    )
+
+
+def _add_why_now_slide(prs: Presentation, why_now: str) -> None:
+    """Slide 11: Why Now — text block."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_slide_heading(slide, "Why Now")
+    _add_text_box(
+        slide,
+        left=LEFT_MARGIN,
+        top=TOP_MARGIN,
+        width=CONTENT_WIDTH,
+        height=CONTENT_HEIGHT,
+        text=why_now,
+        font_size=BODY_SIZE,
+    )
 
 
 def _add_title_slide(prs: Presentation, title_page: dict) -> None:
