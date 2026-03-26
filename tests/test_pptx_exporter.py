@@ -132,3 +132,39 @@ def test_feasibility_slide(sample_pitch_deck, tmp_path):
     )
     rating = sample_pitch_deck["feasibility_summary"]["feasibility_rating"]
     assert rating.upper() in slide_text.upper()
+
+
+def test_cli_integration_writes_pptx(sample_pitch_deck, tmp_path):
+    """Verify export_pitch_deck works with a real output directory path."""
+    out_dir = tmp_path / "output"
+    out_dir.mkdir()
+    pptx_path = out_dir / "pitch_deck.pptx"
+    result = export_pitch_deck(sample_pitch_deck, str(pptx_path))
+    assert result == pptx_path
+    assert pptx_path.exists()
+    assert pptx_path.stat().st_size > 0
+
+
+def test_minimal_pitch_deck_no_crash(tmp_path):
+    """Exporter handles a near-empty PitchDeck dict without crashing."""
+    minimal = {
+        "title_page": {"working_title": "Test"},
+        "logline": "",
+        "format_and_tone": {},
+        "target_audience": "",
+        "competitive_landscape": [],
+        "key_characters": [],
+        "episode_breakdown": {
+            "narrative_arc": {},
+            "key_sequences": [],
+        },
+        "feasibility_summary": {},
+        "why_now": "",
+        "sp_review_notes": "",
+        "unresolved_concerns": [],
+    }
+    output = tmp_path / "minimal.pptx"
+    result = export_pitch_deck(minimal, str(output))
+    assert result == output
+    prs = Presentation(str(output))
+    assert len(prs.slides) == 12
