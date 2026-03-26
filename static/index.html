@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Agentic Production Company</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #1a1a2e;
+            --bg-mid: #16213e;
+            --bg-light: #0f3460;
+            --accent: #e94560;
+            --gold: #f5c542;
+            --green: #4ecca3;
+            --text: #eaeaea;
+            --text-dim: #8892b0;
+            --pixel-size: 4px;
+        }
+
+        body {
+            background: var(--bg-dark);
+            color: var(--text);
+            font-family: 'Press Start 2P', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* ── HEADER ── */
+        .header {
+            text-align: center;
+            padding: 24px 16px 12px;
+            background: linear-gradient(180deg, var(--bg-mid) 0%, var(--bg-dark) 100%);
+            border-bottom: 4px solid var(--accent);
+        }
+
+        .header h1 {
+            font-size: 14px;
+            color: var(--gold);
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 0 #000;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 8px;
+            color: var(--text-dim);
+        }
+
+        /* ── INPUT AREA ── */
+        .input-area {
+            display: flex;
+            justify-content: center;
+            padding: 20px 16px;
+            gap: 8px;
+        }
+
+        .input-area input {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            padding: 12px 16px;
+            background: var(--bg-mid);
+            border: 3px solid var(--bg-light);
+            color: var(--text);
+            width: 100%;
+            max-width: 560px;
+            outline: none;
+            image-rendering: pixelated;
+        }
+
+        .input-area input:focus {
+            border-color: var(--gold);
+        }
+
+        .input-area input::placeholder {
+            color: var(--text-dim);
+            font-size: 8px;
+        }
+
+        .input-area button {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            padding: 12px 20px;
+            background: var(--accent);
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s;
+        }
+
+        .input-area button:hover {
+            background: #ff5a75;
+        }
+
+        .input-area button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        /* ── STAGE ── */
+        .stage {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding: 20px 20px 0;
+            gap: 16px;
+            min-height: 420px;
+            position: relative;
+        }
+
+        /* Ground */
+        .stage::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 48px;
+            background: repeating-linear-gradient(
+                90deg,
+                #2d5016 0px, #2d5016 16px,
+                #3a6b1e 16px, #3a6b1e 32px
+            );
+            border-top: 4px solid #4a8c2a;
+            image-rendering: pixelated;
+        }
+
+        /* ── CHARACTER SLOT ── */
+        .character-slot {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+            width: 160px;
+            min-height: 350px;
+            justify-content: flex-end;
+            padding-bottom: 52px;
+        }
+
+        /* ── SPEECH BUBBLE ── */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            color: #222;
+            font-size: 7px;
+            line-height: 1.6;
+            padding: 10px 12px;
+            border: 3px solid #222;
+            max-width: 150px;
+            min-height: 40px;
+            margin-bottom: 12px;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.3s, transform 0.3s;
+            word-break: break-word;
+        }
+
+        .speech-bubble.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 12px solid #222;
+        }
+
+        .speech-bubble::before {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 9px solid #fff;
+            z-index: 1;
+        }
+
+        .bubble-label {
+            font-size: 6px;
+            color: #888;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .bubble-text {
+            color: #333;
+        }
+
+        /* ── PIXEL CHARACTER ── */
+        .pixel-character {
+            width: 64px;
+            height: 80px;
+            image-rendering: pixelated;
+            position: relative;
+            transition: transform 0.2s;
+        }
+
+        .character-slot.active .pixel-character {
+            animation: bounce 0.6s ease-in-out infinite;
+        }
+
+        .character-slot.done .pixel-character {
+            filter: drop-shadow(0 0 6px var(--green));
+        }
+
+        .character-slot.rework .pixel-character {
+            animation: shake 0.3s ease-in-out;
+            filter: drop-shadow(0 0 6px var(--accent));
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+
+        /* ── PIXEL ART CHARACTERS (CSS pixel art) ── */
+        .pixel-art {
+            display: grid;
+            width: 64px;
+            height: 80px;
+        }
+
+        .pixel-art canvas {
+            width: 64px;
+            height: 80px;
+            image-rendering: pixelated;
+        }
+
+        /* ── CHARACTER NAME ── */
+        .char-name {
+            font-size: 7px;
+            color: var(--text);
+            text-align: center;
+            margin-top: 6px;
+            text-shadow: 1px 1px 0 #000;
+            position: relative;
+            z-index: 2;
+        }
+
+        .char-role {
+            font-size: 6px;
+            color: var(--text-dim);
+            text-align: center;
+            margin-top: 3px;
+        }
+
+        /* ── STATUS BAR ── */
+        .status-bar {
+            background: var(--bg-mid);
+            border-top: 4px solid var(--bg-light);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            min-height: 56px;
+        }
+
+        .progress-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .progress-text {
+            font-size: 8px;
+            color: var(--text);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: var(--bg-dark);
+            border: 2px solid var(--bg-light);
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--green);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .progress-fill.error {
+            background: var(--accent);
+        }
+
+        .step-counter {
+            font-size: 8px;
+            color: var(--gold);
+            white-space: nowrap;
+        }
+
+        /* ── LOG PANEL ── */
+        .log-panel {
+            background: var(--bg-dark);
+            border-top: 2px solid var(--bg-mid);
+            padding: 8px 20px;
+            max-height: 120px;
+            overflow-y: auto;
+            font-size: 7px;
+            line-height: 2;
+        }
+
+        .log-entry {
+            color: var(--text-dim);
+        }
+
+        .log-entry .timestamp {
+            color: var(--bg-light);
+            margin-right: 8px;
+        }
+
+        .log-entry.event-agent_start { color: var(--gold); }
+        .log-entry.event-agent_done { color: var(--green); }
+        .log-entry.event-rework { color: var(--accent); }
+        .log-entry.event-tool_call { color: #7ec8e3; }
+
+        /* ── RESULT OVERLAY ── */
+        .result-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 100;
+            overflow-y: auto;
+            padding: 40px 20px;
+        }
+
+        .result-overlay.visible {
+            display: block;
+        }
+
+        .result-content {
+            max-width: 700px;
+            margin: 0 auto;
+            background: var(--bg-mid);
+            border: 4px solid var(--gold);
+            padding: 24px;
+        }
+
+        .result-content h2 {
+            font-size: 12px;
+            color: var(--gold);
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .result-content pre {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 7px;
+            line-height: 2;
+            color: var(--text);
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .result-close {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            padding: 10px 24px;
+            background: var(--accent);
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            display: block;
+            margin: 16px auto 0;
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 900px) {
+            .stage {
+                gap: 8px;
+                padding: 12px 8px 0;
+            }
+            .character-slot { width: 120px; }
+            .speech-bubble { max-width: 110px; font-size: 6px; }
+        }
+
+        @media (max-width: 640px) {
+            .stage {
+                flex-wrap: wrap;
+                justify-content: center;
+                min-height: auto;
+            }
+            .character-slot { width: 100px; min-height: 250px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>THE AGENTIC PRODUCTION CO.</h1>
+        <p>AI agents collaborate to turn your idea into a pitch deck</p>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="briefInput"
+               placeholder="Enter a show idea... e.g. A 3x60 doc about lighthouse keepers"
+               autocomplete="off">
+        <button id="runBtn" onclick="startPipeline()">GO!</button>
+    </div>
+
+    <div class="stage" id="stage">
+        <!-- Characters generated by JS -->
+    </div>
+
+    <div class="status-bar">
+        <div class="progress-container">
+            <div class="progress-text" id="statusText">Ready. Enter a brief to begin.</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+        <div class="step-counter" id="stepCounter">-/-</div>
+    </div>
+
+    <div class="log-panel" id="logPanel"></div>
+
+    <div class="result-overlay" id="resultOverlay">
+        <div class="result-content">
+            <h2>PITCH DECK COMPLETE</h2>
+            <pre id="resultText"></pre>
+            <button class="result-close" onclick="closeResult()">CLOSE</button>
+        </div>
+    </div>
+
+    <script>
+    // ── CHARACTER DEFINITIONS ──
+    const CHARACTERS = [
+        {
+            id: 'series_producer',
+            name: 'SERIES PRODUCER',
+            role: 'Editorial Vision',
+            // Pixel art: person with glasses and dark suit
+            pixels: [
+                // Hair (dark)
+                { color: '#2c1810', coords: [[2,0],[3,0],[4,0],[5,0],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1]] },
+                // Face (skin)
+                { color: '#f4c089', coords: [[2,2],[3,2],[4,2],[5,2],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[5,4]] },
+                // Glasses
+                { color: '#333', coords: [[1,3],[6,3]] },
+                // Eyes
+                { color: '#1a1a1a', coords: [[3,3],[5,3]] },
+                // Mouth
+                { color: '#c4785a', coords: [[3,4],[4,4]] },
+                // Suit (dark blue)
+                { color: '#1a237e', coords: [[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[1,8],[2,8],[5,8],[6,8]] },
+                // Tie
+                { color: '#e94560', coords: [[3,5],[4,5],[3,6],[4,6],[4,7]] },
+                // Hands (skin)
+                { color: '#f4c089', coords: [[0,8],[7,8]] },
+                // Pants
+                { color: '#0d1b4a', coords: [[2,9],[3,9],[4,9],[5,9],[2,10],[3,10],[4,10],[5,10]] },
+                // Shoes
+                { color: '#222', coords: [[1,11],[2,11],[3,11],[4,11],[5,11],[6,11]] },
+            ]
+        },
+        {
+            id: 'producer',
+            name: 'PRODUCER',
+            role: 'Creative Coordinator',
+            pixels: [
+                // Headset
+                { color: '#555', coords: [[1,0],[6,0],[0,1],[7,1],[0,2],[7,2]] },
+                // Headset mic
+                { color: '#e94560', coords: [[0,3],[0,4]] },
+                // Hair
+                { color: '#8b4513', coords: [[2,0],[3,0],[4,0],[5,0],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1]] },
+                // Face
+                { color: '#d4a574', coords: [[2,2],[3,2],[4,2],[5,2],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[5,4]] },
+                // Eyes
+                { color: '#1a1a1a', coords: [[3,3],[5,3]] },
+                // Mouth (smile)
+                { color: '#c4785a', coords: [[3,4],[4,4]] },
+                // Jacket (warm brown)
+                { color: '#8d6e63', coords: [[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[1,8],[2,8],[5,8],[6,8]] },
+                // Clipboard
+                { color: '#f5f5dc', coords: [[6,8],[7,8],[7,7]] },
+                // Shirt
+                { color: '#fff', coords: [[3,5],[4,5],[3,6],[4,6]] },
+                // Hands
+                { color: '#d4a574', coords: [[0,8],[7,9]] },
+                // Pants
+                { color: '#37474f', coords: [[2,9],[3,9],[4,9],[5,9],[2,10],[3,10],[4,10],[5,10]] },
+                // Shoes
+                { color: '#5d4037', coords: [[1,11],[2,11],[3,11],[4,11],[5,11],[6,11]] },
+            ]
+        },
+        {
+            id: 'researcher',
+            name: 'RESEARCHER',
+            role: 'Fact Finder',
+            pixels: [
+                // Hair (red/auburn)
+                { color: '#b33a2d', coords: [[2,0],[3,0],[4,0],[5,0],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[1,2],[6,2]] },
+                // Face
+                { color: '#fdd9b5', coords: [[2,2],[3,2],[4,2],[5,2],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[5,4]] },
+                // Glasses (round)
+                { color: '#4fc3f7', coords: [[1,3],[6,3]] },
+                // Eyes
+                { color: '#1a1a1a', coords: [[3,3],[5,3]] },
+                // Mouth
+                { color: '#c4785a', coords: [[4,4]] },
+                // Lab coat (white)
+                { color: '#eceff1', coords: [[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[0,8],[1,8],[2,8],[5,8],[6,8],[7,8]] },
+                // Shirt underneath
+                { color: '#4caf50', coords: [[3,5],[4,5]] },
+                // Magnifying glass
+                { color: '#ffd54f', coords: [[7,5],[7,4]] },
+                { color: '#81d4fa', coords: [[7,3]] },
+                // Hands
+                { color: '#fdd9b5', coords: [[0,9],[7,9]] },
+                // Pants
+                { color: '#455a64', coords: [[2,9],[3,9],[4,9],[5,9],[2,10],[3,10],[4,10],[5,10]] },
+                // Shoes
+                { color: '#795548', coords: [[1,11],[2,11],[3,11],[4,11],[5,11],[6,11]] },
+            ]
+        },
+        {
+            id: 'director',
+            name: 'DIRECTOR',
+            role: 'Creative Visionary',
+            pixels: [
+                // Beret
+                { color: '#880e4f', coords: [[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[2,-1],[3,-1],[4,-1]] },
+                // Hair
+                { color: '#212121', coords: [[1,1],[2,1],[3,1],[4,1],[5,1],[6,1]] },
+                // Face
+                { color: '#e8b88a', coords: [[2,2],[3,2],[4,2],[5,2],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[5,4]] },
+                // Sunglasses
+                { color: '#111', coords: [[2,3],[3,3],[5,3],[6,3]] },
+                // Beard stubble
+                { color: '#555', coords: [[3,4],[4,4],[5,4]] },
+                // Turtleneck (black)
+                { color: '#212121', coords: [[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[1,8],[2,8],[5,8],[6,8]] },
+                // Scarf accent
+                { color: '#e94560', coords: [[3,5],[4,5]] },
+                // Hands
+                { color: '#e8b88a', coords: [[0,8],[7,8]] },
+                // Pants (slim)
+                { color: '#1a1a1a', coords: [[2,9],[3,9],[4,9],[5,9],[2,10],[3,10],[4,10],[5,10]] },
+                // Shoes (stylish)
+                { color: '#4e342e', coords: [[1,11],[2,11],[3,11],[4,11],[5,11],[6,11]] },
+            ]
+        },
+        {
+            id: 'production_manager',
+            name: 'PROD. MANAGER',
+            role: 'Logistics & Budget',
+            pixels: [
+                // Hard hat
+                { color: '#ffc107', coords: [[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[0,0],[7,0],[2,-1],[3,-1],[4,-1],[5,-1]] },
+                // Hair
+                { color: '#5d4037', coords: [[2,1],[3,1],[4,1],[5,1]] },
+                // Face
+                { color: '#c9956b', coords: [[2,2],[3,2],[4,2],[5,2],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[5,4]] },
+                // Eyes
+                { color: '#1a1a1a', coords: [[3,3],[5,3]] },
+                // Smile
+                { color: '#a0604a', coords: [[3,4],[4,4],[5,4]] },
+                // Hi-vis vest
+                { color: '#ff9800', coords: [[1,5],[2,5],[5,5],[6,5],[0,6],[1,6],[6,6],[7,6],[0,7],[1,7],[6,7],[7,7]] },
+                // Vest stripes
+                { color: '#ffeb3b', coords: [[2,6],[5,6],[2,7],[5,7]] },
+                // Shirt (dark)
+                { color: '#37474f', coords: [[3,5],[4,5],[2,5],[3,6],[4,6],[3,7],[4,7],[1,8],[2,8],[5,8],[6,8]] },
+                // Calculator
+                { color: '#90a4ae', coords: [[7,7],[7,8]] },
+                { color: '#4caf50', coords: [[7,6]] },
+                // Hands
+                { color: '#c9956b', coords: [[0,8],[7,9]] },
+                // Pants (work)
+                { color: '#455a64', coords: [[2,9],[3,9],[4,9],[5,9],[2,10],[3,10],[4,10],[5,10]] },
+                // Boots
+                { color: '#3e2723', coords: [[1,11],[2,11],[3,11],[4,11],[5,11],[6,11]] },
+            ]
+        }
+    ];
+
+    // ── STATE ──
+    let ws = null;
+    let isRunning = false;
+
+    // ── INIT ──
+    function init() {
+        const stage = document.getElementById('stage');
+        CHARACTERS.forEach(char => {
+            const slot = document.createElement('div');
+            slot.className = 'character-slot';
+            slot.id = `slot-${char.id}`;
+            slot.innerHTML = `
+                <div class="speech-bubble" id="bubble-${char.id}">
+                    <div class="bubble-label"></div>
+                    <div class="bubble-text">Waiting...</div>
+                </div>
+                <div class="pixel-character">
+                    <canvas id="canvas-${char.id}" width="64" height="80"></canvas>
+                </div>
+                <div class="char-name">${char.name}</div>
+                <div class="char-role">${char.role}</div>
+            `;
+            stage.appendChild(slot);
+            drawCharacter(char);
+        });
+
+        document.getElementById('briefInput').addEventListener('keypress', e => {
+            if (e.key === 'Enter') startPipeline();
+        });
+    }
+
+    function drawCharacter(char) {
+        const canvas = document.getElementById(`canvas-${char.id}`);
+        const ctx = canvas.getContext('2d');
+        const scale = 6;
+
+        // Offset to center the 8-wide character in the 64px canvas
+        const offsetX = 8;
+        const offsetY = 12;
+
+        char.pixels.forEach(group => {
+            ctx.fillStyle = group.color;
+            group.coords.forEach(([x, y]) => {
+                ctx.fillRect(
+                    offsetX + x * scale,
+                    offsetY + y * scale,
+                    scale,
+                    scale
+                );
+            });
+        });
+    }
+
+    // ── PIPELINE ──
+    function startPipeline() {
+        const input = document.getElementById('briefInput');
+        const brief = input.value.trim();
+        if (!brief || isRunning) return;
+
+        isRunning = true;
+        document.getElementById('runBtn').disabled = true;
+        resetUI();
+
+        // Connect WebSocket
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${protocol}//${location.host}/ws`);
+
+        ws.onopen = () => {
+            ws.send(JSON.stringify({ type: 'run', brief }));
+            setStatus('Pipeline starting...', 0);
+            addLog('pipeline_start', `Brief: "${brief}"`);
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            handleEvent(data);
+        };
+
+        ws.onclose = () => {
+            if (isRunning) {
+                setStatus('Connection lost.', 0, true);
+                isRunning = false;
+                document.getElementById('runBtn').disabled = false;
+            }
+        };
+
+        ws.onerror = () => {
+            setStatus('Connection error.', 0, true);
+            isRunning = false;
+            document.getElementById('runBtn').disabled = false;
+        };
+    }
+
+    function handleEvent(event) {
+        switch (event.type) {
+            case 'pipeline_start':
+                setStatus('Pipeline started!', 0);
+                break;
+
+            case 'agent_start':
+                setCharacterState(event.agent, 'active');
+                setBubble(event.agent, event.phase || '', event.message);
+                setStatus(event.message, ((event.step - 1) / event.total_steps) * 100);
+                setStep(event.step, event.total_steps);
+                addLog('agent_start', `${agentLabel(event.agent)} started: ${event.message}`);
+                break;
+
+            case 'agent_done':
+                setCharacterState(event.agent, 'done');
+                setBubble(event.agent, 'Done', event.message);
+                addLog('agent_done', `${agentLabel(event.agent)} finished: ${event.message}`);
+                break;
+
+            case 'tool_call':
+                setBubble(event.agent, event.tool, formatToolArgs(event));
+                addLog('tool_call', `${agentLabel(event.agent)} using ${event.tool}`);
+                break;
+
+            case 'rework':
+                setCharacterState(event.target, 'rework');
+                setBubble('series_producer', 'Rework!', event.message);
+                setStatus(`Rework cycle ${event.cycle}: ${event.notes}`, null);
+                addLog('rework', event.message);
+                // After a brief delay, reset the target to active
+                setTimeout(() => setCharacterState(event.target, 'active'), 600);
+                break;
+
+            case 'status':
+                setStatus(event.message, ((event.step - 1) / event.total_steps) * 100);
+                setStep(event.step, event.total_steps);
+                addLog('status', event.message);
+                break;
+
+            case 'pipeline_complete':
+                setStatus('Pitch deck complete!', 100);
+                setStep(9, 9);
+                addLog('agent_done', 'Pipeline complete!');
+                showResult(event.pitch_deck);
+                isRunning = false;
+                document.getElementById('runBtn').disabled = false;
+                if (ws) ws.close();
+                break;
+
+            case 'pipeline_error':
+                setStatus(`Error: ${event.error}`, null, true);
+                addLog('rework', `Pipeline error: ${event.error}`);
+                isRunning = false;
+                document.getElementById('runBtn').disabled = false;
+                if (ws) ws.close();
+                break;
+
+            case 'error':
+                setStatus(event.message, null, true);
+                break;
+        }
+    }
+
+    // ── UI HELPERS ──
+    function resetUI() {
+        CHARACTERS.forEach(char => {
+            setCharacterState(char.id, '');
+            const bubble = document.getElementById(`bubble-${char.id}`);
+            bubble.classList.remove('visible');
+        });
+        document.getElementById('progressFill').style.width = '0%';
+        document.getElementById('progressFill').classList.remove('error');
+        document.getElementById('stepCounter').textContent = '-/-';
+        document.getElementById('logPanel').innerHTML = '';
+        document.getElementById('resultOverlay').classList.remove('visible');
+    }
+
+    function setCharacterState(agentId, state) {
+        const slot = document.getElementById(`slot-${agentId}`);
+        if (!slot) return;
+        slot.className = 'character-slot';
+        if (state) slot.classList.add(state);
+    }
+
+    function setBubble(agentId, label, text) {
+        const bubble = document.getElementById(`bubble-${agentId}`);
+        if (!bubble) return;
+        bubble.querySelector('.bubble-label').textContent = label;
+        bubble.querySelector('.bubble-text').textContent = text;
+        bubble.classList.add('visible');
+    }
+
+    function setStatus(text, percent, isError) {
+        document.getElementById('statusText').textContent = text;
+        if (percent !== null && percent !== undefined) {
+            const fill = document.getElementById('progressFill');
+            fill.style.width = percent + '%';
+            if (isError) fill.classList.add('error');
+        }
+    }
+
+    function setStep(current, total) {
+        document.getElementById('stepCounter').textContent = `${current}/${total}`;
+    }
+
+    function addLog(type, message) {
+        const panel = document.getElementById('logPanel');
+        const now = new Date().toLocaleTimeString();
+        const entry = document.createElement('div');
+        entry.className = `log-entry event-${type}`;
+        entry.innerHTML = `<span class="timestamp">[${now}]</span>${message}`;
+        panel.appendChild(entry);
+        panel.scrollTop = panel.scrollHeight;
+    }
+
+    function agentLabel(id) {
+        const char = CHARACTERS.find(c => c.id === id);
+        return char ? char.name : id;
+    }
+
+    function formatToolArgs(event) {
+        if (event.tool === 'web_search' && event.args?.query) {
+            return `Searching: "${event.args.query}"`;
+        }
+        if (event.tool === 'lookup_rates') {
+            return `Looking up rates for ${event.args?.role || 'crew'}`;
+        }
+        if (event.tool === 'reference_research') {
+            return `Referencing: ${event.args?.section || 'research'}`;
+        }
+        if (event.tool === 'flag_gap') {
+            return `Flagging: ${event.args?.description || 'gap'}`;
+        }
+        return event.message || 'Working...';
+    }
+
+    function showResult(pitchDeck) {
+        const overlay = document.getElementById('resultOverlay');
+        const text = document.getElementById('resultText');
+        text.textContent = JSON.stringify(pitchDeck, null, 2);
+        overlay.classList.add('visible');
+    }
+
+    function closeResult() {
+        document.getElementById('resultOverlay').classList.remove('visible');
+    }
+
+    // ── DEMO MODE (for testing without backend) ──
+    function runDemo() {
+        resetUI();
+        const demoEvents = [
+            { type: 'pipeline_start', brief: 'Demo run' },
+            { type: 'agent_start', agent: 'series_producer', phase: 'phase_a', step: 1, total_steps: 9, message: 'Reading the brief and shaping editorial vision...' },
+            { type: 'agent_done', agent: 'series_producer', phase: 'phase_a', message: 'Editorial vision set. Producer brief ready.' },
+            { type: 'agent_start', agent: 'producer', phase: 'briefing', step: 2, total_steps: 9, message: 'Creating briefs for the specialist team...' },
+            { type: 'agent_done', agent: 'producer', phase: 'briefing', message: 'Specialist briefs dispatched to the team.' },
+            { type: 'agent_start', agent: 'researcher', phase: 'research', step: 3, total_steps: 9, message: 'Searching the web for facts, competitors, and locations...' },
+            { type: 'tool_call', agent: 'researcher', tool: 'web_search', args: { query: 'lighthouse keepers documentary' }, message: 'Using web_search...' },
+            { type: 'tool_call', agent: 'researcher', tool: 'web_search', args: { query: 'famous lighthouses UK' }, message: 'Using web_search...' },
+            { type: 'agent_done', agent: 'researcher', phase: 'research', message: 'Research pack compiled.' },
+            { type: 'agent_start', agent: 'director', phase: 'treatment', step: 4, total_steps: 9, message: 'Crafting the narrative arc and visual style...' },
+            { type: 'tool_call', agent: 'director', tool: 'reference_research', args: { section: 'locations' }, message: 'Using reference_research...' },
+            { type: 'agent_done', agent: 'director', phase: 'treatment', message: 'Creative treatment complete.' },
+            { type: 'agent_start', agent: 'production_manager', phase: 'feasibility', step: 5, total_steps: 9, message: 'Calculating budget, crew, and logistics...' },
+            { type: 'tool_call', agent: 'production_manager', tool: 'lookup_rates', args: { role: 'camera_operator', region: 'UK' }, message: 'Using lookup_rates...' },
+            { type: 'agent_done', agent: 'production_manager', phase: 'feasibility', message: 'Feasibility assessment done.' },
+            { type: 'agent_start', agent: 'producer', phase: 'collation', step: 6, total_steps: 9, message: 'Collating all outputs into episode package...' },
+            { type: 'agent_done', agent: 'producer', phase: 'collation', message: 'Episode package assembled.' },
+            { type: 'agent_start', agent: 'series_producer', phase: 'phase_b', step: 7, total_steps: 9, message: 'Reviewing the episode package...' },
+            { type: 'agent_done', agent: 'series_producer', phase: 'phase_b', message: 'Pitch deck approved!' },
+            { type: 'pipeline_complete', pitch_deck: { title_page: 'Keepers of the Light', logline: 'A 3x60 documentary exploring the vanishing world of lighthouse keepers.' } },
+        ];
+
+        let i = 0;
+        function next() {
+            if (i < demoEvents.length) {
+                handleEvent(demoEvents[i]);
+                i++;
+                setTimeout(next, 800 + Math.random() * 600);
+            }
+        }
+        next();
+    }
+
+    // Boot
+    init();
+    </script>
+</body>
+</html>
