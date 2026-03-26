@@ -53,3 +53,33 @@ def test_text_slides_present(sample_pitch_deck, tmp_path):
     assert sample_pitch_deck["format_and_tone"]["genre"] in slide_text(2)
     # Slide 4: target_audience
     assert sample_pitch_deck["target_audience"][:50] in slide_text(3)
+
+
+def test_competitor_table_slide(sample_pitch_deck, tmp_path):
+    """Slide 5 contains a table with competitor data."""
+    output = tmp_path / "deck.pptx"
+    export_pitch_deck(sample_pitch_deck, str(output))
+    prs = Presentation(str(output))
+    slide = prs.slides[4]  # 0-indexed, slide 5
+    tables = [s for s in slide.shapes if s.has_table]
+    assert len(tables) == 1
+    table = tables[0].table
+    # Header row + data rows
+    expected_rows = 1 + len(sample_pitch_deck["competitive_landscape"])
+    assert len(table.rows) == expected_rows
+    # 4 columns: title, broadcaster, year, relevance
+    assert len(table.columns) == 4
+
+
+def test_characters_table_slide(sample_pitch_deck, tmp_path):
+    """Slide 6 contains a table with character data."""
+    output = tmp_path / "deck.pptx"
+    export_pitch_deck(sample_pitch_deck, str(output))
+    prs = Presentation(str(output))
+    slide = prs.slides[5]  # 0-indexed, slide 6
+    tables = [s for s in slide.shapes if s.has_table]
+    assert len(tables) == 1
+    table = tables[0].table
+    expected_rows = 1 + len(sample_pitch_deck["key_characters"])
+    assert len(table.rows) == expected_rows
+    assert len(table.columns) == 4

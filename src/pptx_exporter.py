@@ -54,6 +54,8 @@ def export_pitch_deck(pitch_deck: dict, output_path: str) -> Path:
     _add_logline_slide(prs, pitch_deck.get("logline", ""))
     _add_format_slide(prs, pitch_deck.get("format_and_tone", {}))
     _add_audience_slide(prs, pitch_deck.get("target_audience", ""))
+    _add_competitors_slide(prs, pitch_deck.get("competitive_landscape", []))
+    _add_characters_slide(prs, pitch_deck.get("key_characters", []))
 
     prs.save(str(path))
     return path
@@ -151,6 +153,92 @@ def _add_audience_slide(prs: Presentation, target_audience: str) -> None:
         height=CONTENT_HEIGHT,
         text=target_audience,
         font_size=BODY_SIZE,
+    )
+
+
+def _truncate(text: str, max_chars: int = MAX_CELL_CHARS) -> str:
+    """Truncate text with ellipsis if over max length."""
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars - 3] + "..."
+
+
+def _add_table_slide(
+    prs: Presentation,
+    heading: str,
+    headers: list[str],
+    rows: list[list[str]],
+) -> None:
+    """Add a slide with a heading and a styled table."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_slide_heading(slide, heading)
+
+    num_rows = len(rows) + 1  # +1 for header
+    num_cols = len(headers)
+    table_shape = slide.shapes.add_table(
+        num_rows, num_cols,
+        LEFT_MARGIN, TOP_MARGIN, CONTENT_WIDTH, CONTENT_HEIGHT,
+    )
+    table = table_shape.table
+
+    # Header row
+    for col_idx, header_text in enumerate(headers):
+        cell = table.cell(0, col_idx)
+        cell.text = header_text
+        for paragraph in cell.text_frame.paragraphs:
+            paragraph.font.size = TABLE_SIZE
+            paragraph.font.bold = True
+            paragraph.font.color.rgb = WHITE
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = DARK_BLUE
+
+    # Data rows
+    for row_idx, row_data in enumerate(rows):
+        for col_idx, cell_text in enumerate(row_data):
+            cell = table.cell(row_idx + 1, col_idx)
+            cell.text = _truncate(cell_text)
+            for paragraph in cell.text_frame.paragraphs:
+                paragraph.font.size = TABLE_SIZE
+                paragraph.font.color.rgb = BLACK
+            # Alternating row color
+            if row_idx % 2 == 1:
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = LIGHT_GREY
+
+
+def _add_competitors_slide(prs: Presentation, competitors: list[dict]) -> None:
+    """Slide 5: Competitive Landscape — table."""
+    rows = [
+        [
+            c.get("title", ""),
+            c.get("broadcaster", ""),
+            c.get("year", ""),
+            c.get("relevance", ""),
+        ]
+        for c in competitors
+    ]
+    _add_table_slide(
+        prs, "Competitive Landscape",
+        ["Title", "Broadcaster", "Year", "Relevance"],
+        rows,
+    )
+
+
+def _add_characters_slide(prs: Presentation, characters: list[dict]) -> None:
+    """Slide 6: Key Characters — table."""
+    rows = [
+        [
+            c.get("name", ""),
+            c.get("role", ""),
+            c.get("access_notes", ""),
+            c.get("story_angle", ""),
+        ]
+        for c in characters
+    ]
+    _add_table_slide(
+        prs, "Key Characters",
+        ["Name", "Role", "Access", "Story Angle"],
+        rows,
     )
 
 
