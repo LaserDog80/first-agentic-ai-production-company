@@ -50,17 +50,33 @@ def export_pitch_deck(pitch_deck: dict, output_path: str) -> Path:
     prs.slide_width = SLIDE_WIDTH
     prs.slide_height = SLIDE_HEIGHT
 
+    # Slide 1: Title
     _add_title_slide(prs, pitch_deck.get("title_page", {}))
+    # Slide 2: Logline
     _add_logline_slide(prs, pitch_deck.get("logline", ""))
+    # Slide 3: Format & Tone
     _add_format_slide(prs, pitch_deck.get("format_and_tone", {}))
+    # Slide 4: Target Audience
     _add_audience_slide(prs, pitch_deck.get("target_audience", ""))
+    # Slide 5: Competitive Landscape
     _add_competitors_slide(prs, pitch_deck.get("competitive_landscape", []))
+    # Slide 6: Key Characters
     _add_characters_slide(prs, pitch_deck.get("key_characters", []))
-
+    # Slides 7-9: Episode breakdown
     episode = pitch_deck.get("episode_breakdown", {})
     _add_narrative_arc_slide(prs, episode)
     _add_sequences_slide(prs, episode.get("key_sequences", []))
     _add_visual_approach_slide(prs, episode)
+    # Slide 10: Feasibility
+    _add_feasibility_slide(prs, pitch_deck.get("feasibility_summary", {}))
+    # Slide 11: Why Now
+    _add_why_now_slide(prs, pitch_deck.get("why_now", ""))
+    # Slide 12: Review Notes & Concerns
+    _add_review_slide(
+        prs,
+        pitch_deck.get("sp_review_notes", ""),
+        pitch_deck.get("unresolved_concerns", []),
+    )
 
     prs.save(str(path))
     return path
@@ -340,6 +356,90 @@ def _add_visual_approach_slide(prs: Presentation, episode: dict) -> None:
     p4.text = approach
     p4.font.size = BODY_SIZE
     p4.font.color.rgb = DARK_GREY
+
+
+def _add_feasibility_slide(prs: Presentation, feasibility: dict) -> None:
+    """Slide 10: Feasibility — rating, budget, days, risks."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_slide_heading(slide, "Feasibility")
+
+    rating = feasibility.get("feasibility_rating", "N/A").upper()
+    budget = feasibility.get("budget_bracket", {})
+    low = budget.get("low", "?")
+    high = budget.get("high", "?")
+    currency = budget.get("currency", "")
+    days = feasibility.get("shooting_days", "N/A")
+    risks = feasibility.get("key_risks", [])
+
+    txbox = slide.shapes.add_textbox(
+        LEFT_MARGIN, TOP_MARGIN, CONTENT_WIDTH, CONTENT_HEIGHT
+    )
+    tf = txbox.text_frame
+    tf.word_wrap = True
+
+    items = [
+        f"Rating: {rating}",
+        f"Budget: {currency} {low:,} - {high:,}" if isinstance(low, int) else f"Budget: {currency} {low} - {high}",
+        f"Shooting Days: {days}",
+    ]
+    for i, item in enumerate(items):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.text = item
+        p.font.size = BODY_SIZE
+        p.font.bold = True
+        p.font.color.rgb = DARK_GREY
+        p.space_after = Pt(8)
+
+    # Risks
+    if risks:
+        p_label = tf.add_paragraph()
+        p_label.text = "Key Risks:"
+        p_label.font.size = BODY_SIZE
+        p_label.font.bold = True
+        p_label.font.color.rgb = DARK_BLUE
+        p_label.space_before = Pt(12)
+
+        for risk in risks:
+            p_risk = tf.add_paragraph()
+            p_risk.text = f"  \u2022  {_truncate(risk)}"
+            p_risk.font.size = SMALL_SIZE
+            p_risk.font.color.rgb = DARK_GREY
+
+
+def _add_review_slide(
+    prs: Presentation, review_notes: str, concerns: list[str]
+) -> None:
+    """Slide 12: SP Review Notes & Unresolved Concerns."""
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_slide_heading(slide, "Review Notes & Concerns")
+
+    txbox = slide.shapes.add_textbox(
+        LEFT_MARGIN, TOP_MARGIN, CONTENT_WIDTH, CONTENT_HEIGHT
+    )
+    tf = txbox.text_frame
+    tf.word_wrap = True
+
+    # Review notes
+    p = tf.paragraphs[0]
+    p.text = review_notes
+    p.font.size = SMALL_SIZE
+    p.font.color.rgb = DARK_GREY
+    p.space_after = Pt(14)
+
+    # Concerns
+    if concerns:
+        p_label = tf.add_paragraph()
+        p_label.text = "Unresolved Concerns:"
+        p_label.font.size = BODY_SIZE
+        p_label.font.bold = True
+        p_label.font.color.rgb = DARK_BLUE
+        p_label.space_before = Pt(12)
+
+        for concern in concerns:
+            p_c = tf.add_paragraph()
+            p_c.text = f"  \u2022  {_truncate(concern)}"
+            p_c.font.size = SMALL_SIZE
+            p_c.font.color.rgb = DARK_GREY
 
 
 def _add_why_now_slide(prs: Presentation, why_now: str) -> None:

@@ -111,3 +111,24 @@ def test_sequences_table_slide(sample_pitch_deck, tmp_path):
     sequences = sample_pitch_deck["episode_breakdown"]["key_sequences"]
     assert len(table.rows) == 1 + len(sequences)
     assert len(table.columns) == 4
+
+
+def test_full_slide_count(sample_pitch_deck, tmp_path):
+    """Complete export produces exactly 12 slides."""
+    output = tmp_path / "deck.pptx"
+    export_pitch_deck(sample_pitch_deck, str(output))
+    prs = Presentation(str(output))
+    assert len(prs.slides) == 12
+
+
+def test_feasibility_slide(sample_pitch_deck, tmp_path):
+    """Slide 10 contains feasibility rating."""
+    output = tmp_path / "deck.pptx"
+    export_pitch_deck(sample_pitch_deck, str(output))
+    prs = Presentation(str(output))
+    slide = prs.slides[9]
+    slide_text = " ".join(
+        shape.text for shape in slide.shapes if shape.has_text_frame
+    )
+    rating = sample_pitch_deck["feasibility_summary"]["feasibility_rating"]
+    assert rating.upper() in slide_text.upper()
