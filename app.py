@@ -9,7 +9,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from src.commentary import CommentaryEngine
 from src.orchestrator import Orchestrator
+from src.provider import create_client, get_model_name, load_config
 from src.pptx_exporter import export_pitch_deck
 
 load_dotenv()
@@ -75,17 +77,37 @@ async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
     def sync_emit(event: dict) -> None:
         asyncio.run_coroutine_threadsafe(emit(event), loop)
 
+    # Set up live commentary engine (utility-tier LLM)
+    config = load_config("config.yaml")
+    commentary = CommentaryEngine(
+        client=create_client(config),
+        model=get_model_name(config, "utility"),
+        emit_callback=sync_emit,
+    )
+
+    def sync_emit_with_commentary(event: dict) -> None:
+        """Emit event to client AND feed it to the commentary engine."""
+        sync_emit(event)
+        commentary.ingest(event)
+
     await emit({"type": "pipeline_start", "brief": brief})
 
     def run_blocking():
         orchestrator = Orchestrator(config_path="config.yaml")
-        orchestrator.set_event_callback(sync_emit)
+        orchestrator.set_event_callback(sync_emit_with_commentary)
         return orchestrator.run(brief)
 
     try:
         result = await loop.run_in_executor(None, run_blocking)
 
         if result.success:
+            # Generate outro commentary before showing results
+            if result.pitch_deck:
+                outro_text = await loop.run_in_executor(
+                    None, commentary.generate_outro, result.pitch_deck
+                )
+                await emit({"type": "outro", "text": outro_text})
+
             # Generate PPTX
             import hashlib
             run_id = hashlib.md5(brief.encode()).hexdigest()[:12]
@@ -112,6 +134,8 @@ async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
             "type": "pipeline_error",
             "error": str(exc),
         })
+    finally:
+        commentary.shutdown()
 
 
 if __name__ == "__main__":
