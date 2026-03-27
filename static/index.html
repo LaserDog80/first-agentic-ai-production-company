@@ -377,15 +377,219 @@
             text-align: center;
         }
 
-        .result-content pre {
+        .result-actions {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .btn-download {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            padding: 14px 28px;
+            background: var(--green);
+            border: none;
+            color: #000;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: background 0.15s;
+        }
+
+        .btn-download:hover {
+            background: #6fe8c0;
+        }
+
+        /* ── RESULT TABS ── */
+        .result-tabs {
+            display: flex;
+            border-bottom: 3px solid var(--bg-light);
+            margin-bottom: 16px;
+            gap: 0;
+        }
+
+        .result-tab {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            padding: 10px 16px;
+            background: var(--bg-dark);
+            border: 2px solid var(--bg-light);
+            border-bottom: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+            margin-right: -2px;
+            position: relative;
+            bottom: -3px;
+        }
+
+        .result-tab:hover {
+            color: var(--text);
+            background: var(--bg-mid);
+        }
+
+        .result-tab.active {
+            color: var(--gold);
+            background: var(--bg-mid);
+            border-color: var(--gold);
+            border-bottom: 3px solid var(--bg-mid);
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.visible {
+            display: block;
+        }
+
+        /* ── PITCH DECK SECTIONS ── */
+        .deck-section {
+            margin-bottom: 16px;
+            border: 2px solid var(--bg-light);
+            padding: 12px;
+        }
+
+        .deck-section h3 {
+            font-size: 8px;
+            color: var(--gold);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .deck-section p, .deck-section li {
             font-family: 'Press Start 2P', monospace;
             font-size: 7px;
             line-height: 2;
             color: var(--text);
-            white-space: pre-wrap;
-            word-break: break-word;
-            max-height: 60vh;
-            overflow-y: auto;
+        }
+
+        .deck-section ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .deck-section li::before {
+            content: '> ';
+            color: var(--accent);
+        }
+
+        .deck-label {
+            font-size: 6px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .deck-value {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 7px;
+            line-height: 2;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .deck-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+        }
+
+        .deck-table th, .deck-table td {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 6px;
+            line-height: 2;
+            padding: 4px 6px;
+            text-align: left;
+            border-bottom: 1px solid var(--bg-light);
+        }
+
+        .deck-table th {
+            color: var(--gold);
+            text-transform: uppercase;
+        }
+
+        .deck-table td {
+            color: var(--text);
+        }
+
+        .feasibility-badge {
+            display: inline-block;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            padding: 4px 12px;
+            border: 2px solid;
+            text-transform: uppercase;
+        }
+
+        .feasibility-badge.green { color: var(--green); border-color: var(--green); }
+        .feasibility-badge.amber { color: var(--gold); border-color: var(--gold); }
+        .feasibility-badge.red { color: var(--accent); border-color: var(--accent); }
+
+        /* ── EVIDENCE TRAIL ── */
+        .evidence-narrative {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 7px;
+            line-height: 2.4;
+            color: var(--text);
+        }
+
+        .evidence-intro {
+            color: var(--text);
+            margin-bottom: 16px;
+            padding: 10px 12px;
+            border: 2px solid var(--bg-light);
+            background: var(--bg-dark);
+        }
+
+        .evidence-chapter {
+            margin-bottom: 14px;
+            padding-left: 12px;
+            border-left: 3px solid var(--bg-light);
+        }
+
+        .evidence-chapter.has-tools {
+            border-left-color: #7ec8e3;
+        }
+
+        .evidence-chapter.has-rework {
+            border-left-color: var(--accent);
+        }
+
+        .evidence-who {
+            color: var(--gold);
+            margin-bottom: 2px;
+        }
+
+        .evidence-what {
+            color: var(--text);
+        }
+
+        .evidence-tools {
+            color: #7ec8e3;
+            font-style: italic;
+        }
+
+        .evidence-time {
+            color: var(--text-dim);
+            font-size: 6px;
+        }
+
+        .evidence-footer {
+            margin-top: 12px;
+            padding-top: 8px;
+            border-top: 1px solid var(--bg-light);
+            color: var(--text-dim);
+            font-size: 7px;
+        }
+
+        .evidence-rework-note {
+            color: var(--accent);
+            margin-top: 8px;
+            padding: 8px 12px;
+            border: 2px solid var(--accent);
+            background: rgba(233,69,96,0.1);
         }
 
         .result-close {
@@ -453,7 +657,15 @@
     <div class="result-overlay" id="resultOverlay">
         <div class="result-content">
             <h2>PITCH DECK COMPLETE</h2>
-            <pre id="resultText"></pre>
+            <div class="result-actions" id="resultActions"></div>
+            <div class="result-tabs" id="resultTabs">
+                <button class="result-tab active" onclick="switchTab('deck')">PITCH DECK</button>
+                <button class="result-tab" onclick="switchTab('evidence')">EVIDENCE TRAIL</button>
+                <button class="result-tab" onclick="switchTab('json')">RAW JSON</button>
+            </div>
+            <div class="tab-panel visible" id="tabDeck"></div>
+            <div class="tab-panel" id="tabEvidence"></div>
+            <div class="tab-panel" id="tabJson"></div>
             <button class="result-close" onclick="closeResult()">CLOSE</button>
         </div>
     </div>
@@ -748,7 +960,7 @@
                 setStatus('Pitch deck complete!', 100);
                 setStep(9, 9);
                 addLog('agent_done', 'Pipeline complete!');
-                showResult(event.pitch_deck);
+                showResult(event.pitch_deck, event.download_url, event.evidence);
                 isRunning = false;
                 document.getElementById('runBtn').disabled = false;
                 if (ws) ws.close();
@@ -841,11 +1053,274 @@
         return event.message || 'Working...';
     }
 
-    function showResult(pitchDeck) {
+    function showResult(pitchDeck, downloadUrl, evidence) {
         const overlay = document.getElementById('resultOverlay');
-        const text = document.getElementById('resultText');
-        text.textContent = JSON.stringify(pitchDeck, null, 2);
+        const actions = document.getElementById('resultActions');
+
+        window._lastPitchDeck = pitchDeck;
+
+        // -- Download button --
+        actions.innerHTML = downloadUrl
+            ? `<a class="btn-download" href="${downloadUrl}" download="pitch_deck.pptx">DOWNLOAD PPTX</a>`
+            : '';
+
+        // -- Populate tab panels --
+        document.getElementById('tabDeck').innerHTML = renderDeck(pitchDeck);
+        document.getElementById('tabEvidence').innerHTML = renderEvidence(evidence);
+        document.getElementById('tabJson').innerHTML = `<pre style="font-family:'Press Start 2P',monospace;font-size:7px;line-height:2;color:var(--text);white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow-y:auto">${esc(JSON.stringify(pitchDeck, null, 2))}</pre>`;
+
+        // -- Reset to first tab --
+        switchTab('deck');
+
         overlay.classList.add('visible');
+    }
+
+    function switchTab(tabName) {
+        const tabs = document.querySelectorAll('.result-tab');
+        const panels = { deck: 'tabDeck', evidence: 'tabEvidence', json: 'tabJson' };
+
+        tabs.forEach(t => t.classList.remove('active'));
+        Object.values(panels).forEach(id => document.getElementById(id).classList.remove('visible'));
+
+        document.getElementById(panels[tabName]).classList.add('visible');
+        // Activate the matching tab button
+        const tabIndex = { deck: 0, evidence: 1, json: 2 };
+        tabs[tabIndex[tabName]].classList.add('active');
+    }
+
+    function renderDeck(deck) {
+        if (!deck) return '<p style="color:var(--accent)">No pitch deck data returned.</p>';
+        console.log('renderDeck input:', JSON.stringify(deck).slice(0, 500));
+        try { return _renderDeckInner(deck); }
+        catch (e) {
+            console.error('renderDeck error:', e);
+            return `<p style="color:var(--accent)">Error rendering deck: ${esc(e.message)}</p><pre style="font-family:'Press Start 2P',monospace;font-size:7px;line-height:2;color:var(--text);white-space:pre-wrap;word-break:break-word">${esc(JSON.stringify(deck, null, 2))}</pre>`;
+        }
+    }
+
+    function _renderDeckInner(deck) {
+        let html = '';
+
+        // Title page
+        const tp = deck.title_page;
+        if (tp) {
+            html += `<div class="deck-section">
+                <h3>${esc(tp.working_title || 'Untitled')}</h3>
+                <div class="deck-label">Genre</div><div class="deck-value">${esc(tp.genre || '')}</div>
+                <div class="deck-label">Format</div><div class="deck-value">${esc(tp.format || '')}</div>
+                <div class="deck-label">Target Broadcaster</div><div class="deck-value">${esc(tp.target_broadcaster || '')}</div>
+            </div>`;
+        }
+
+        // Logline
+        if (deck.logline) {
+            html += `<div class="deck-section">
+                <h3>Logline</h3>
+                <p>${esc(deck.logline)}</p>
+            </div>`;
+        }
+
+        // Format & tone
+        const ft = deck.format_and_tone;
+        if (ft) {
+            html += `<div class="deck-section">
+                <h3>Format & Tone</h3>
+                <div class="deck-label">Series Length</div><div class="deck-value">${esc(ft.series_length || '')}</div>
+                <div class="deck-label">Genre</div><div class="deck-value">${esc(ft.genre || '')}</div>
+                <div class="deck-label">Tone</div><div class="deck-value">${esc(ft.tone || '')}</div>
+            </div>`;
+        }
+
+        // Target audience
+        if (deck.target_audience) {
+            html += `<div class="deck-section">
+                <h3>Target Audience</h3>
+                <p>${esc(deck.target_audience)}</p>
+            </div>`;
+        }
+
+        // Competitive landscape
+        if (deck.competitive_landscape && deck.competitive_landscape.length) {
+            html += `<div class="deck-section">
+                <h3>Competitive Landscape</h3>
+                <table class="deck-table">
+                    <tr><th>Title</th><th>Broadcaster</th><th>Year</th><th>Relevance</th></tr>
+                    ${deck.competitive_landscape.map(c => `<tr><td>${esc(c.title)}</td><td>${esc(c.broadcaster)}</td><td>${esc(c.year)}</td><td>${esc(c.relevance)}</td></tr>`).join('')}
+                </table>
+            </div>`;
+        }
+
+        // Key characters
+        if (deck.key_characters && deck.key_characters.length) {
+            html += `<div class="deck-section">
+                <h3>Key Characters</h3>
+                <table class="deck-table">
+                    <tr><th>Name</th><th>Role</th><th>Story Angle</th></tr>
+                    ${deck.key_characters.map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.role)}</td><td>${esc(c.story_angle)}</td></tr>`).join('')}
+                </table>
+            </div>`;
+        }
+
+        // Episode breakdown
+        const eb = deck.episode_breakdown;
+        if (eb) {
+            html += `<div class="deck-section">
+                <h3>Episode: ${esc(eb.episode_title || '')}</h3>`;
+            if (eb.narrative_arc) {
+                const na = eb.narrative_arc;
+                html += `<div class="deck-label">Opening</div><div class="deck-value">${esc(na.opening)}</div>
+                    <div class="deck-label">Development</div><div class="deck-value">${esc(na.development)}</div>
+                    <div class="deck-label">Climax</div><div class="deck-value">${esc(na.climax)}</div>
+                    <div class="deck-label">Resolution</div><div class="deck-value">${esc(na.resolution)}</div>`;
+            }
+            if (eb.key_sequences && eb.key_sequences.length) {
+                html += `<div class="deck-label" style="margin-top:8px">Key Sequences</div>
+                    <table class="deck-table">
+                        <tr><th>Sequence</th><th>Style</th><th>Mins</th></tr>
+                        ${eb.key_sequences.map(s => `<tr><td>${esc(s.name)}<br><span style="color:var(--text-dim)">${esc(s.description)}</span></td><td>${esc(s.visual_style)}</td><td>${s.duration_mins}</td></tr>`).join('')}
+                    </table>`;
+            }
+            if (eb.visual_approach) {
+                html += `<div class="deck-label" style="margin-top:8px">Visual Approach</div><div class="deck-value">${esc(eb.visual_approach)}</div>`;
+            }
+            html += `</div>`;
+        }
+
+        // Feasibility
+        const fs = deck.feasibility_summary;
+        if (fs) {
+            const rating = fs.feasibility_rating || 'green';
+            html += `<div class="deck-section">
+                <h3>Feasibility</h3>
+                <span class="feasibility-badge ${rating}">${rating}</span>
+                <div style="margin-top:8px">
+                    <div class="deck-label">Shooting Days</div><div class="deck-value">${fs.shooting_days || '?'}</div>`;
+            if (fs.budget_bracket) {
+                const bb = fs.budget_bracket;
+                html += `<div class="deck-label">Budget</div><div class="deck-value">${bb.currency || ''} ${(bb.low || 0).toLocaleString()} – ${(bb.high || 0).toLocaleString()}</div>
+                    <div class="deck-label">Notes</div><div class="deck-value">${esc(bb.notes || '')}</div>`;
+            }
+            if (fs.key_risks && fs.key_risks.length) {
+                html += `<div class="deck-label">Key Risks</div><ul>${fs.key_risks.map(r => `<li>${esc(r)}</li>`).join('')}</ul>`;
+            }
+            html += `</div></div>`;
+        }
+
+        // Why now
+        if (deck.why_now) {
+            html += `<div class="deck-section">
+                <h3>Why Now?</h3>
+                <p>${esc(deck.why_now)}</p>
+            </div>`;
+        }
+
+        // SP review notes
+        if (deck.sp_review_notes) {
+            html += `<div class="deck-section">
+                <h3>Series Producer Review</h3>
+                <p>${esc(deck.sp_review_notes)}</p>
+            </div>`;
+        }
+
+        // Unresolved concerns
+        if (deck.unresolved_concerns && deck.unresolved_concerns.length) {
+            html += `<div class="deck-section">
+                <h3>Unresolved Concerns</h3>
+                <ul>${deck.unresolved_concerns.map(c => `<li>${esc(c)}</li>`).join('')}</ul>
+            </div>`;
+        }
+
+        return html;
+    }
+
+    const AGENT_NAMES = {
+        series_producer: 'The Series Producer',
+        producer: 'The Producer',
+        researcher: 'The Researcher',
+        director: 'The Director',
+        production_manager: 'The Production Manager',
+        evidence_generator: 'The Evidence Generator',
+    };
+
+    const PHASE_VERBS = {
+        phase_a: 'read the brief and shaped the editorial vision',
+        briefing: 'broke the vision down into specialist assignments',
+        research: 'went out into the world to gather facts',
+        treatment: 'crafted the creative treatment and narrative arc',
+        feasibility: 'ran the numbers on budget, crew, and logistics',
+        collation: 'pulled everything together into an episode package',
+        phase_b: 'reviewed the full package and made the final call',
+        evidence: 'compiled the evidence trail',
+    };
+
+    function renderEvidence(evidence) {
+        if (!evidence) return '<p style="color:var(--text-dim);font-size:7px">No evidence trail available for this run.</p>';
+
+        let html = '<div class="evidence-narrative">';
+
+        // Intro
+        if (evidence.pipeline_summary) {
+            html += `<div class="evidence-intro">${esc(evidence.pipeline_summary)}</div>`;
+        }
+
+        // Story steps
+        if (evidence.steps && evidence.steps.length) {
+            evidence.steps.forEach((step) => {
+                const who = AGENT_NAMES[step.agent_name] || step.agent_name;
+                const verb = PHASE_VERBS[step.phase] || step.phase;
+                const hasTools = step.tools_used && step.tools_used.length > 0;
+                const cls = hasTools ? 'evidence-chapter has-tools' : 'evidence-chapter';
+                const secs = (step.duration_ms / 1000).toFixed(1);
+
+                html += `<div class="${cls}">`;
+                html += `<div class="evidence-who">${esc(who)}</div>`;
+                html += `<div class="evidence-what">${esc(who)} ${esc(verb)}.</div>`;
+
+                if (step.what_received) {
+                    html += `<div class="evidence-what">Starting from: ${esc(step.what_received)}</div>`;
+                }
+                if (step.what_produced) {
+                    html += `<div class="evidence-what">They delivered: ${esc(step.what_produced)}</div>`;
+                }
+                if (hasTools) {
+                    const toolStr = step.tools_used.length === 1
+                        ? `using ${esc(step.tools_used[0])}`
+                        : `using ${step.tools_used.slice(0, -1).map(esc).join(', ')} and ${esc(step.tools_used[step.tools_used.length - 1])}`;
+                    html += `<div class="evidence-tools">${toolStr}</div>`;
+                }
+                html += `<div class="evidence-time">${secs}s</div>`;
+                html += `</div>`;
+            });
+        }
+
+        // Rework details
+        if (evidence.rework_count > 0 && evidence.rework_details && evidence.rework_details.length) {
+            html += `<div class="evidence-rework-note">`;
+            html += `The Series Producer sent work back ${evidence.rework_count} time${evidence.rework_count > 1 ? 's' : ''}:`;
+            evidence.rework_details.forEach(d => {
+                html += `<br>&gt; ${esc(d)}`;
+            });
+            html += `</div>`;
+        }
+
+        // Footer
+        if (evidence.total_duration_ms) {
+            const totalSecs = (evidence.total_duration_ms / 1000).toFixed(1);
+            const mins = Math.floor(totalSecs / 60);
+            const remSecs = (totalSecs % 60).toFixed(0);
+            const timeStr = mins > 0 ? `${mins}m ${remSecs}s` : `${totalSecs}s`;
+            html += `<div class="evidence-footer">The entire pipeline took ${timeStr} from brief to pitch deck.</div>`;
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    function esc(str) {
+        if (str == null) return '';
+        const div = document.createElement('div');
+        div.textContent = String(str);
+        return div.innerHTML;
     }
 
     function closeResult() {
@@ -875,7 +1350,7 @@
             { type: 'agent_done', agent: 'producer', phase: 'collation', message: 'Episode package assembled.' },
             { type: 'agent_start', agent: 'series_producer', phase: 'phase_b', step: 7, total_steps: 9, message: 'Reviewing the episode package...' },
             { type: 'agent_done', agent: 'series_producer', phase: 'phase_b', message: 'Pitch deck approved!' },
-            { type: 'pipeline_complete', pitch_deck: { title_page: 'Keepers of the Light', logline: 'A 3x60 documentary exploring the vanishing world of lighthouse keepers.' } },
+            { type: 'pipeline_complete', pitch_deck: { title_page: { working_title: 'Keepers of the Light', genre: 'Documentary', format: '3x60', target_broadcaster: 'BBC Two' }, logline: 'A 3x60 documentary exploring the vanishing world of lighthouse keepers.' }, download_url: null, evidence: { pipeline_summary: 'Demo run — no real agents executed.', steps: [], total_duration_ms: 0, rework_count: 0, rework_details: [] } },
         ];
 
         let i = 0;
