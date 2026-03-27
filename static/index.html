@@ -265,6 +265,10 @@
             text-shadow: 1px 1px 0 #000;
             position: relative;
             z-index: 2;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+            line-height: 1.6;
         }
 
         .char-role {
@@ -272,6 +276,10 @@
             color: var(--text-dim);
             text-align: center;
             margin-top: 3px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+            line-height: 1.6;
         }
 
         /* ── STATUS BAR ── */
@@ -604,6 +612,230 @@
             margin: 16px auto 0;
         }
 
+        /* ── INTRO OVERLAY ── */
+        .intro-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 200;
+            background: linear-gradient(
+                to bottom,
+                var(--bg-dark) 0%,
+                var(--bg-dark) 55%,
+                rgba(26,26,46,0.7) 75%,
+                rgba(26,26,46,0) 100%
+            );
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 40px 20px 20px;
+            min-height: 50vh;
+            transition: opacity 0.8s;
+        }
+
+        .intro-overlay.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .intro-overlay.hidden {
+            display: none;
+        }
+
+        .intro-text-area {
+            max-width: 640px;
+            width: 100%;
+            text-align: left;
+            margin-bottom: 20px;
+            max-height: 55vh;
+            overflow-y: auto;
+            scrollbar-width: none;
+        }
+
+        .intro-text-area::-webkit-scrollbar {
+            display: none;
+        }
+
+        .intro-line {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 9px;
+            line-height: 2;
+            color: var(--text);
+            opacity: 0;
+            transform: translateY(6px);
+            transition: opacity 0.4s, transform 0.4s;
+            margin-bottom: 8px;
+        }
+
+        .intro-line.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .intro-line.highlight-line {
+            color: var(--gold);
+        }
+
+        .intro-cursor {
+            display: inline-block;
+            width: 7px;
+            height: 11px;
+            background: var(--gold);
+            animation: blink 0.6s step-end infinite;
+            vertical-align: middle;
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .intro-skip {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            padding: 10px 20px;
+            background: transparent;
+            border: 2px solid var(--text-dim);
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: color 0.2s, border-color 0.2s;
+            margin-top: auto;
+        }
+
+        .intro-skip:hover {
+            color: var(--gold);
+            border-color: var(--gold);
+        }
+
+        /* Highlight glow on characters during intro */
+        .character-slot.intro-highlight .pixel-character {
+            filter: drop-shadow(0 0 12px var(--gold));
+            animation: bounce 0.6s ease-in-out infinite;
+        }
+
+        .character-slot.intro-dim {
+            opacity: 0.35;
+            transition: opacity 0.5s;
+        }
+
+        /* Hide input area until intro is done — use visibility to reserve space */
+        .input-area.intro-hidden {
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        /* ── NARRATION BAR ── */
+        .narration-bar {
+            background: var(--bg-mid);
+            border-left: 4px solid var(--gold);
+            padding: 12px 24px;
+            min-height: 36px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            line-height: 2.2;
+            color: var(--text);
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.4s;
+            margin: 0 20px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .narration-bar.visible {
+            opacity: 1;
+        }
+
+        .narration-cursor {
+            display: inline-block;
+            width: 6px;
+            height: 10px;
+            background: var(--gold);
+            animation: blink 0.6s step-end infinite;
+            vertical-align: middle;
+            margin-left: 2px;
+        }
+
+        /* ── OUTRO BLOCK (in result overlay) ── */
+        .outro-block {
+            border-left: 4px solid var(--gold);
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            line-height: 2.2;
+            color: var(--text);
+            background: var(--bg-dark);
+        }
+
+        /* ── SPOTLIGHT OUTRO ── */
+        .spotlight-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 150;
+            background: rgba(0,0,0,0);
+            transition: background 1s;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .spotlight-overlay.visible {
+            display: flex;
+            background: rgba(0,0,0,0.92);
+        }
+
+        .spotlight-text {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            line-height: 2.4;
+            color: var(--gold);
+            text-align: center;
+            max-width: 600px;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.6s, transform 0.6s;
+        }
+
+        .spotlight-text.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .spotlight-cursor {
+            display: inline-block;
+            width: 9px;
+            height: 15px;
+            background: var(--gold);
+            animation: blink 0.6s step-end infinite;
+            vertical-align: middle;
+            margin-left: 3px;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 8px rgba(78,204,163,0.4); }
+            50% { box-shadow: 0 0 24px rgba(78,204,163,0.8); }
+        }
+
+        .spotlight-continue {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            padding: 18px 36px;
+            background: var(--green);
+            border: none;
+            color: #000;
+            cursor: pointer;
+            margin-top: 32px;
+            transition: box-shadow 0.3s;
+            animation: pulse-glow 1.5s ease-in-out infinite;
+        }
+
+        .spotlight-continue:hover {
+            box-shadow: 0 0 30px rgba(78,204,163,0.9);
+        }
+
         /* ── RESPONSIVE ── */
         @media (max-width: 900px) {
             .stage {
@@ -626,16 +858,25 @@
 </head>
 <body>
 
+    <div class="intro-overlay" id="introOverlay">
+        <div class="intro-text-area" id="introTextArea"></div>
+        <button class="intro-skip" id="introSkip" onclick="skipIntro()">SKIP INTRO &gt;</button>
+    </div>
+
     <div class="header">
         <h1>THE AGENTIC PRODUCTION CO.</h1>
         <p>AI agents collaborate to turn your idea into a pitch deck</p>
     </div>
 
-    <div class="input-area">
+    <div class="input-area intro-hidden" id="inputArea">
         <input type="text" id="briefInput"
                placeholder="Enter a show idea... e.g. A 3x60 doc about lighthouse keepers"
                autocomplete="off">
         <button id="runBtn" onclick="startPipeline()">GO!</button>
+    </div>
+
+    <div class="narration-bar" id="narrationBar">
+        <span id="narrationText"></span>
     </div>
 
     <div class="stage" id="stage">
@@ -654,9 +895,15 @@
 
     <div class="log-panel" id="logPanel"></div>
 
+    <div class="spotlight-overlay" id="spotlightOverlay">
+        <div class="spotlight-text" id="spotlightText"></div>
+        <button class="spotlight-continue" id="spotlightContinue" onclick="dismissSpotlight()" style="opacity:0;transition:opacity 0.6s">SEE THE FULL DECK &gt;</button>
+    </div>
+
     <div class="result-overlay" id="resultOverlay">
         <div class="result-content">
             <h2>PITCH DECK COMPLETE</h2>
+            <div class="outro-block" id="outroBlock" style="display:none"></div>
             <div class="result-actions" id="resultActions"></div>
             <div class="result-tabs" id="resultTabs">
                 <button class="result-tab active" onclick="switchTab('deck')">PITCH DECK</button>
@@ -677,28 +924,30 @@
             id: 'series_producer',
             name: 'SERIES PRODUCER',
             role: 'Editorial Vision',
-            // Pixel art: person with glasses and dark suit
+            // Pixel art: professional woman with glasses and blazer
             pixels: [
-                // Hair (dark)
-                { color: '#2c1810', coords: [[2,0],[3,0],[4,0],[5,0],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1]] },
+                // Hair (dark brown, longer — frames face)
+                { color: '#2c1810', coords: [[2,-1],[3,-1],[4,-1],[5,-1],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[0,2],[1,2],[6,2],[7,2],[0,3],[7,3],[0,4],[7,4],[0,5],[7,5]] },
                 // Face (skin)
                 { color: '#f4c089', coords: [[2,2],[3,2],[4,2],[5,2],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[5,4]] },
                 // Glasses
-                { color: '#333', coords: [[1,3],[6,3]] },
+                { color: '#6a5acd', coords: [[1,3],[6,3]] },
                 // Eyes
                 { color: '#1a1a1a', coords: [[3,3],[5,3]] },
-                // Mouth
-                { color: '#c4785a', coords: [[3,4],[4,4]] },
-                // Suit (dark blue)
-                { color: '#1a237e', coords: [[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[1,8],[2,8],[5,8],[6,8]] },
-                // Tie
-                { color: '#e94560', coords: [[3,5],[4,5],[3,6],[4,6],[4,7]] },
+                // Lips
+                { color: '#d4636a', coords: [[3,4],[4,4]] },
+                // Blazer (dark navy)
+                { color: '#1a237e', coords: [[1,5],[2,5],[5,5],[6,5],[1,6],[2,6],[5,6],[6,6],[1,7],[2,7],[5,7],[6,7],[1,8],[2,8],[5,8],[6,8]] },
+                // Blouse (cream)
+                { color: '#f5f0e8', coords: [[3,5],[4,5],[3,6],[4,6],[3,7],[4,7]] },
+                // Necklace accent
+                { color: '#f5c542', coords: [[3,5],[4,5]] },
                 // Hands (skin)
                 { color: '#f4c089', coords: [[0,8],[7,8]] },
-                // Pants
+                // Skirt (dark)
                 { color: '#0d1b4a', coords: [[2,9],[3,9],[4,9],[5,9],[2,10],[3,10],[4,10],[5,10]] },
-                // Shoes
-                { color: '#222', coords: [[1,11],[2,11],[3,11],[4,11],[5,11],[6,11]] },
+                // Shoes (heels)
+                { color: '#1a237e', coords: [[1,11],[2,11],[3,11],[4,11],[5,11],[6,11]] },
             ]
         },
         {
@@ -766,26 +1015,27 @@
             id: 'director',
             name: 'DIRECTOR',
             role: 'Creative Visionary',
+            // Pixel art: creative woman with beret and flowing hair
             pixels: [
                 // Beret
                 { color: '#880e4f', coords: [[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[2,-1],[3,-1],[4,-1]] },
-                // Hair
-                { color: '#212121', coords: [[1,1],[2,1],[3,1],[4,1],[5,1],[6,1]] },
+                // Hair (dark, longer — flows past face)
+                { color: '#1a1a1a', coords: [[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[0,2],[7,2],[0,3],[7,3],[0,4],[7,4],[0,5],[7,5],[0,6],[7,6]] },
                 // Face
                 { color: '#e8b88a', coords: [[2,2],[3,2],[4,2],[5,2],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[5,4]] },
-                // Sunglasses
+                // Sunglasses (stylish, slightly wider)
                 { color: '#111', coords: [[2,3],[3,3],[5,3],[6,3]] },
-                // Beard stubble
-                { color: '#555', coords: [[3,4],[4,4],[5,4]] },
+                // Lips
+                { color: '#c4505a', coords: [[3,4],[4,4]] },
                 // Turtleneck (black)
-                { color: '#212121', coords: [[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[1,8],[2,8],[5,8],[6,8]] },
-                // Scarf accent
-                { color: '#e94560', coords: [[3,5],[4,5]] },
+                { color: '#212121', coords: [[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[1,8],[2,8],[5,8],[6,8]] },
+                // Scarf accent (red)
+                { color: '#e94560', coords: [[3,5],[4,5],[3,6],[4,6]] },
                 // Hands
                 { color: '#e8b88a', coords: [[0,8],[7,8]] },
-                // Pants (slim)
+                // Slim trousers
                 { color: '#1a1a1a', coords: [[2,9],[3,9],[4,9],[5,9],[2,10],[3,10],[4,10],[5,10]] },
-                // Shoes (stylish)
+                // Boots (stylish)
                 { color: '#4e342e', coords: [[1,11],[2,11],[3,11],[4,11],[5,11],[6,11]] },
             ]
         },
@@ -826,6 +1076,73 @@
     // ── STATE ──
     let ws = null;
     let isRunning = false;
+    let introComplete = false;
+    let narrationInterval = null;
+    let outroText = null;
+
+    // ── INTRO SCRIPT ──
+    const INTRO_SCRIPT = [
+        {
+            text: "Welcome to The Agentic Production Company.",
+            highlight: null,
+            pause: 2000
+        },
+        {
+            text: "You're about to watch something different.",
+            highlight: null,
+            pause: 1500
+        },
+        {
+            text: "This isn't one AI answering a question. These are five independent AI agents — each running its own large language model.",
+            highlight: null,
+            pause: 3000
+        },
+        {
+            text: "Each agent reasons on its own, uses real tools, and makes its own decisions. That's what \"agentic\" means.",
+            highlight: null,
+            pause: 3000
+        },
+        {
+            text: "They collaborate like a real production team — passing work between them, building on each other's output.",
+            highlight: null,
+            pause: 3000
+        },
+        {
+            text: "Meet the Series Producer. She sets the editorial vision and has the final say on quality.",
+            highlight: "series_producer",
+            pause: 2500
+        },
+        {
+            text: "The Producer. He coordinates the team, creates specialist briefs, and assembles the final package.",
+            highlight: "producer",
+            pause: 2500
+        },
+        {
+            text: "The Researcher. An independent LLM agent that searches the real web for facts, competitors, and locations.",
+            highlight: "researcher",
+            pause: 2500
+        },
+        {
+            text: "The Director. She crafts the narrative arc, visual approach, and key sequences.",
+            highlight: "director",
+            pause: 2500
+        },
+        {
+            text: "The Production Manager. His own AI agent running the numbers — budget, crew, shooting days, logistics.",
+            highlight: "production_manager",
+            pause: 2500
+        },
+        {
+            text: "The Series Producer can even send work back if quality isn't good enough. Real feedback loops between independent agents.",
+            highlight: "series_producer",
+            pause: 2500
+        },
+        {
+            text: "Enter a show idea below and watch them work.",
+            highlight: null,
+            pause: 0
+        }
+    ];
 
     // ── INIT ──
     function init() {
@@ -851,6 +1168,214 @@
 
         document.getElementById('briefInput').addEventListener('keypress', e => {
             if (e.key === 'Enter') startPipeline();
+        });
+
+        // Check if user has seen intro before
+        if (localStorage.getItem('introSeen')) {
+            finishIntro();
+        } else {
+            runIntro();
+        }
+    }
+
+    // ── INTRO ENGINE (stacked narrative) ──
+    let introTimer = null;
+    let introTypeInterval = null;
+    let introIndex = 0;
+
+    function runIntro() {
+        // Dim all characters initially
+        CHARACTERS.forEach(c => {
+            const slot = document.getElementById(`slot-${c.id}`);
+            if (slot) slot.classList.add('intro-dim');
+        });
+        introIndex = 0;
+        playIntroLine();
+    }
+
+    function playIntroLine() {
+        if (introIndex >= INTRO_SCRIPT.length) {
+            localStorage.setItem('introSeen', '1');
+            endIntroAnimation();
+            return;
+        }
+
+        const frame = INTRO_SCRIPT[introIndex];
+        const area = document.getElementById('introTextArea');
+
+        // Create a new line element
+        const line = document.createElement('div');
+        line.className = 'intro-line' + (frame.highlight ? ' highlight-line' : '');
+        area.appendChild(line);
+
+        // Update character highlights
+        CHARACTERS.forEach(c => {
+            const slot = document.getElementById(`slot-${c.id}`);
+            if (!slot) return;
+            slot.classList.remove('intro-highlight');
+            if (frame.highlight && c.id === frame.highlight) {
+                slot.classList.remove('intro-dim');
+                slot.classList.add('intro-highlight');
+            } else if (frame.highlight) {
+                slot.classList.add('intro-dim');
+            } else {
+                slot.classList.remove('intro-dim');
+            }
+        });
+
+        // Typewriter into this line
+        let i = 0;
+        const cursor = '<span class="intro-cursor"></span>';
+        if (introTypeInterval) clearInterval(introTypeInterval);
+
+        introTypeInterval = setInterval(() => {
+            if (i < frame.text.length) {
+                line.innerHTML = escHtml(frame.text.slice(0, i + 1)) + cursor;
+                i++;
+                // Keep scrolled to bottom as text types
+                area.scrollTop = area.scrollHeight;
+            } else {
+                clearInterval(introTypeInterval);
+                introTypeInterval = null;
+                line.innerHTML = escHtml(frame.text);
+                line.classList.add('visible');
+
+                area.scrollTop = area.scrollHeight;
+
+                // Pause then advance
+                const pause = frame.pause || 1500;
+                introTimer = setTimeout(() => {
+                    introIndex++;
+                    playIntroLine();
+                }, pause);
+            }
+        }, 30);
+
+        // Make line visible immediately (for typewriter to show)
+        requestAnimationFrame(() => line.classList.add('visible'));
+    }
+
+    function escHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    function endIntroAnimation() {
+        const overlay = document.getElementById('introOverlay');
+        overlay.classList.add('fade-out');
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+            finishIntro();
+        }, 800);
+    }
+
+    function skipIntro() {
+        if (introTimer) clearTimeout(introTimer);
+        if (introTypeInterval) clearInterval(introTypeInterval);
+        localStorage.setItem('introSeen', '1');
+        const overlay = document.getElementById('introOverlay');
+        overlay.classList.add('hidden');
+        finishIntro();
+    }
+
+    function finishIntro() {
+        introComplete = true;
+        const inputArea = document.getElementById('inputArea');
+        inputArea.classList.remove('intro-hidden');
+        // Focus the input to invite typing
+        document.getElementById('briefInput').focus();
+        document.getElementById('introOverlay').classList.add('hidden');
+        CHARACTERS.forEach(c => {
+            const slot = document.getElementById(`slot-${c.id}`);
+            if (slot) slot.classList.remove('intro-dim', 'intro-highlight');
+        });
+    }
+
+    // ── NARRATION BAR ──
+    function showNarration(text) {
+        const bar = document.getElementById('narrationBar');
+        const textEl = document.getElementById('narrationText');
+
+        // Cancel any ongoing narration typewriter
+        if (narrationInterval) clearInterval(narrationInterval);
+
+        bar.classList.add('visible');
+        let i = 0;
+        const cursor = '<span class="narration-cursor"></span>';
+        narrationInterval = setInterval(() => {
+            if (i < text.length) {
+                textEl.innerHTML = esc(text.slice(0, i + 1)) + cursor;
+                i++;
+            } else {
+                clearInterval(narrationInterval);
+                narrationInterval = null;
+                textEl.innerHTML = esc(text);
+            }
+        }, 20);
+    }
+
+    function hideNarration() {
+        const bar = document.getElementById('narrationBar');
+        bar.classList.remove('visible');
+    }
+
+    // ── SPOTLIGHT OUTRO ──
+    let spotlightTypeInterval = null;
+
+    function showSpotlight() {
+        const overlay = document.getElementById('spotlightOverlay');
+        const textEl = document.getElementById('spotlightText');
+        const continueBtn = document.getElementById('spotlightContinue');
+
+        // Hide narration bar
+        hideNarration();
+
+        // Show overlay with dim effect
+        overlay.style.display = 'flex';
+        requestAnimationFrame(() => {
+            overlay.classList.add('visible');
+        });
+
+        // Beat of silence (1.5s), then typewriter the outro text
+        const text = outroText || 'Five AI agents just turned a single sentence into a pitch deck.';
+        setTimeout(() => {
+            textEl.classList.add('visible');
+            // Typewriter in gold
+            let i = 0;
+            const cursor = '<span class="spotlight-cursor"></span>';
+            spotlightTypeInterval = setInterval(() => {
+                if (i < text.length) {
+                    textEl.innerHTML = escHtml(text.slice(0, i + 1)) + cursor;
+                    i++;
+                } else {
+                    clearInterval(spotlightTypeInterval);
+                    spotlightTypeInterval = null;
+                    textEl.innerHTML = escHtml(text);
+                    // Show continue button after typing finishes
+                    setTimeout(() => {
+                        continueBtn.style.opacity = '1';
+                    }, 800);
+                }
+            }, 35);
+        }, 1500);
+    }
+
+    function dismissSpotlight() {
+        if (spotlightTypeInterval) clearInterval(spotlightTypeInterval);
+        const overlay = document.getElementById('spotlightOverlay');
+        // Show the result overlay FIRST (behind the spotlight)
+        const r = window._pendingResult;
+        if (r) {
+            showResult(r.pitchDeck, r.downloadUrl, r.evidence);
+            window._pendingResult = null;
+        }
+        // Then fade out the spotlight on top
+        requestAnimationFrame(() => {
+            overlay.classList.remove('visible');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 400);
         });
     }
 
@@ -878,6 +1403,7 @@
 
     // ── PIPELINE ──
     function startPipeline() {
+        if (!introComplete) return;
         const input = document.getElementById('briefInput');
         const brief = input.value.trim();
         if (!brief || isRunning) return;
@@ -960,10 +1486,16 @@
                 setStatus('Pitch deck complete!', 100);
                 setStep(9, 9);
                 addLog('agent_done', 'Pipeline complete!');
-                showResult(event.pitch_deck, event.download_url, event.evidence);
                 isRunning = false;
                 document.getElementById('runBtn').disabled = false;
                 if (ws) ws.close();
+                // Store result data for after spotlight
+                window._pendingResult = {
+                    pitchDeck: event.pitch_deck,
+                    downloadUrl: event.download_url,
+                    evidence: event.evidence,
+                };
+                showSpotlight();
                 break;
 
             case 'pipeline_error':
@@ -972,6 +1504,16 @@
                 isRunning = false;
                 document.getElementById('runBtn').disabled = false;
                 if (ws) ws.close();
+                break;
+
+            case 'commentary':
+                showNarration(event.text);
+                addLog('status', `Narrator: ${event.text}`);
+                break;
+
+            case 'outro':
+                outroText = event.text;
+                addLog('agent_done', `Outro: ${event.text}`);
                 break;
 
             case 'error':
@@ -992,6 +1534,17 @@
         document.getElementById('stepCounter').textContent = '-/-';
         document.getElementById('logPanel').innerHTML = '';
         document.getElementById('resultOverlay').classList.remove('visible');
+        // Reset narration, outro, and spotlight
+        hideNarration();
+        outroText = null;
+        window._pendingResult = null;
+        document.getElementById('outroBlock').style.display = 'none';
+        const spotlight = document.getElementById('spotlightOverlay');
+        spotlight.classList.remove('visible');
+        spotlight.style.display = 'none';
+        document.getElementById('spotlightText').innerHTML = '';
+        document.getElementById('spotlightText').classList.remove('visible');
+        document.getElementById('spotlightContinue').style.opacity = '0';
     }
 
     function setCharacterState(agentId, state) {
@@ -1058,6 +1611,15 @@
         const actions = document.getElementById('resultActions');
 
         window._lastPitchDeck = pitchDeck;
+
+        // -- Outro block --
+        const outroBlock = document.getElementById('outroBlock');
+        if (outroText) {
+            outroBlock.textContent = outroText;
+            outroBlock.style.display = 'block';
+        } else {
+            outroBlock.style.display = 'none';
+        }
 
         // -- Download button --
         actions.innerHTML = downloadUrl
