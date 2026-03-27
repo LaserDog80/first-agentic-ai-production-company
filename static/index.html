@@ -113,26 +113,26 @@
             display: flex;
             justify-content: center;
             align-items: flex-end;
-            padding: 20px 20px 0;
+            padding: 12px 20px 0;
             gap: 16px;
-            min-height: 420px;
+            min-height: 280px;
             position: relative;
         }
 
-        /* Ground */
+        /* Studio floor */
         .stage::after {
             content: '';
             position: absolute;
             bottom: 0;
             left: 0;
             right: 0;
-            height: 48px;
-            background: repeating-linear-gradient(
-                90deg,
-                #2d5016 0px, #2d5016 16px,
-                #3a6b1e 16px, #3a6b1e 32px
+            height: 40px;
+            background: linear-gradient(
+                180deg,
+                #2a2a3e 0%,
+                #222236 100%
             );
-            border-top: 4px solid #4a8c2a;
+            border-top: 2px solid #3a3a52;
             image-rendering: pixelated;
         }
 
@@ -144,9 +144,9 @@
             position: relative;
             z-index: 1;
             width: 160px;
-            min-height: 350px;
+            min-height: 240px;
             justify-content: flex-end;
-            padding-bottom: 52px;
+            padding-bottom: 44px;
         }
 
         /* ── SPEECH BUBBLE ── */
@@ -699,7 +699,10 @@
             color: var(--text-dim);
             cursor: pointer;
             transition: color 0.2s, border-color 0.2s;
-            margin-top: auto;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 201;
         }
 
         .intro-skip:hover {
@@ -840,19 +843,75 @@
         @media (max-width: 900px) {
             .stage {
                 gap: 8px;
-                padding: 12px 8px 0;
+                padding: 8px 8px 0;
             }
             .character-slot { width: 120px; }
             .speech-bubble { max-width: 110px; font-size: 6px; }
         }
 
         @media (max-width: 640px) {
-            .stage {
-                flex-wrap: wrap;
-                justify-content: center;
-                min-height: auto;
+            .header h1 { font-size: 10px; }
+            .header p { font-size: 7px; }
+
+            .input-area {
+                padding: 12px 10px;
             }
-            .character-slot { width: 100px; min-height: 250px; }
+            .input-area input {
+                font-size: 8px;
+                padding: 10px 12px;
+                min-width: 0;
+            }
+            .input-area button {
+                font-size: 8px;
+                padding: 10px 14px;
+            }
+
+            .stage {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                justify-content: flex-start;
+                min-height: auto;
+                padding: 8px 10px 0;
+                gap: 10px;
+                -webkit-overflow-scrolling: touch;
+            }
+            .character-slot {
+                width: 100px;
+                min-width: 100px;
+                min-height: 160px;
+                padding-bottom: 36px;
+            }
+            .pixel-character { transform: scale(0.75); transform-origin: bottom center; }
+            .char-name { font-size: 5px; }
+            .char-role { font-size: 4px; }
+            .speech-bubble {
+                max-width: 95px;
+                font-size: 5px;
+                padding: 5px 6px;
+                min-height: 24px;
+                line-height: 1.4;
+            }
+
+            .narration-bar {
+                font-size: 8px;
+                padding: 8px 12px;
+                margin: 0 8px;
+            }
+
+            .status-bar { padding: 8px 10px; }
+            .progress-text { font-size: 7px; }
+            .step-counter { font-size: 7px; }
+            .log-panel { font-size: 6px; padding: 6px 10px; }
+
+            .intro-overlay { padding: 24px 14px 14px; }
+            .intro-line { font-size: 8px; line-height: 1.8; margin-bottom: 6px; }
+            .intro-skip { top: 12px; right: 12px; font-size: 7px; padding: 8px 14px; }
+
+            .result-content { padding: 16px; }
+            .result-content h2 { font-size: 10px; }
+            .result-tab { font-size: 7px; padding: 8px 10px; }
+            .spotlight-text { font-size: 9px; }
+            .spotlight-continue { font-size: 10px; padding: 14px 24px; }
         }
     </style>
 </head>
@@ -865,12 +924,12 @@
 
     <div class="header">
         <h1>THE AGENTIC PRODUCTION CO.</h1>
-        <p>AI agents collaborate to turn your idea into a pitch deck</p>
+        <p>AI agents collaborate to turn your unscripted TV idea into a pitch deck</p>
     </div>
 
     <div class="input-area intro-hidden" id="inputArea">
         <input type="text" id="briefInput"
-               placeholder="Enter a show idea... e.g. A 3x60 doc about lighthouse keepers"
+               placeholder="Enter an unscripted show idea... e.g. A 3x60 doc about lighthouse keepers"
                autocomplete="off">
         <button id="runBtn" onclick="startPipeline()">GO!</button>
     </div>
@@ -909,10 +968,12 @@
                 <button class="result-tab active" onclick="switchTab('deck')">PITCH DECK</button>
                 <button class="result-tab" onclick="switchTab('evidence')">EVIDENCE TRAIL</button>
                 <button class="result-tab" onclick="switchTab('json')">RAW JSON</button>
+                <button class="result-tab" onclick="switchTab('learn')">WHAT JUST HAPPENED</button>
             </div>
             <div class="tab-panel visible" id="tabDeck"></div>
             <div class="tab-panel" id="tabEvidence"></div>
             <div class="tab-panel" id="tabJson"></div>
+            <div class="tab-panel" id="tabLearn"></div>
             <button class="result-close" onclick="closeResult()">CLOSE</button>
         </div>
     </div>
@@ -1093,7 +1154,7 @@
             pause: 1500
         },
         {
-            text: "This isn't one AI answering a question. These are five independent AI agents — each running its own large language model.",
+            text: "This isn't one AI answering a question. These are five independent AI agents — each running its own large language model — built for unscripted and factual television.",
             highlight: null,
             pause: 3000
         },
@@ -1429,14 +1490,14 @@
 
         ws.onclose = () => {
             if (isRunning) {
-                setStatus('Connection lost.', 0, true);
+                setStatus('Connection lost. The agents may be busy — try refreshing in a moment.', 0, true);
                 isRunning = false;
                 document.getElementById('runBtn').disabled = false;
             }
         };
 
         ws.onerror = () => {
-            setStatus('Connection error.', 0, true);
+            setStatus('Unable to reach the AI agents. Check your connection and try refreshing.', 0, true);
             isRunning = false;
             document.getElementById('runBtn').disabled = false;
         };
@@ -1499,7 +1560,7 @@
                 break;
 
             case 'pipeline_error':
-                setStatus(`Error: ${event.error}`, null, true);
+                setStatus(`Something went wrong: ${event.error}. Try running again — the agents can be unpredictable!`, null, true);
                 addLog('rework', `Pipeline error: ${event.error}`);
                 isRunning = false;
                 document.getElementById('runBtn').disabled = false;
@@ -1557,6 +1618,15 @@
     function setBubble(agentId, label, text) {
         const bubble = document.getElementById(`bubble-${agentId}`);
         if (!bubble) return;
+        // Filter out internal schema/validation noise
+        if (text && /schema|validation|JSON|parsing|integer|string values|downstream processing/i.test(text)) {
+            text = 'Working...';
+        }
+        // Truncate long messages
+        const maxLen = 120;
+        if (text && text.length > maxLen) {
+            text = text.slice(0, maxLen) + '...';
+        }
         bubble.querySelector('.bubble-label').textContent = label;
         bubble.querySelector('.bubble-text').textContent = text;
         bubble.classList.add('visible');
@@ -1630,6 +1700,7 @@
         document.getElementById('tabDeck').innerHTML = renderDeck(pitchDeck);
         document.getElementById('tabEvidence').innerHTML = renderEvidence(evidence);
         document.getElementById('tabJson').innerHTML = `<pre style="font-family:'Press Start 2P',monospace;font-size:7px;line-height:2;color:var(--text);white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow-y:auto">${esc(JSON.stringify(pitchDeck, null, 2))}</pre>`;
+        document.getElementById('tabLearn').innerHTML = renderLearnPanel();
 
         // -- Reset to first tab --
         switchTab('deck');
@@ -1639,21 +1710,29 @@
 
     function switchTab(tabName) {
         const tabs = document.querySelectorAll('.result-tab');
-        const panels = { deck: 'tabDeck', evidence: 'tabEvidence', json: 'tabJson' };
+        const panels = { deck: 'tabDeck', evidence: 'tabEvidence', json: 'tabJson', learn: 'tabLearn' };
 
         tabs.forEach(t => t.classList.remove('active'));
         Object.values(panels).forEach(id => document.getElementById(id).classList.remove('visible'));
 
         document.getElementById(panels[tabName]).classList.add('visible');
-        // Activate the matching tab button
-        const tabIndex = { deck: 0, evidence: 1, json: 2 };
+        const tabIndex = { deck: 0, evidence: 1, json: 2, learn: 3 };
         tabs[tabIndex[tabName]].classList.add('active');
     }
 
     function renderDeck(deck) {
-        if (!deck) return '<p style="color:var(--accent)">No pitch deck data returned.</p>';
+        if (!deck || Object.keys(deck).length === 0) {
+            return '<p style="color:var(--accent)">The pitch deck data was incomplete. Check the RAW JSON tab for what was returned, or try running again.</p>';
+        }
         console.log('renderDeck input:', JSON.stringify(deck).slice(0, 500));
-        try { return _renderDeckInner(deck); }
+        try {
+            const html = _renderDeckInner(deck);
+            // If all sections were empty, show fallback with raw data
+            if (!html || html.trim() === '') {
+                return `<div class="deck-section"><h3>Pitch Deck</h3><p>The deck was returned in an unexpected format. Here is the raw data:</p></div><pre style="font-family:'Press Start 2P',monospace;font-size:7px;line-height:2;color:var(--text);white-space:pre-wrap;word-break:break-word">${esc(JSON.stringify(deck, null, 2))}</pre>`;
+            }
+            return html;
+        }
         catch (e) {
             console.error('renderDeck error:', e);
             return `<p style="color:var(--accent)">Error rendering deck: ${esc(e.message)}</p><pre style="font-family:'Press Start 2P',monospace;font-size:7px;line-height:2;color:var(--text);white-space:pre-wrap;word-break:break-word">${esc(JSON.stringify(deck, null, 2))}</pre>`;
@@ -1876,6 +1955,34 @@
 
         html += '</div>';
         return html;
+    }
+
+    function renderLearnPanel() {
+        return `
+        <div class="deck-section">
+            <h3>What you just watched</h3>
+            <p>Five independent AI agents — each running its own large language model — just collaborated to turn a single sentence into a structured pitch deck for an unscripted television show.</p>
+            <p>This is not one AI answering a question. Each agent reasoned independently, made its own decisions, and passed its work to the next.</p>
+        </div>
+        <div class="deck-section">
+            <h3>What makes this "agentic"?</h3>
+            <ul>
+                <li><strong>Independent reasoning</strong> — each agent has its own role, instructions, and judgement. The Researcher doesn't know what the Director will do with its findings.</li>
+                <li><strong>Real tool use</strong> — the Researcher searched the actual web. The Production Manager calculated real budgets. These aren't canned responses.</li>
+                <li><strong>Feedback loops</strong> — the Series Producer reviewed the final package and could send work back for revision. Agents can reject each other's output.</li>
+                <li><strong>Collaboration, not conversation</strong> — work flows between specialists, building on what came before. No single prompt produced this deck.</li>
+            </ul>
+        </div>
+        <div class="deck-section">
+            <h3>How is this different from ChatGPT?</h3>
+            <p>A chatbot gives you one response to one prompt. This pipeline ran multiple AI models in sequence, each with different expertise, passing structured data between them — with quality control built in.</p>
+            <p>The same architecture powers autonomous coding assistants, research agents, automated content pipelines, and AI-driven workflows across industries.</p>
+        </div>
+        <div class="deck-section">
+            <h3>Where is this heading?</h3>
+            <p>What you saw is early — the output isn't perfect yet. But the pattern is real: AI agents that can reason, use tools, collaborate, and self-correct.</p>
+            <p>In production, this means AI as a development tool — not replacing the team, but accelerating the work between the brief and the first draft.</p>
+        </div>`;
     }
 
     function esc(str) {

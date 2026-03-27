@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
-from typing import Literal
-from pydantic import BaseModel
+from typing import Any, Literal
+from pydantic import BaseModel, field_validator
 
 
 # --- Nested/shared types ---
@@ -15,8 +15,13 @@ class FormatSpec(BaseModel):
 class CompetitorEntry(BaseModel):
     title: str
     broadcaster: str
-    year: str
+    year: str  # LLMs may return int; validator coerces
     relevance: str
+
+    @field_validator("year", mode="before")
+    @classmethod
+    def coerce_year_to_str(cls, v: Any) -> str:
+        return str(v)
 
 
 class CharacterEntry(BaseModel):
