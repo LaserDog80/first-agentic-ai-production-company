@@ -23,6 +23,9 @@ agents:
   production_manager:
     model_tier: "strong"
     max_iterations: 5
+  artist:
+    model_tier: "strong"
+    max_iterations: 1
 
 pipeline:
   max_rework_cycles: 2  # TOTAL pipeline-wide cap, not per-agent

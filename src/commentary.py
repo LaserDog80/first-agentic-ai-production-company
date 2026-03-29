@@ -15,7 +15,7 @@ POLL_INTERVAL = 12.0
 
 # Hard character limits on LLM output
 MAX_LIVE_CHARS = 500
-MAX_OUTRO_CHARS = 600
+MAX_OUTRO_CHARS = 300
 
 
 class CommentaryEngine:
@@ -82,10 +82,19 @@ class CommentaryEngine:
                     {"role": "system", "content": self._outro_prompt},
                     {"role": "user", "content": deck_json},
                 ],
-                max_tokens=200,
+                max_tokens=120,
                 temperature=0.7,
             )
             text = response.choices[0].message.content.strip()
+            # Convert ||BREAK|| marker to actual paragraph break
+            text = text.replace("||BREAK||", "\n\n")
+            # If no double newline, try to insert one before common phrases
+            if "\n\n" not in text:
+                for marker in ["This is early", "It handles", "It automates",
+                               "Early work", "Not perfect"]:
+                    if marker in text:
+                        text = text.replace(marker, "\n\n" + marker)
+                        break
             return text[:MAX_OUTRO_CHARS]
         except Exception:
             logger.exception("Outro generation failed")

@@ -28,6 +28,10 @@ TASK
    potential characters/contributors, key facts, archive sources, locations, \
    and risks/sensitivities
 4. Cite your sources. Rate your confidence on every fact.
+5. Suggest deck imagery — think about what visuals a pitch deck for this \
+   show would include. Research the subject matter to identify iconic, \
+   evocative images that would sell this show to a commissioner. For each \
+   image, specify the scene concept, visual elements, and mood.
 
 INPUTS
 You will receive a ResearchBrief JSON with fields: topic, angles_to_explore, \
@@ -81,8 +85,31 @@ Return a single JSON object matching this exact schema:
   ],
   "risks_and_sensitivities": [
     "<string — each risk, sensitivity, or legal consideration>"
+  ],
+  "deck_imagery": [
+    {
+      "slot": "<string — where in the deck: 'title_background', 'logline', 'narrative_arc', or 'visual_approach'>",
+      "concept": "<string — vivid scene description, e.g. 'aerial view of Scottish highlands at dawn'>",
+      "elements": ["<string — visual element keywords: mountains, water, city, forest, people, boat, camera, night, sunset, desert, snow, ruins, etc.>"],
+      "mood": "<string — emotional register: epic, intimate, dark, bright, calm, tense, hopeful, mysterious>"
+    }
   ]
 }
+
+DECK IMAGERY GUIDANCE
+You MUST provide exactly 4 deck_imagery entries, one for each slot:
+- "title_background": The hero image — the single most iconic visual that \
+  captures the essence of this show. Think big, cinematic, evocative.
+- "logline": A supporting mood image that reinforces the logline. Smaller, \
+  atmospheric.
+- "narrative_arc": An image that captures the journey or story progression. \
+  Think about the show's dramatic arc.
+- "visual_approach": An image that showcases the visual style and filming \
+  approach — where and how this show will be shot.
+
+Research what real pitch decks for similar shows include. Think about what \
+images a commissioner would expect to see. Use specific, concrete scene \
+descriptions with named elements (not abstract concepts).
 
 CONSTRAINTS
 - NEVER fabricate sources. If you cannot find something, say so and rate \

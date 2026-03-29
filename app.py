@@ -101,14 +101,7 @@ async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
         result = await loop.run_in_executor(None, run_blocking)
 
         if result.success:
-            # Generate outro commentary before showing results
-            if result.pitch_deck:
-                outro_text = await loop.run_in_executor(
-                    None, commentary.generate_outro, result.pitch_deck
-                )
-                await emit({"type": "outro", "text": outro_text})
-
-            # Generate PPTX
+            # Generate PPTX first (needs rendered_imagery bytes)
             import hashlib
             run_id = hashlib.md5(brief.encode()).hexdigest()[:12]
             pptx_dir = Path("output/web")
@@ -118,9 +111,22 @@ async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
                 export_pitch_deck(result.pitch_deck, str(pptx_path))
                 _generated_files[run_id] = pptx_path
 
+            # Strip binary rendered_imagery before JSON serialization
+            deck_for_json = {
+                k: v for k, v in (result.pitch_deck or {}).items()
+                if k != "rendered_imagery"
+            } if result.pitch_deck else None
+
+            # Generate outro commentary
+            if deck_for_json:
+                outro_text = await loop.run_in_executor(
+                    None, commentary.generate_outro, deck_for_json
+                )
+                await emit({"type": "outro", "text": outro_text})
+
             await emit({
                 "type": "pipeline_complete",
-                "pitch_deck": result.pitch_deck,
+                "pitch_deck": deck_for_json,
                 "evidence": result.evidence,
                 "download_url": f"/download/{run_id}" if result.pitch_deck else None,
             })

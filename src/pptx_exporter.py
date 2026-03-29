@@ -1,10 +1,15 @@
 """Convert PitchDeck JSON to PowerPoint (.pptx) files."""
+from io import BytesIO
 from pathlib import Path
 
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
+
+# Pixel art imports kept for potential future use but not rendered in PPTX
+# from src.pixel_art import generate_title_card, generate_mood_art
+# from src.scene_renderer import render_scene_for_slot
 
 
 # Slide dimensions (standard 16:9)
@@ -35,6 +40,25 @@ CONTENT_HEIGHT = Inches(5.5)
 MAX_CELL_CHARS = 150
 
 
+def _get_imagery_for_slot(
+    deck_imagery: list[dict], slot: str,
+) -> dict | None:
+    """Find a deck_imagery entry by slot name."""
+    for entry in deck_imagery:
+        if entry.get("slot") == slot:
+            return entry
+    return None
+
+
+def _render_slot_image(
+    imagery: dict | None, genre: str, tone: str,
+    rendered_imagery: dict[str, bytes] | None = None,
+    width: int = 960, height: int = 400, pixel_size: int = 4,
+) -> bytes | None:
+    """Images disabled in PPTX draft — returns None."""
+    return None
+
+
 def export_pitch_deck(pitch_deck: dict, output_path: str) -> Path:
     """Convert a PitchDeck dict to a .pptx file.
 
@@ -50,10 +74,20 @@ def export_pitch_deck(pitch_deck: dict, output_path: str) -> Path:
     prs.slide_width = SLIDE_WIDTH
     prs.slide_height = SLIDE_HEIGHT
 
+    # Extract genre/tone metadata for pixel art generation
+    fmt_tone = pitch_deck.get("format_and_tone", {})
+    genre = fmt_tone.get("genre", "")
+    tone = fmt_tone.get("tone", "")
+    title = pitch_deck.get("title_page", {}).get("working_title", "Untitled")
+    deck_imagery = pitch_deck.get("deck_imagery", [])
+    rendered_imagery = pitch_deck.get("rendered_imagery", {})
+
     # Slide 1: Title
-    _add_title_slide(prs, pitch_deck.get("title_page", {}))
+    _add_title_slide(prs, pitch_deck.get("title_page", {}), genre, tone,
+                     deck_imagery, rendered_imagery)
     # Slide 2: Logline
-    _add_logline_slide(prs, pitch_deck.get("logline", ""))
+    _add_logline_slide(prs, pitch_deck.get("logline", ""), genre, tone,
+                       deck_imagery, rendered_imagery)
     # Slide 3: Format & Tone
     _add_format_slide(prs, pitch_deck.get("format_and_tone", {}))
     # Slide 4: Target Audience
@@ -64,9 +98,11 @@ def export_pitch_deck(pitch_deck: dict, output_path: str) -> Path:
     _add_characters_slide(prs, pitch_deck.get("key_characters", []))
     # Slides 7-9: Episode breakdown
     episode = pitch_deck.get("episode_breakdown", {})
-    _add_narrative_arc_slide(prs, episode)
+    _add_narrative_arc_slide(prs, episode, genre, tone, deck_imagery,
+                             rendered_imagery)
     _add_sequences_slide(prs, episode.get("key_sequences", []))
-    _add_visual_approach_slide(prs, episode)
+    _add_visual_approach_slide(prs, episode, genre, tone, deck_imagery,
+                               rendered_imagery)
     # Slide 10: Feasibility
     _add_feasibility_slide(prs, pitch_deck.get("feasibility_summary", {}))
     # Slide 11: Why Now
@@ -121,16 +157,40 @@ def _add_slide_heading(slide, text: str) -> None:
     )
 
 
-def _add_logline_slide(prs: Presentation, logline: str) -> None:
-    """Slide 2: Logline — prominent centered text."""
+def _add_logline_slide(
+    prs: Presentation, logline: str,
+    genre: str = "", tone: str = "",
+    deck_imagery: list[dict] | None = None,
+    rendered_imagery: dict[str, bytes] | None = None,
+) -> None:
+    """Slide 2: Logline with scene art or mood art banner."""
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _add_slide_heading(slide, "Logline")
+
+    # Try scene render first, fall back to mood art
+    imagery = _get_imagery_for_slot(deck_imagery or [], "logline")
+    scene_bytes = _render_slot_image(
+        imagery, genre, tone, rendered_imagery,
+        width=960, height=120, pixel_size=4,
+    )
+    try:
+        if scene_bytes:
+            img_stream = BytesIO(scene_bytes)
+        else:
+            ma_bytes = generate_mood_art(genre, tone, 960, 60, seed=1, pixel_size=6)
+            img_stream = BytesIO(ma_bytes)
+        img_width = Inches(10.0)
+        img_left = (SLIDE_WIDTH - img_width) // 2
+        slide.shapes.add_picture(img_stream, img_left, Inches(1.8), width=img_width)
+    except Exception:
+        pass
+
     _add_text_box(
         slide,
         left=LEFT_MARGIN,
-        top=Inches(2.0),
+        top=Inches(2.8),
         width=CONTENT_WIDTH,
-        height=Inches(4.0),
+        height=Inches(3.5),
         text=logline,
         font_size=SUBTITLE_SIZE,
         color=DARK_GREY,
@@ -263,11 +323,34 @@ def _add_characters_slide(prs: Presentation, characters: list[dict]) -> None:
     )
 
 
-def _add_narrative_arc_slide(prs: Presentation, episode: dict) -> None:
-    """Slide 7: Narrative Arc — four labelled text blocks."""
+def _add_narrative_arc_slide(
+    prs: Presentation, episode: dict,
+    genre: str = "", tone: str = "",
+    deck_imagery: list[dict] | None = None,
+    rendered_imagery: dict[str, bytes] | None = None,
+) -> None:
+    """Slide 7: Narrative Arc with scene art or mood art header."""
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     ep_title = episode.get("episode_title", "Episode Breakdown")
     _add_slide_heading(slide, f"Narrative Arc: {ep_title}")
+
+    # Scene render or mood art header strip
+    imagery = _get_imagery_for_slot(deck_imagery or [], "narrative_arc")
+    scene_bytes = _render_slot_image(
+        imagery, genre, tone, rendered_imagery,
+        width=960, height=160, pixel_size=4,
+    )
+    try:
+        if scene_bytes:
+            img_stream = BytesIO(scene_bytes)
+        else:
+            ma_bytes = generate_mood_art(genre, tone, 960, 80, seed=2, pixel_size=6)
+            img_stream = BytesIO(ma_bytes)
+        img_width = Inches(10.0)
+        img_left = (SLIDE_WIDTH - img_width) // 2
+        slide.shapes.add_picture(img_stream, img_left, Inches(1.0), width=img_width)
+    except Exception:
+        pass
 
     arc = episode.get("narrative_arc", {})
     sections = [
@@ -278,7 +361,7 @@ def _add_narrative_arc_slide(prs: Presentation, episode: dict) -> None:
     ]
 
     txbox = slide.shapes.add_textbox(
-        LEFT_MARGIN, TOP_MARGIN, CONTENT_WIDTH, CONTENT_HEIGHT
+        LEFT_MARGIN, Inches(2.0), CONTENT_WIDTH, Inches(4.7)
     )
     tf = txbox.text_frame
     tf.word_wrap = True
@@ -318,16 +401,41 @@ def _add_sequences_slide(prs: Presentation, sequences: list[dict]) -> None:
     )
 
 
-def _add_visual_approach_slide(prs: Presentation, episode: dict) -> None:
-    """Slide 9: Visual Approach — tone + visual approach text."""
+def _add_visual_approach_slide(
+    prs: Presentation, episode: dict,
+    genre: str = "", tone_meta: str = "",
+    deck_imagery: list[dict] | None = None,
+    rendered_imagery: dict[str, bytes] | None = None,
+) -> None:
+    """Slide 9: Visual Approach with scene art illustration."""
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _add_slide_heading(slide, "Visual Approach")
+
+    # Scene render (larger piece) or mood art fallback
+    imagery = _get_imagery_for_slot(deck_imagery or [], "visual_approach")
+    scene_bytes = _render_slot_image(
+        imagery, genre, tone_meta, rendered_imagery,
+        width=960, height=300, pixel_size=4,
+    )
+    try:
+        if scene_bytes:
+            img_stream = BytesIO(scene_bytes)
+        else:
+            ma_bytes = generate_mood_art(
+                genre, tone_meta, 960, 160, seed=3, pixel_size=8,
+            )
+            img_stream = BytesIO(ma_bytes)
+        img_width = Inches(10.0)
+        img_left = (SLIDE_WIDTH - img_width) // 2
+        slide.shapes.add_picture(img_stream, img_left, Inches(1.0), width=img_width)
+    except Exception:
+        pass
 
     tone = episode.get("overall_tone", "")
     approach = episode.get("visual_approach", "")
 
     txbox = slide.shapes.add_textbox(
-        LEFT_MARGIN, TOP_MARGIN, CONTENT_WIDTH, CONTENT_HEIGHT
+        LEFT_MARGIN, Inches(2.8), CONTENT_WIDTH, Inches(4.0)
     )
     tf = txbox.text_frame
     tf.word_wrap = True
@@ -457,12 +565,17 @@ def _add_why_now_slide(prs: Presentation, why_now: str) -> None:
     )
 
 
-def _add_title_slide(prs: Presentation, title_page: dict) -> None:
-    """Slide 1: Title page with working title, genre, format, broadcaster."""
+def _add_title_slide(
+    prs: Presentation, title_page: dict,
+    genre: str = "", tone: str = "",
+    deck_imagery: list[dict] | None = None,
+    rendered_imagery: dict[str, bytes] | None = None,
+) -> None:
+    """Slide 1: Title page with pixel art scene background + title card."""
     slide = prs.slides.add_slide(prs.slide_layouts[6])  # Blank layout
 
     title = title_page.get("working_title", "Untitled")
-    genre = title_page.get("genre", "")
+    tp_genre = title_page.get("genre", "")
     fmt = title_page.get("format", "")
     broadcaster = title_page.get("target_broadcaster", "")
 
@@ -481,12 +594,12 @@ def _add_title_slide(prs: Presentation, title_page: dict) -> None:
     )
 
     # Subtitle line: genre | format | broadcaster
-    subtitle_parts = [p for p in [genre, fmt, broadcaster] if p]
+    subtitle_parts = [p for p in [tp_genre, fmt, broadcaster] if p]
     subtitle = "  |  ".join(subtitle_parts)
     _add_text_box(
         slide,
         left=LEFT_MARGIN,
-        top=Inches(3.8),
+        top=Inches(4.5),
         width=CONTENT_WIDTH,
         height=Inches(0.8),
         text=subtitle,
