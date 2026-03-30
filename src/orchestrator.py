@@ -23,6 +23,7 @@ from src.prompts import (
     series_producer, producer, researcher, director,
     production_manager, evidence,
 )
+from src.pixel_art_llm import render_deck_imagery
 
 
 @dataclass
@@ -212,6 +213,9 @@ class Orchestrator:
             "message": "Research pack compiled.",
         })
 
+        # Step 3b — Artist: deck_imagery -> rendered pixel art (invisible to user)
+        outputs = self._run_artist(outputs)
+
         # Step 4 — Director: DirectorBrief + ResearchPack -> CreativeTreatment
         self._emit({
             "type": "agent_start",
@@ -315,6 +319,55 @@ class Orchestrator:
             model_tier=self.config["agents"]["researcher"]["model_tier"],
         )
         outputs["research_pack"] = research_pack
+        return outputs
+
+    def _run_artist(self, outputs: dict) -> dict:
+        """Step 3b: Artist renders deck imagery as pixel art.
+
+        Runs silently — no step counter increment, invisible to the user.
+        Falls back to procedural rendering if LLM fails.
+        """
+        research_pack = outputs.get("research_pack", {})
+        deck_imagery = research_pack.get("deck_imagery", [])
+        if not deck_imagery:
+            outputs["rendered_imagery"] = {}
+            return outputs
+
+        self._emit({
+            "type": "agent_start",
+            "agent": "artist",
+            "phase": "rendering",
+            "message": "Rendering bespoke pixel art for the deck...",
+        })
+
+        # Get genre/tone from the producer brief
+        producer_brief = outputs.get("producer_brief", {})
+        fmt = producer_brief.get("format", {})
+        genre = fmt.get("genre", "") if isinstance(fmt, dict) else ""
+        tone = fmt.get("tone", "") if isinstance(fmt, dict) else ""
+
+        artist_model = get_model_name(
+            self.config,
+            self.config["agents"].get("artist", {}).get("model_tier", "utility"),
+        )
+
+        rendered = render_deck_imagery(
+            deck_imagery=deck_imagery,
+            genre=genre,
+            tone=tone,
+            client=self.client,
+            model=artist_model,
+            timeout=self.agent_timeout,
+            event_callback=self._event_callback,
+        )
+
+        outputs["rendered_imagery"] = rendered
+        self._emit({
+            "type": "agent_done",
+            "agent": "artist",
+            "phase": "rendering",
+            "message": f"Pixel art complete — {len(rendered)} scenes rendered.",
+        })
         return outputs
 
     def _run_director(self, outputs: dict) -> dict:
@@ -476,6 +529,14 @@ class Orchestrator:
                     "model_tier"
                 ],
             )
+            # Inject deck_imagery and pre-rendered pixel art from earlier steps
+            research_pack = outputs.get("research_pack", {})
+            imagery = research_pack.get("deck_imagery", [])
+            if imagery:
+                pitch_deck["deck_imagery"] = imagery
+            rendered = outputs.get("rendered_imagery", {})
+            if rendered:
+                pitch_deck["rendered_imagery"] = rendered
             outputs["pitch_deck"] = pitch_deck
             break
 

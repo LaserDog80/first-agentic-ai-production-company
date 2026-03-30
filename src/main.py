@@ -34,13 +34,19 @@ def main():
         print(f"\n{'='*60}")
         print("PITCH DECK COMPLETE")
         print(f"{'='*60}\n")
-        print(json.dumps(result.pitch_deck, indent=2))
+
+        # Strip binary rendered_imagery before JSON serialization
+        deck_for_json = {
+            k: v for k, v in (result.pitch_deck or {}).items()
+            if k != "rendered_imagery"
+        }
+        print(json.dumps(deck_for_json, indent=2))
 
         if args.output:
             out_dir = Path(args.output)
             out_dir.mkdir(parents=True, exist_ok=True)
             (out_dir / "pitch_deck.json").write_text(
-                json.dumps(result.pitch_deck, indent=2)
+                json.dumps(deck_for_json, indent=2)
             )
             (out_dir / "evidence.json").write_text(
                 json.dumps(result.evidence, indent=2)

@@ -49,6 +49,13 @@ class LocationEntry(BaseModel):
     logistics_note: str
 
 
+class DeckImageEntry(BaseModel):
+    slot: str  # e.g. "title_background", "narrative_arc", "visual_approach"
+    concept: str  # e.g. "aerial view of Scottish highlands at dawn"
+    elements: list[str]  # e.g. ["mountains", "heather", "mist"]
+    mood: str  # e.g. "epic", "intimate", "dark"
+
+
 class NarrativeArc(BaseModel):
     opening: str
     development: str
@@ -131,6 +138,7 @@ class ResearchPack(BaseModel):
     archive_sources: list[ArchiveEntry]
     locations: list[LocationEntry]
     risks_and_sensitivities: list[str]
+    deck_imagery: list[DeckImageEntry] = []
 
 
 class CreativeTreatment(BaseModel):
@@ -189,6 +197,7 @@ class PitchDeck(BaseModel):
     why_now: str
     sp_review_notes: str
     unresolved_concerns: list[str]
+    deck_imagery: list[DeckImageEntry] = []
 
 
 # --- Logging types ---

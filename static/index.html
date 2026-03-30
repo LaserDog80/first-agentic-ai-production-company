@@ -1407,12 +1407,12 @@
             const cursor = '<span class="spotlight-cursor"></span>';
             spotlightTypeInterval = setInterval(() => {
                 if (i < text.length) {
-                    textEl.innerHTML = escHtml(text.slice(0, i + 1)) + cursor;
+                    textEl.innerHTML = escHtml(text.slice(0, i + 1)).replace(/\n/g, '<br>') + cursor;
                     i++;
                 } else {
                     clearInterval(spotlightTypeInterval);
                     spotlightTypeInterval = null;
-                    textEl.innerHTML = escHtml(text);
+                    textEl.innerHTML = escHtml(text).replace(/\n/g, '<br>');
                     // Show continue button after typing finishes
                     setTimeout(() => {
                         continueBtn.style.opacity = '1';
@@ -1685,7 +1685,7 @@
         // -- Outro block --
         const outroBlock = document.getElementById('outroBlock');
         if (outroText) {
-            outroBlock.textContent = outroText;
+            outroBlock.innerHTML = escHtml(outroText).replace(/\n\n+/g, '<br>').replace(/\n/g, ' ');
             outroBlock.style.display = 'block';
         } else {
             outroBlock.style.display = 'none';
@@ -1693,7 +1693,7 @@
 
         // -- Download button --
         actions.innerHTML = downloadUrl
-            ? `<a class="btn-download" href="${downloadUrl}" download="pitch_deck.pptx">DOWNLOAD PPTX</a>`
+            ? `<a class="btn-download" href="${downloadUrl}" download="pitch_deck_draft.pptx">DOWNLOAD PPTX DRAFT</a>`
             : '';
 
         // -- Populate tab panels --
@@ -1739,24 +1739,267 @@
         }
     }
 
+    // ── PIXEL ART GENERATORS (JS) ──
+    const PIXEL_FONT = {
+        'A':[0x0E,0x11,0x11,0x1F,0x11,0x11,0x11],'B':[0x1E,0x11,0x11,0x1E,0x11,0x11,0x1E],
+        'C':[0x0E,0x11,0x10,0x10,0x10,0x11,0x0E],'D':[0x1C,0x12,0x11,0x11,0x11,0x12,0x1C],
+        'E':[0x1F,0x10,0x10,0x1E,0x10,0x10,0x1F],'F':[0x1F,0x10,0x10,0x1E,0x10,0x10,0x10],
+        'G':[0x0E,0x11,0x10,0x17,0x11,0x11,0x0F],'H':[0x11,0x11,0x11,0x1F,0x11,0x11,0x11],
+        'I':[0x0E,0x04,0x04,0x04,0x04,0x04,0x0E],'J':[0x07,0x02,0x02,0x02,0x02,0x12,0x0C],
+        'K':[0x11,0x12,0x14,0x18,0x14,0x12,0x11],'L':[0x10,0x10,0x10,0x10,0x10,0x10,0x1F],
+        'M':[0x11,0x1B,0x15,0x15,0x11,0x11,0x11],'N':[0x11,0x19,0x15,0x13,0x11,0x11,0x11],
+        'O':[0x0E,0x11,0x11,0x11,0x11,0x11,0x0E],'P':[0x1E,0x11,0x11,0x1E,0x10,0x10,0x10],
+        'Q':[0x0E,0x11,0x11,0x11,0x15,0x12,0x0D],'R':[0x1E,0x11,0x11,0x1E,0x14,0x12,0x11],
+        'S':[0x0E,0x11,0x10,0x0E,0x01,0x11,0x0E],'T':[0x1F,0x04,0x04,0x04,0x04,0x04,0x04],
+        'U':[0x11,0x11,0x11,0x11,0x11,0x11,0x0E],'V':[0x11,0x11,0x11,0x11,0x0A,0x0A,0x04],
+        'W':[0x11,0x11,0x11,0x15,0x15,0x1B,0x11],'X':[0x11,0x11,0x0A,0x04,0x0A,0x11,0x11],
+        'Y':[0x11,0x11,0x0A,0x04,0x04,0x04,0x04],'Z':[0x1F,0x01,0x02,0x04,0x08,0x10,0x1F],
+        '0':[0x0E,0x11,0x13,0x15,0x19,0x11,0x0E],'1':[0x04,0x0C,0x04,0x04,0x04,0x04,0x0E],
+        '2':[0x0E,0x11,0x01,0x06,0x08,0x10,0x1F],'3':[0x0E,0x11,0x01,0x06,0x01,0x11,0x0E],
+        '4':[0x02,0x06,0x0A,0x12,0x1F,0x02,0x02],'5':[0x1F,0x10,0x1E,0x01,0x01,0x11,0x0E],
+        '6':[0x06,0x08,0x10,0x1E,0x11,0x11,0x0E],'7':[0x1F,0x01,0x02,0x04,0x08,0x08,0x08],
+        '8':[0x0E,0x11,0x11,0x0E,0x11,0x11,0x0E],'9':[0x0E,0x11,0x11,0x0F,0x01,0x02,0x0C],
+        ' ':[0,0,0,0,0,0,0],':':[0,4,4,0,4,4,0],'-':[0,0,0,0x1F,0,0,0],
+        "'":[4,4,8,0,0,0,0],'.':[0,0,0,0,0,4,4],',':[0,0,0,0,0,4,8],
+        '!':[4,4,4,4,4,0,4],'?':[0x0E,0x11,1,2,4,0,4],'&':[0x0C,0x12,0x0C,0x1A,0x13,0x13,0x0D],
+    };
+
+    const GENRE_PALETTES = {
+        documentary: ['#1a2632','#d4c5a9','#8b7355','#5c6b4f','#3d5a80'],
+        observational: ['#1c2333','#b0c4de','#6b8cae','#4a6670','#8898aa'],
+        entertainment: ['#1a1a2e','#f0c987','#e86833','#4ecca3','#3d5a80'],
+        factual: ['#1a2632','#d4c5a9','#8b7355','#5c6b4f','#3d5a80'],
+        comedy: ['#2d1b3d','#f5e663','#e94560','#4ecca3','#ff9a3c'],
+        drama: ['#1a1a2e','#e8d5b7','#c45b3e','#6b3a5c','#2a4a6b'],
+        reality: ['#2a1f2e','#f0c987','#e86833','#c43a6b','#4a9080'],
+        true_crime: ['#0d0d0d','#c0392b','#e74c3c','#7f8c8d','#2c3e50'],
+        nature: ['#0f2419','#a8d08d','#5b8a3c','#3d6b4f','#7eb89a'],
+        travel: ['#162447','#e8a87c','#d4956b','#41729f','#5c8a97'],
+        history: ['#1a1410','#d4a76a','#8b6914','#5c4033','#3a2820'],
+    };
+    const DEFAULT_PALETTE = ['#16213e','#eaeaea','#f5c542','#4ecca3','#e94560'];
+
+    function _getGenrePalette(genre, tone) {
+        const g = (genre || '').toLowerCase();
+        for (const [key, pal] of Object.entries(GENRE_PALETTES)) {
+            if (g.includes(key)) return pal;
+        }
+        const t = (tone || '').toLowerCase();
+        if (t.includes('warm') || t.includes('intimate')) return GENRE_PALETTES.documentary;
+        if (t.includes('dark') || t.includes('gritty')) return GENRE_PALETTES.true_crime;
+        if (t.includes('light') || t.includes('funny')) return GENRE_PALETTES.comedy;
+        return DEFAULT_PALETTE;
+    }
+
+    function _hexToRgb(hex) {
+        const h = hex.replace('#','');
+        return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+    }
+
+    function _lcg(state) {
+        state = (state * 1103515245 + 12345) & 0x7FFFFFFF;
+        return [state, state / 0x7FFFFFFF];
+    }
+
+    function generateTitleCardDataUrl(title, genre, tone) {
+        const palette = _getGenrePalette(genre, tone);
+        const bg = _hexToRgb(palette[0]);
+        const text = _hexToRgb(palette[1]);
+        const accent = _hexToRgb(palette[2]);
+        const scale = 3;
+        const padding = 16;
+        const glyphW = 5 * scale, glyphH = 7 * scale;
+        const spaceW = 2 * scale, lineGap = 2 * scale;
+        const maxW = 660;
+        const contentW = maxW - 2 * padding;
+
+        // Word wrap
+        const words = title.toUpperCase().split(' ');
+        const lines = [];
+        let cur = '';
+        for (const w of words) {
+            const test = cur ? cur + ' ' + w : w;
+            if (test.length * (glyphW + spaceW) - spaceW > contentW && cur) {
+                lines.push(cur); cur = w;
+            } else { cur = test; }
+        }
+        if (cur) lines.push(cur);
+
+        const totalH = lines.length * glyphH + (lines.length - 1) * lineGap;
+        const imgH = totalH + 2 * padding + 4 * scale;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = maxW;
+        canvas.height = imgH;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        // Background
+        ctx.fillStyle = `rgb(${bg[0]},${bg[1]},${bg[2]})`;
+        ctx.fillRect(0, 0, maxW, imgH);
+
+        // Accent bars
+        ctx.fillStyle = `rgb(${accent[0]},${accent[1]},${accent[2]})`;
+        for (let x = 0; x < maxW; x += scale * 2) ctx.fillRect(x, 0, scale, scale);
+        for (let x = scale; x < maxW; x += scale * 2) ctx.fillRect(x, imgH - scale, scale, scale);
+
+        // Draw text
+        ctx.fillStyle = `rgb(${text[0]},${text[1]},${text[2]})`;
+        let yOff = padding + 2 * scale;
+        for (const line of lines) {
+            const lineW = line.length * (glyphW + spaceW) - spaceW;
+            let xOff = (maxW - lineW) / 2;
+            for (const ch of line) {
+                const glyph = PIXEL_FONT[ch];
+                if (!glyph) { xOff += glyphW + spaceW; continue; }
+                for (let row = 0; row < 7; row++) {
+                    for (let col = 0; col < 5; col++) {
+                        if (glyph[row] & (0x10 >> col)) {
+                            ctx.fillRect(xOff + col * scale, yOff + row * scale, scale, scale);
+                        }
+                    }
+                }
+                xOff += glyphW + spaceW;
+            }
+            yOff += glyphH + lineGap;
+        }
+        return canvas.toDataURL('image/png');
+    }
+
+    function generateMoodArtDataUrl(genre, tone, width, height, seed) {
+        const palette = _getGenrePalette(genre, tone);
+        const colors = palette.map(_hexToRgb);
+        const ps = 5;
+        const cols = Math.floor(width / ps);
+        const rows = Math.floor(height / ps);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        let state = seed || 42;
+        const _fill = (c) => { ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`; };
+        const _clamp = (c,v) => c.map(ch => Math.max(0,Math.min(255,ch+v)));
+
+        // Use seed to pick pattern variant — ensures variety across sections
+        const patternIdx = (seed || 0) % 6;
+
+        if (patternIdx === 0) {
+            // Diagonal bands with texture
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const band = Math.floor((x + y * 1.5) * colors.length / (cols + rows));
+                    [state] = _lcg(state); const r = state / 0x7FFFFFFF;
+                    const base = colors[Math.min(band, colors.length - 1)];
+                    _fill(_clamp(base, Math.floor((r-0.5)*18)));
+                    ctx.fillRect(x*ps, y*ps, ps, ps);
+                }
+            }
+        } else if (patternIdx === 1) {
+            // Mosaic blocks — irregular rectangles
+            ctx.fillStyle = `rgb(${colors[0][0]},${colors[0][1]},${colors[0][2]})`;
+            ctx.fillRect(0, 0, width, height);
+            for (let i = 0; i < 60; i++) {
+                [state] = _lcg(state); const rx = state / 0x7FFFFFFF;
+                [state] = _lcg(state); const ry = state / 0x7FFFFFFF;
+                [state] = _lcg(state); const rw = state / 0x7FFFFFFF;
+                [state] = _lcg(state); const rh = state / 0x7FFFFFFF;
+                [state] = _lcg(state); const rc = state / 0x7FFFFFFF;
+                const bx = Math.floor(rx * cols) * ps;
+                const by = Math.floor(ry * rows) * ps;
+                const bw = (Math.floor(rw * 6) + 2) * ps;
+                const bh = (Math.floor(rh * 3) + 1) * ps;
+                const c = colors[Math.floor(rc * colors.length)];
+                [state] = _lcg(state); const rv = state / 0x7FFFFFFF;
+                _fill(_clamp(c, Math.floor((rv-0.5)*25)));
+                ctx.fillRect(bx, by, bw, bh);
+            }
+        } else if (patternIdx === 2) {
+            // Wave pattern — sine curves
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    [state] = _lcg(state); const r = state / 0x7FFFFFFF;
+                    const wave = Math.sin(x * 0.15 + y * 0.4 + (seed||0) * 0.1) * 0.5 + 0.5;
+                    const idx = Math.floor(wave * (colors.length - 1));
+                    const base = colors[Math.min(idx, colors.length - 1)];
+                    _fill(_clamp(base, Math.floor((r-0.5)*15)));
+                    ctx.fillRect(x*ps, y*ps, ps, ps);
+                }
+            }
+        } else if (patternIdx === 3) {
+            // Scattered bright blocks on dark (confetti style)
+            _fill(colors[0]); ctx.fillRect(0, 0, width, height);
+            for (let i = 0; i < cols * rows / 2; i++) {
+                [state] = _lcg(state); const rx = state / 0x7FFFFFFF;
+                [state] = _lcg(state); const ry = state / 0x7FFFFFFF;
+                [state] = _lcg(state); const rc = state / 0x7FFFFFFF;
+                [state] = _lcg(state); const rs = state / 0x7FFFFFFF;
+                const c = colors[1 + Math.floor(rc * (colors.length - 1))];
+                _fill(c);
+                const sz = rs > 0.7 ? ps * 2 : ps;
+                ctx.fillRect(Math.floor(rx*cols)*ps, Math.floor(ry*rows)*ps, sz, sz);
+            }
+        } else if (patternIdx === 4) {
+            // Horizontal strata with accent highlights
+            for (let y = 0; y < rows; y++) {
+                const band = Math.floor(y * colors.length / rows);
+                const base = colors[Math.min(band, colors.length - 1)];
+                for (let x = 0; x < cols; x++) {
+                    [state] = _lcg(state); const r = state / 0x7FFFFFFF;
+                    if (r > 0.9) {
+                        _fill(colors[2]); // accent highlight
+                    } else {
+                        _fill(_clamp(base, Math.floor((r-0.5)*22)));
+                    }
+                    ctx.fillRect(x*ps, y*ps, ps, ps);
+                }
+            }
+        } else {
+            // Diamond/chevron pattern
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const cx = cols / 2, cy = rows / 2;
+                    const dist = Math.abs(x - cx) + Math.abs(y - cy);
+                    const idx = Math.floor(dist * colors.length / (cx + cy));
+                    [state] = _lcg(state); const r = state / 0x7FFFFFFF;
+                    const base = colors[Math.min(idx, colors.length - 1)];
+                    _fill(_clamp(base, Math.floor((r-0.5)*20)));
+                    ctx.fillRect(x*ps, y*ps, ps, ps);
+                }
+            }
+        }
+        return canvas.toDataURL('image/png');
+    }
+
     function _renderDeckInner(deck) {
         let html = '';
 
-        // Title page
+        // Extract genre/tone for pixel art
+        const ft_art = deck.format_and_tone || {};
+        const art_genre = ft_art.genre || '';
+        const art_tone = ft_art.tone || '';
+
+        // Title page with pixel art title card
         const tp = deck.title_page;
         if (tp) {
-            html += `<div class="deck-section">
-                <h3>${esc(tp.working_title || 'Untitled')}</h3>
+            const titleImg = generateTitleCardDataUrl(tp.working_title || 'Untitled', art_genre, art_tone);
+            const moodBg = generateMoodArtDataUrl(art_genre, art_tone, 660, 80, 999);
+            html += `<div class="deck-section" style="text-align:center">
+                <img src="${moodBg}" style="width:100%;image-rendering:pixelated;margin-bottom:8px" alt="">
+                <img src="${titleImg}" style="width:100%;max-width:660px;image-rendering:pixelated;margin-bottom:12px" alt="${esc(tp.working_title || '')}">
                 <div class="deck-label">Genre</div><div class="deck-value">${esc(tp.genre || '')}</div>
                 <div class="deck-label">Format</div><div class="deck-value">${esc(tp.format || '')}</div>
                 <div class="deck-label">Target Broadcaster</div><div class="deck-value">${esc(tp.target_broadcaster || '')}</div>
             </div>`;
         }
 
-        // Logline
+        // Logline with mood art
         if (deck.logline) {
+            const moodImg1 = generateMoodArtDataUrl(art_genre, art_tone, 660, 60, 1001);
             html += `<div class="deck-section">
                 <h3>Logline</h3>
+                <img src="${moodImg1}" style="width:100%;image-rendering:pixelated;margin-bottom:8px" alt="">
                 <p>${esc(deck.logline)}</p>
             </div>`;
         }
@@ -1805,8 +2048,10 @@
         // Episode breakdown
         const eb = deck.episode_breakdown;
         if (eb) {
+            const moodArc = generateMoodArtDataUrl(art_genre, art_tone, 660, 48, 2002);
             html += `<div class="deck-section">
-                <h3>Episode: ${esc(eb.episode_title || '')}</h3>`;
+                <h3>Episode: ${esc(eb.episode_title || '')}</h3>
+                <img src="${moodArc}" style="width:100%;image-rendering:pixelated;margin-bottom:8px" alt="">`;
             if (eb.narrative_arc) {
                 const na = eb.narrative_arc;
                 html += `<div class="deck-label">Opening</div><div class="deck-value">${esc(na.opening)}</div>
@@ -1994,6 +2239,28 @@
 
     function closeResult() {
         document.getElementById('resultOverlay').classList.remove('visible');
+        // Reset the main page to fresh state
+        CHARACTERS.forEach(char => {
+            const bubble = document.getElementById(`bubble-${char.id}`);
+            if (bubble) bubble.classList.remove('visible');
+            setCharacterState(char.id, 'idle');
+        });
+        document.getElementById('progressFill').style.width = '0%';
+        document.getElementById('progressFill').classList.remove('error');
+        document.getElementById('statusText').textContent = 'Ready. Enter a brief to begin.';
+        document.getElementById('stepCounter').textContent = '-/-';
+        document.getElementById('logPanel').innerHTML = '';
+        hideNarration();
+        outroText = null;
+        window._pendingResult = null;
+        document.getElementById('outroBlock').style.display = 'none';
+        const spotlight = document.getElementById('spotlightOverlay');
+        spotlight.classList.remove('visible');
+        spotlight.style.display = 'none';
+        document.getElementById('spotlightText').innerHTML = '';
+        document.getElementById('spotlightText').classList.remove('visible');
+        document.getElementById('spotlightContinue').style.opacity = '0';
+        document.getElementById('briefInput').value = '';
     }
 
     // ── DEMO MODE (for testing without backend) ──

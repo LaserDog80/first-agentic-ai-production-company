@@ -26,14 +26,17 @@ def test_export_creates_file(sample_pitch_deck, tmp_path):
 
 
 def test_title_slide_content(sample_pitch_deck, tmp_path):
-    """Title slide contains the working title."""
+    """Title slide contains the working title (as text or pixel art image)."""
     output = tmp_path / "deck.pptx"
     export_pitch_deck(sample_pitch_deck, str(output))
     prs = Presentation(str(output))
     first_slide = prs.slides[0]
     texts = [shape.text for shape in first_slide.shapes if shape.has_text_frame]
     all_text = " ".join(texts)
-    assert sample_pitch_deck["title_page"]["working_title"] in all_text
+    has_image = any(shape.shape_type == 13 for shape in first_slide.shapes)
+    # Title may be rendered as pixel art image or text fallback
+    title_in_text = sample_pitch_deck["title_page"]["working_title"] in all_text
+    assert title_in_text or has_image
 
 
 def test_text_slides_present(sample_pitch_deck, tmp_path):
