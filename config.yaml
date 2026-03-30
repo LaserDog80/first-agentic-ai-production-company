@@ -35,3 +35,6 @@ tools:
   tavily:
     api_key_env: "TAVILY_API_KEY"
     search_depth: "advanced"
+  linkup:
+    api_key_env: "LINKUP_API_KEY"
+    search_depth: "standard"
