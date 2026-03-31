@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.git/
+.gitignore
+tests/
+output/
+docs/
+*.md
+*.docx
+.DS_Store
