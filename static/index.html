@@ -453,15 +453,22 @@
 
         /* ── PITCH DECK SECTIONS ── */
         .deck-section {
-            margin-bottom: 16px;
+            margin-bottom: 32px;
             border: 2px solid var(--bg-light);
-            padding: 12px;
+            padding: 20px 24px;
+        }
+
+        .deck-section.deck-title-page {
+            padding: 32px 24px;
+            border-color: var(--gold);
+            border-width: 3px;
+            margin-bottom: 40px;
         }
 
         .deck-section h3 {
-            font-size: 8px;
+            font-size: 9px;
             color: var(--gold);
-            margin-bottom: 8px;
+            margin-bottom: 14px;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -469,8 +476,8 @@
         .deck-section p, .deck-section li {
             font-family: 'Press Start 2P', monospace;
             font-size: 7px;
-            line-height: 2;
-            color: var(--text);
+            line-height: 2.4;
+            color: var(--text-dim);
         }
 
         .deck-section ul {
@@ -487,7 +494,8 @@
             font-size: 6px;
             color: var(--text-dim);
             text-transform: uppercase;
-            margin-bottom: 2px;
+            margin-bottom: 4px;
+            letter-spacing: 1px;
         }
 
         .deck-value {
@@ -495,7 +503,7 @@
             font-size: 7px;
             line-height: 2;
             color: var(--text);
-            margin-bottom: 8px;
+            margin-bottom: 14px;
         }
 
         .deck-table {
@@ -508,7 +516,7 @@
             font-family: 'Press Start 2P', monospace;
             font-size: 6px;
             line-height: 2;
-            padding: 4px 6px;
+            padding: 8px 10px;
             text-align: left;
             border-bottom: 1px solid var(--bg-light);
         }
@@ -520,6 +528,43 @@
 
         .deck-table td {
             color: var(--text);
+        }
+
+        .character-cards {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+            margin-top: 8px;
+        }
+
+        .character-card {
+            border: 2px solid var(--bg-light);
+            padding: 16px;
+            background: var(--bg-dark);
+        }
+
+        .character-card-name {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            color: var(--gold);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .character-card-role {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 6px;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .character-card-angle {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 7px;
+            line-height: 2.4;
+            color: var(--text-dim);
         }
 
         .feasibility-badge {
@@ -912,6 +957,8 @@
             .result-tab { font-size: 7px; padding: 8px 10px; }
             .spotlight-text { font-size: 9px; }
             .spotlight-continue { font-size: 10px; padding: 14px 24px; }
+
+            .deck-section { padding: 14px 16px; }
         }
     </style>
 </head>
@@ -2030,7 +2077,7 @@
         if (tp) {
             const titleImg = generateTitleCardDataUrl(tp.working_title || 'Untitled', art_genre, art_tone);
             const moodBg = generateMoodArtDataUrl(art_genre, art_tone, 660, 80, 999);
-            html += `<div class="deck-section" style="text-align:center">
+            html += `<div class="deck-section deck-title-page" style="text-align:center">
                 <img src="${moodBg}" style="width:100%;image-rendering:pixelated;margin-bottom:8px" alt="">
                 <img src="${titleImg}" style="width:100%;max-width:660px;image-rendering:pixelated;margin-bottom:12px" alt="${esc(tp.working_title || '')}">
                 <div class="deck-label">Genre</div><div class="deck-value">${esc(tp.genre || '')}</div>
@@ -2083,10 +2130,13 @@
         if (deck.key_characters && deck.key_characters.length) {
             html += `<div class="deck-section">
                 <h3>Key Characters</h3>
-                <table class="deck-table">
-                    <tr><th>Name</th><th>Role</th><th>Story Angle</th></tr>
-                    ${deck.key_characters.map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.role)}</td><td>${esc(c.story_angle)}</td></tr>`).join('')}
-                </table>
+                <div class="character-cards">
+                    ${deck.key_characters.map(c => `<div class="character-card">
+                        <div class="character-card-name">${esc(c.name)}</div>
+                        <div class="character-card-role">${esc(c.role)}</div>
+                        <div class="character-card-angle">${esc(c.story_angle)}</div>
+                    </div>`).join('')}
+                </div>
             </div>`;
         }
 
