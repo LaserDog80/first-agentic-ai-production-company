@@ -979,7 +979,7 @@
                placeholder="Enter an unscripted show idea... e.g. A 3x60 doc about lighthouse keepers"
                autocomplete="off">
         <button id="runBtn" onclick="startPipeline()">GO!</button>
-        <button id="demoBtn" onclick="startDemo()" title="Test without API calls" style="background:transparent;border:2px solid var(--gold);color:var(--gold);font-family:'Press Start 2P',monospace;font-size:8px;padding:12px 14px;cursor:pointer;white-space:nowrap;transition:background 0.15s,color 0.15s;">DEMO</button>
+        <button id="demoBtn" onclick="startDemo()" title="Test without API calls" style="display:none;background:transparent;border:2px solid var(--gold);color:var(--gold);font-family:'Press Start 2P',monospace;font-size:8px;padding:12px 14px;cursor:pointer;white-space:nowrap;transition:background 0.15s,color 0.15s;">DEMO</button>
     </div>
 
     <div class="narration-bar" id="narrationBar">
@@ -1742,7 +1742,7 @@
         const now = new Date().toLocaleTimeString();
         const entry = document.createElement('div');
         entry.className = `log-entry event-${type}`;
-        entry.innerHTML = `<span class="timestamp">[${now}]</span>${message}`;
+        entry.innerHTML = `<span class="timestamp">[${now}]</span>${escHtml(message)}`;
         panel.appendChild(entry);
         panel.scrollTop = panel.scrollHeight;
     }
@@ -1784,8 +1784,10 @@
         }
 
         // -- Download button --
-        actions.innerHTML = downloadUrl
-            ? `<a class="btn-download" href="${downloadUrl}" download="pitch_deck_draft.pptx">DOWNLOAD PPTX DRAFT</a>`
+        // Only allow relative download URLs (must start with /)
+        const safeUrl = (downloadUrl && /^\/download\/[\w-]+$/.test(downloadUrl)) ? downloadUrl : null;
+        actions.innerHTML = safeUrl
+            ? `<a class="btn-download" href="${safeUrl}" download="pitch_deck_draft.pptx">DOWNLOAD PPTX DRAFT</a>`
             : '';
 
         // -- Populate tab panels --
@@ -2394,6 +2396,21 @@
         }
         next();
     }
+
+    // Config-driven feature flags
+    (async function loadConfig() {
+        try {
+            const resp = await fetch('/config');
+            if (resp.ok) {
+                const config = await resp.json();
+                if (config.demo_enabled) {
+                    document.getElementById('demoBtn').style.display = '';
+                }
+            }
+        } catch (e) {
+            // Server unreachable — demo button stays hidden
+        }
+    })();
 
     // Boot
     init();
