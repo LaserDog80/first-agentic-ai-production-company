@@ -32,6 +32,7 @@ pipeline:
   agent_timeout_seconds: 300
 
 tools:
+  search_provider: "auto"  # auto | tavily | linkup
   tavily:
     api_key_env: "TAVILY_API_KEY"
     search_depth: "advanced"
