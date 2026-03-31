@@ -1,5 +1,6 @@
 # tests/test_tools.py
 import json
+import os
 import pytest
 from unittest.mock import patch, MagicMock
 from src.tools import tool, get_openai_tools_schema, execute_tool
@@ -64,17 +65,96 @@ def test_flag_gap():
 
 # --- web_search (mocked) ---
 
+TAVILY_RESULT = {
+    "results": [
+        {"title": "Test", "url": "http://test.com", "content": "Tavily"}
+    ]
+}
+
+LINKUP_RESULT = MagicMock()
+LINKUP_RESULT.results = [
+    MagicMock(name="LinkItem", url="http://link.com", content="Linkup")
+]
+LINKUP_RESULT.results[0].name = "LinkItem"
+
+
+@patch.dict(os.environ, {"TAVILY_API_KEY": "test-key"})
 @patch("src.tools.search.TavilyClient")
 def test_web_search(mock_tavily_class):
     mock_client = MagicMock()
-    mock_client.search.return_value = {
-        "results": [{"title": "Test", "url": "http://test.com", "content": "Test content"}]
-    }
+    mock_client.search.return_value = TAVILY_RESULT
     mock_tavily_class.return_value = mock_client
 
     result = web_search("lighthouse documentaries")
     assert "results" in result
     assert len(result["results"]) == 1
+
+
+@patch.dict(os.environ, {"SEARCH_PROVIDER": "tavily", "TAVILY_API_KEY": "k"})
+@patch("src.tools.search.TavilyClient")
+def test_web_search_provider_tavily(mock_tavily_class):
+    """SEARCH_PROVIDER=tavily should only call Tavily."""
+    mock_client = MagicMock()
+    mock_client.search.return_value = TAVILY_RESULT
+    mock_tavily_class.return_value = mock_client
+
+    result = web_search("query")
+    assert result == TAVILY_RESULT
+    mock_client.search.assert_called_once()
+
+
+@patch.dict(
+    os.environ, {"SEARCH_PROVIDER": "linkup", "LINKUP_API_KEY": "k"}
+)
+@patch("src.tools.search.LinkupClient")
+def test_web_search_provider_linkup(mock_linkup_class):
+    """SEARCH_PROVIDER=linkup should only call Linkup."""
+    mock_client = MagicMock()
+    mock_client.search.return_value = LINKUP_RESULT
+    mock_linkup_class.return_value = mock_client
+
+    result = web_search("query")
+    assert "results" in result
+    assert result["results"][0]["url"] == "http://link.com"
+    mock_client.search.assert_called_once()
+
+
+@patch.dict(
+    os.environ,
+    {"SEARCH_PROVIDER": "auto", "TAVILY_API_KEY": "k", "LINKUP_API_KEY": "k"},
+)
+@patch("src.tools.search.LinkupClient")
+@patch("src.tools.search.TavilyClient")
+def test_web_search_provider_auto_fallback(
+    mock_tavily_class, mock_linkup_class
+):
+    """SEARCH_PROVIDER=auto should fall back to Linkup on Tavily failure."""
+    mock_tavily_client = MagicMock()
+    mock_tavily_client.search.side_effect = RuntimeError("boom")
+    mock_tavily_class.return_value = mock_tavily_client
+
+    mock_linkup_client = MagicMock()
+    mock_linkup_client.search.return_value = LINKUP_RESULT
+    mock_linkup_class.return_value = mock_linkup_client
+
+    result = web_search("query")
+    assert result["results"][0]["url"] == "http://link.com"
+    mock_tavily_client.search.assert_called_once()
+    mock_linkup_client.search.assert_called_once()
+
+
+@patch.dict(os.environ, {"TAVILY_API_KEY": "k"}, clear=False)
+@patch("src.tools.search.TavilyClient")
+def test_web_search_provider_unset_defaults_auto(mock_tavily_class):
+    """When SEARCH_PROVIDER is unset it should behave like 'auto'."""
+    # Remove SEARCH_PROVIDER if present
+    os.environ.pop("SEARCH_PROVIDER", None)
+    mock_client = MagicMock()
+    mock_client.search.return_value = TAVILY_RESULT
+    mock_tavily_class.return_value = mock_client
+
+    result = web_search("query")
+    assert result == TAVILY_RESULT
 
 
 # --- reference_research (closure — model only sees `section` param) ---
