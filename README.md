@@ -84,6 +84,43 @@ Output includes:
 - `evidence.json` — evidence pack tracing every agent's contribution
 - `log.json` — detailed orchestration log with token usage and timing
 
+### Demo Mode
+
+Demo mode runs the pipeline with fixture data and no API calls — useful for testing the UI and pipeline flow without incurring costs.
+
+**CLI** (always available):
+```bash
+python -m src.main --demo
+```
+
+**Web UI** (must be explicitly enabled):
+```bash
+ENABLE_DEMO=true python app.py
+```
+
+When `ENABLE_DEMO=true` is set, a "DEMO" button appears next to the input field. Demo mode is disabled by default.
+
+## Deployment
+
+### Hugging Face Spaces
+
+This app can be deployed as a [Hugging Face Space](https://huggingface.co/spaces) using the Docker SDK.
+
+1. **Create a new Space** on Hugging Face with SDK type **Docker**.
+
+2. **Add secrets** in the Space settings:
+   - `NEBIUS_API_KEY` — your Nebius API key
+   - `TAVILY_API_KEY` — your Tavily search API key
+   - (Optional) `ENABLE_DEMO` — set to `true` to show the demo button
+
+3. **Push the repo** to the Space:
+   ```bash
+   git remote add hf https://huggingface.co/spaces/YOUR_USER/YOUR_SPACE
+   git push hf main
+   ```
+
+The Dockerfile is pre-configured for HF Spaces (port 7860, health check included). The app will be available at `https://YOUR_USER-YOUR_SPACE.hf.space`.
+
 ## Development
 
 See `CLAUDE.md` for development conventions and workflow.

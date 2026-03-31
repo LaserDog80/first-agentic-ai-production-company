@@ -3,6 +3,8 @@ import asyncio
 import json
 import logging
 import os
+import re
+import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -19,6 +21,8 @@ from src.pptx_exporter import export_pitch_deck
 load_dotenv()
 logger = logging.getLogger(__name__)
 
+DEMO_ENABLED = os.environ.get("ENABLE_DEMO", "").lower() in ("true", "1", "yes")
+
 app = FastAPI(title="The Agentic Production Company")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -26,12 +30,20 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 _generated_files: dict[str, Path] = {}
 
 
+_RUN_ID_PATTERN = re.compile(r"^(demo-)?[a-f0-9]{12}$")
+
+
 @app.get("/download/{run_id}")
 async def download_pptx(run_id: str):
     """Download a generated PPTX file."""
+    if not _RUN_ID_PATTERN.match(run_id):
+        return JSONResponse(status_code=400, content={"error": "Invalid run ID"})
     path = _generated_files.get(run_id)
     if not path or not path.exists():
         return JSONResponse(status_code=404, content={"error": "File not found"})
+    # Verify path is under the expected output directory
+    if not path.resolve().is_relative_to(Path("output/web").resolve()):
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
     return FileResponse(
         str(path),
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -45,27 +57,66 @@ async def index():
     return FileResponse("static/index.html")
 
 
+@app.get("/config")
+async def get_config():
+    """Return frontend configuration flags."""
+    return JSONResponse({"demo_enabled": DEMO_ENABLED})
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for container orchestration."""
+    return JSONResponse({"status": "ok"})
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for running the pipeline with live updates."""
     await websocket.accept()
+    _MAX_MESSAGE_BYTES = 16_384  # 16 KB max WebSocket message
+    _MAX_BRIEF_LENGTH = 2_000   # 2000 chars max brief
+
     try:
         while True:
             data = await websocket.receive_text()
-            message = json.loads(data)
+            if len(data) > _MAX_MESSAGE_BYTES:
+                await websocket.send_json(
+                    {"type": "error", "message": "Message too large"}
+                )
+                continue
 
-            if message.get("type") == "demo":
-                await _run_demo(websocket, message.get("brief", ""))
+            try:
+                message = json.loads(data)
+            except json.JSONDecodeError:
+                await websocket.send_json(
+                    {"type": "error", "message": "Invalid JSON"}
+                )
+                continue
 
-            elif message.get("type") == "run":
-                brief = message.get("brief", "")
+            msg_type = message.get("type")
+            brief = str(message.get("brief", ""))[:_MAX_BRIEF_LENGTH]
+
+            if msg_type == "demo":
+                if not DEMO_ENABLED:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Demo mode is disabled. Set ENABLE_DEMO=true to enable.",
+                    })
+                    continue
+                await _run_demo(websocket, brief)
+
+            elif msg_type == "run":
                 if not brief:
                     await websocket.send_json(
                         {"type": "error", "message": "No brief provided"}
                     )
                     continue
-
                 await _run_pipeline(websocket, brief)
+
+            else:
+                await websocket.send_json(
+                    {"type": "error", "message": "Unknown message type"}
+                )
 
     except WebSocketDisconnect:
         logger.info("Client disconnected")
@@ -109,8 +160,7 @@ async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
 
         if result.success:
             # Generate PPTX first (needs rendered_imagery bytes)
-            import hashlib
-            run_id = hashlib.md5(brief.encode()).hexdigest()[:12]
+            run_id = secrets.token_hex(6)
             pptx_dir = Path("output/web")
             pptx_dir.mkdir(parents=True, exist_ok=True)
             pptx_path = pptx_dir / f"{run_id}.pptx"
@@ -143,9 +193,10 @@ async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
                 "error": result.error,
             })
     except Exception as exc:
+        logger.exception("Pipeline error: %s", exc)
         await emit({
             "type": "pipeline_error",
-            "error": str(exc),
+            "error": "An error occurred processing your brief. Please try again.",
         })
     finally:
         commentary.shutdown()
@@ -165,10 +216,7 @@ async def _run_demo(websocket: WebSocket, brief: str) -> None:
         pitch_deck = result.get("pitch_deck")
 
         # Generate PPTX from demo data, same as the real pipeline
-        import hashlib
-        run_id = "demo-" + hashlib.md5(
-            (brief or "demo").encode()
-        ).hexdigest()[:12]
+        run_id = "demo-" + secrets.token_hex(6)
         pptx_dir = Path("output/web")
         pptx_dir.mkdir(parents=True, exist_ok=True)
         pptx_path = pptx_dir / f"{run_id}.pptx"
@@ -185,9 +233,10 @@ async def _run_demo(websocket: WebSocket, brief: str) -> None:
             "download_url": download_url,
         })
     except Exception as exc:
+        logger.exception("Demo pipeline error: %s", exc)
         await emit({
             "type": "pipeline_error",
-            "error": str(exc),
+            "error": "An error occurred running the demo. Please try again.",
         })
 
 
