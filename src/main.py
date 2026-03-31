@@ -7,6 +7,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from src.demo_data import get_demo_result
 from src.orchestrator import Orchestrator
 from src.pptx_exporter import export_pitch_deck
 
@@ -17,14 +18,57 @@ def main():
     parser = argparse.ArgumentParser(
         description="The Agentic Production Company — turn a one-line idea into a pitch deck"
     )
-    parser.add_argument("brief", help="One-line show idea (e.g. 'A 3x60 doc about...')")
-    parser.add_argument("--config", default="config.yaml", help="Path to config file")
-    parser.add_argument("--output", default=None, help="Output directory for results")
+    parser.add_argument(
+        "brief",
+        nargs="?",
+        default="",
+        help="One-line show idea (e.g. 'A 3x60 doc about...')",
+    )
+    parser.add_argument(
+        "--config", default="config.yaml", help="Path to config file",
+    )
+    parser.add_argument(
+        "--output", default=None, help="Output directory for results",
+    )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="Run in demo mode with fixture data (no API calls)",
+    )
     args = parser.parse_args()
 
     print(f"\n{'='*60}")
     print("THE AGENTIC PRODUCTION COMPANY")
     print(f"{'='*60}")
+
+    # -- Demo mode --
+    if args.demo:
+        print("\n[DEMO MODE] Using fixture data — no API calls.\n")
+        demo = get_demo_result()
+        print(json.dumps(demo["pitch_deck"], indent=2))
+
+        if args.output:
+            out_dir = Path(args.output)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / "pitch_deck.json").write_text(
+                json.dumps(demo["pitch_deck"], indent=2)
+            )
+            (out_dir / "evidence.json").write_text(
+                json.dumps(demo["evidence"], indent=2)
+            )
+            if demo["pitch_deck"]:
+                pptx_path = export_pitch_deck(
+                    demo["pitch_deck"],
+                    str(out_dir / "pitch_deck.pptx"),
+                )
+                print(f"PowerPoint saved to {pptx_path}")
+            print(f"\nResults saved to {out_dir}/")
+        return
+
+    # -- Normal mode --
+    if not args.brief:
+        parser.error("brief is required when not using --demo")
+
     print(f"\nBrief: {args.brief}\n")
 
     orchestrator = Orchestrator(config_path=args.config)

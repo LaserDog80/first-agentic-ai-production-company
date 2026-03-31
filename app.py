@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.commentary import CommentaryEngine
+from src.demo_runner import run_demo_pipeline
 from src.orchestrator import Orchestrator
 from src.provider import create_client, get_model_name, load_config
 from src.pptx_exporter import export_pitch_deck
@@ -53,10 +54,15 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             message = json.loads(data)
 
-            if message.get("type") == "run":
+            if message.get("type") == "demo":
+                await _run_demo(websocket, message.get("brief", ""))
+
+            elif message.get("type") == "run":
                 brief = message.get("brief", "")
                 if not brief:
-                    await websocket.send_json({"type": "error", "message": "No brief provided"})
+                    await websocket.send_json(
+                        {"type": "error", "message": "No brief provided"}
+                    )
                     continue
 
                 await _run_pipeline(websocket, brief)
@@ -143,6 +149,46 @@ async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
         })
     finally:
         commentary.shutdown()
+
+
+async def _run_demo(websocket: WebSocket, brief: str) -> None:
+    """Run the demo pipeline, emitting events over WebSocket."""
+
+    async def emit(event: dict) -> None:
+        try:
+            await websocket.send_json(event)
+        except Exception:
+            pass
+
+    try:
+        result = await run_demo_pipeline(emit, brief)
+        pitch_deck = result.get("pitch_deck")
+
+        # Generate PPTX from demo data, same as the real pipeline
+        import hashlib
+        run_id = "demo-" + hashlib.md5(
+            (brief or "demo").encode()
+        ).hexdigest()[:12]
+        pptx_dir = Path("output/web")
+        pptx_dir.mkdir(parents=True, exist_ok=True)
+        pptx_path = pptx_dir / f"{run_id}.pptx"
+        download_url = None
+        if pitch_deck:
+            export_pitch_deck(pitch_deck, str(pptx_path))
+            _generated_files[run_id] = pptx_path
+            download_url = f"/download/{run_id}"
+
+        await emit({
+            "type": "pipeline_complete",
+            "pitch_deck": pitch_deck,
+            "evidence": result.get("evidence"),
+            "download_url": download_url,
+        })
+    except Exception as exc:
+        await emit({
+            "type": "pipeline_error",
+            "error": str(exc),
+        })
 
 
 if __name__ == "__main__":

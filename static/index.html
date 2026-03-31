@@ -932,6 +932,7 @@
                placeholder="Enter an unscripted show idea... e.g. A 3x60 doc about lighthouse keepers"
                autocomplete="off">
         <button id="runBtn" onclick="startPipeline()">GO!</button>
+        <button id="demoBtn" onclick="startDemo()" title="Test without API calls" style="background:transparent;border:2px solid var(--gold);color:var(--gold);font-family:'Press Start 2P',monospace;font-size:8px;padding:12px 14px;cursor:pointer;white-space:nowrap;transition:background 0.15s,color 0.15s;">DEMO</button>
     </div>
 
     <div class="narration-bar" id="narrationBar">
@@ -1493,6 +1494,7 @@
                 setStatus('Connection lost. The agents may be busy — try refreshing in a moment.', 0, true);
                 isRunning = false;
                 document.getElementById('runBtn').disabled = false;
+                document.getElementById('demoBtn').disabled = false;
             }
         };
 
@@ -1500,6 +1502,47 @@
             setStatus('Unable to reach the AI agents. Check your connection and try refreshing.', 0, true);
             isRunning = false;
             document.getElementById('runBtn').disabled = false;
+            document.getElementById('demoBtn').disabled = false;
+        };
+    }
+
+    // ── DEMO MODE (server-side, with PPTX generation) ──
+    function startDemo() {
+        if (!introComplete || isRunning) return;
+
+        isRunning = true;
+        document.getElementById('runBtn').disabled = true;
+        document.getElementById('demoBtn').disabled = true;
+        resetUI();
+
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${protocol}//${location.host}/ws`);
+
+        ws.onopen = () => {
+            ws.send(JSON.stringify({ type: 'demo' }));
+            setStatus('Demo pipeline starting...', 0);
+            addLog('pipeline_start', 'Demo mode — no API calls');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            handleEvent(data);
+        };
+
+        ws.onclose = () => {
+            if (isRunning) {
+                setStatus('Connection lost.', 0, true);
+                isRunning = false;
+                document.getElementById('runBtn').disabled = false;
+                document.getElementById('demoBtn').disabled = false;
+            }
+        };
+
+        ws.onerror = () => {
+            setStatus('Unable to connect for demo.', 0, true);
+            isRunning = false;
+            document.getElementById('runBtn').disabled = false;
+            document.getElementById('demoBtn').disabled = false;
         };
     }
 
@@ -1549,6 +1592,7 @@
                 addLog('agent_done', 'Pipeline complete!');
                 isRunning = false;
                 document.getElementById('runBtn').disabled = false;
+                document.getElementById('demoBtn').disabled = false;
                 if (ws) ws.close();
                 // Store result data for after spotlight
                 window._pendingResult = {
@@ -1564,6 +1608,7 @@
                 addLog('rework', `Pipeline error: ${event.error}`);
                 isRunning = false;
                 document.getElementById('runBtn').disabled = false;
+                document.getElementById('demoBtn').disabled = false;
                 if (ws) ws.close();
                 break;
 
