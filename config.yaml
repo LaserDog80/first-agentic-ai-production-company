@@ -31,6 +31,10 @@ pipeline:
   max_rework_cycles: 2  # TOTAL pipeline-wide cap, not per-agent
   agent_timeout_seconds: 300
 
+rate_limiting:
+  hourly_limit: 10    # Max pipeline runs per hour (global, all users)
+  daily_limit: 50     # Max pipeline runs per day (global, all users)
+
 tools:
   search_provider: "auto"  # auto | tavily | linkup
   tavily:
