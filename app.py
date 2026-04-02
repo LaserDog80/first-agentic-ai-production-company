@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import secrets
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -22,6 +23,54 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 DEMO_ENABLED = os.environ.get("ENABLE_DEMO", "").lower() in ("true", "1", "yes")
+
+
+class RateLimiter:
+    """Global in-memory rate limiter tracking pipeline runs per hour and day."""
+
+    def __init__(self, hourly_limit: int = 10, daily_limit: int = 50) -> None:
+        self.hourly_limit = hourly_limit
+        self.daily_limit = daily_limit
+        self._timestamps: list[float] = []
+
+    def _prune(self, now: float) -> None:
+        """Remove timestamps older than 24 hours."""
+        cutoff = now - 86_400
+        self._timestamps = [t for t in self._timestamps if t > cutoff]
+
+    def check(self) -> str | None:
+        """Return an error message if rate limited, or None if allowed."""
+        now = time.monotonic()
+        self._prune(now)
+
+        one_hour_ago = now - 3_600
+        hourly_count = sum(1 for t in self._timestamps if t > one_hour_ago)
+        if hourly_count >= self.hourly_limit:
+            return (
+                f"Rate limit reached: {self.hourly_limit} runs per hour. "
+                "Please try again later."
+            )
+
+        if len(self._timestamps) >= self.daily_limit:
+            return (
+                f"Daily limit reached: {self.daily_limit} runs per day. "
+                "Please try again tomorrow."
+            )
+
+        return None
+
+    def record(self) -> None:
+        """Record a pipeline run."""
+        self._timestamps.append(time.monotonic())
+
+
+# Initialise rate limiter from config
+_config = load_config("config.yaml")
+_rl_cfg = _config.get("rate_limiting", {})
+rate_limiter = RateLimiter(
+    hourly_limit=_rl_cfg.get("hourly_limit", 10),
+    daily_limit=_rl_cfg.get("daily_limit", 50),
+)
 
 app = FastAPI(title="The Agentic Production Company")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -111,6 +160,16 @@ async def websocket_endpoint(websocket: WebSocket):
                         {"type": "error", "message": "No brief provided"}
                     )
                     continue
+
+                # Check global rate limit before running
+                limit_msg = rate_limiter.check()
+                if limit_msg:
+                    await websocket.send_json(
+                        {"type": "error", "message": limit_msg}
+                    )
+                    continue
+
+                rate_limiter.record()
                 await _run_pipeline(websocket, brief)
 
             else:
