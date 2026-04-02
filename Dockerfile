@@ -9,6 +9,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=appuser:appuser . .
 
+RUN mkdir -p /app/output/web && chown -R appuser:appuser /app/output
+
 USER appuser
 
 ENV PORT=7860
