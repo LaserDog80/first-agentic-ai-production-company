@@ -21,5 +21,8 @@ htmlcov/
 .idea/
 *.swp
 
+# OS
+.DS_Store
+
 # Output
 output/
