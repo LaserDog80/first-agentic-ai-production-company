@@ -1,3 +1,12 @@
+---
+title: Agentic Production Company
+emoji: 🎬
+colorFrom: purple
+colorTo: blue
+sdk: docker
+pinned: false
+---
+
 # The Agentic Production Company
 
 > A multi-agent pipeline that turns a one-line TV show idea into a structured pitch deck.
