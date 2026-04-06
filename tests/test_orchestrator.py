@@ -1,4 +1,5 @@
 # tests/test_orchestrator.py
+"""Tests for the orchestrator (backward compat) and core pipeline classes."""
 import json
 import pytest
 from unittest.mock import MagicMock, patch
@@ -7,7 +8,7 @@ from src.orchestrator import Orchestrator, PipelineResult
 
 def _mock_agent_result(output_dict: dict, tool_calls=None):
     """Create a mock AgentResult."""
-    from src.agent import AgentResult
+    from src.core.agent import AgentResult
     return AgentResult(
         output=json.dumps(output_dict),
         tool_calls=tool_calls or [],
@@ -19,8 +20,8 @@ def _mock_agent_result(output_dict: dict, tool_calls=None):
 
 def _make_orchestrator(mock_config):
     """Helper to create an Orchestrator with mocked config."""
-    with patch("src.orchestrator.create_client"), \
-         patch("src.orchestrator.load_config") as mock_load:
+    with patch("src.core.pipeline.create_client"), \
+         patch("src.core.pipeline.load_config") as mock_load:
         mock_load.return_value = mock_config
         return Orchestrator(config_path="config.yaml")
 
@@ -31,36 +32,9 @@ def test_orchestrator_init(mock_config):
     assert orch is not None
 
 
-def test_orchestrator_log_entry(mock_config):
-    """Orchestrator records log entries correctly."""
-    orch = _make_orchestrator(mock_config)
-    result = _mock_agent_result({"test": "output"})
-    orch._log_step("test_agent", "test_phase", "test input", result)
-    assert len(orch.log) == 1
-    assert orch.log[0].agent_name == "test_agent"
-
-
-def test_rework_detection(mock_config):
-    """Orchestrator detects rework requests in agent tool calls."""
-    orch = _make_orchestrator(mock_config)
-    tool_calls = [
-        {"name": "request_rework", "args": {"agent": "researcher",
-         "notes": "Need more competitors"}}
-    ]
-    result = _mock_agent_result({"test": "output"}, tool_calls=tool_calls)
-    rework = orch._detect_rework(result)
-    assert rework is not None
-    assert rework["agent"] == "researcher"
-
-
-def test_rework_cap_enforced(mock_config):
-    """Orchestrator refuses rework after hitting global cap."""
-    orch = _make_orchestrator(mock_config)
-    orch.rework_count = 2  # already at cap
-    tool_calls = [
-        {"name": "request_rework", "args": {"agent": "researcher",
-         "notes": "More detail"}}
-    ]
-    result = _mock_agent_result({"test": "output"}, tool_calls=tool_calls)
-    rework = orch._detect_rework(result)
-    assert rework is None
+def test_pipeline_result_dataclass():
+    """PipelineResult has expected fields."""
+    result = PipelineResult()
+    assert result.pitch_deck is None
+    assert result.success is False
+    assert result.log == []

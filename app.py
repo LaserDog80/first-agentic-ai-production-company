@@ -1,4 +1,4 @@
-"""FastAPI web server with WebSocket for real-time pipeline updates."""
+"""FastAPI web server with WebSocket for real-time multi-pipeline updates."""
 import asyncio
 import json
 import logging
@@ -14,10 +14,9 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.commentary import CommentaryEngine
+from src.core.pipeline import discover_pipelines, create_pipeline, PipelineDefinition
 from src.demo_runner import run_demo_pipeline
-from src.orchestrator import Orchestrator
 from src.provider import create_client, get_model_name, load_config
-from src.pptx_exporter import export_pitch_deck
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -34,12 +33,10 @@ class RateLimiter:
         self._timestamps: list[float] = []
 
     def _prune(self, now: float) -> None:
-        """Remove timestamps older than 24 hours."""
         cutoff = now - 86_400
         self._timestamps = [t for t in self._timestamps if t > cutoff]
 
     def check(self) -> str | None:
-        """Return an error message if rate limited, or None if allowed."""
         now = time.monotonic()
         self._prune(now)
 
@@ -50,17 +47,14 @@ class RateLimiter:
                 f"Rate limit reached: {self.hourly_limit} runs per hour. "
                 "Please try again later."
             )
-
         if len(self._timestamps) >= self.daily_limit:
             return (
                 f"Daily limit reached: {self.daily_limit} runs per day. "
                 "Please try again tomorrow."
             )
-
         return None
 
     def record(self) -> None:
-        """Record a pipeline run."""
         self._timestamps.append(time.monotonic())
 
 
@@ -72,31 +66,29 @@ rate_limiter = RateLimiter(
     daily_limit=_rl_cfg.get("daily_limit", 50),
 )
 
-app = FastAPI(title="The Agentic Production Company")
+app = FastAPI(title="Multi-Agent Orchestration Framework")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Track generated PPTX files by run ID
+# Track generated files by run ID
 _generated_files: dict[str, Path] = {}
-
 
 _RUN_ID_PATTERN = re.compile(r"^(demo-)?[a-f0-9]{12}$")
 
 
 @app.get("/download/{run_id}")
-async def download_pptx(run_id: str):
-    """Download a generated PPTX file."""
+async def download_file(run_id: str):
+    """Download a generated file."""
     if not _RUN_ID_PATTERN.match(run_id):
         return JSONResponse(status_code=400, content={"error": "Invalid run ID"})
     path = _generated_files.get(run_id)
     if not path or not path.exists():
         return JSONResponse(status_code=404, content={"error": "File not found"})
-    # Verify path is under the expected output directory
     if not path.resolve().is_relative_to(Path("output/web").resolve()):
         return JSONResponse(status_code=400, content={"error": "Invalid path"})
     return FileResponse(
         str(path),
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        filename="pitch_deck.pptx",
+        filename=path.name,
     )
 
 
@@ -112,18 +104,48 @@ async def get_config():
     return JSONResponse({"demo_enabled": DEMO_ENABLED})
 
 
+@app.get("/api/pipelines")
+async def list_pipelines():
+    """Return all available pipelines and their metadata."""
+    pipelines = discover_pipelines()
+    result = []
+    for pid, defn in pipelines.items():
+        result.append({
+            "id": defn.id,
+            "name": defn.name,
+            "description": defn.description,
+            "category": defn.category,
+            "version": defn.version,
+            "input": {
+                "type": defn.input_config.type,
+                "label": defn.input_config.label,
+                "placeholder": defn.input_config.placeholder,
+                "max_length": defn.input_config.max_length,
+            },
+            "agents": {
+                name: {"role": cfg.get("role", name)}
+                for name, cfg in defn.agents.items()
+            },
+            "steps": [
+                {"id": s.id, "label": s.label, "description": s.description, "agent": s.agent}
+                for s in defn.steps
+            ],
+            "has_review": defn.review.enabled,
+        })
+    return JSONResponse(result)
+
+
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for container orchestration."""
     return JSONResponse({"status": "ok"})
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for running the pipeline with live updates."""
+    """WebSocket endpoint for running pipelines with live updates."""
     await websocket.accept()
-    _MAX_MESSAGE_BYTES = 16_384  # 16 KB max WebSocket message
-    _MAX_BRIEF_LENGTH = 2_000   # 2000 chars max brief
+    _MAX_MESSAGE_BYTES = 16_384
+    _MAX_INPUT_LENGTH = 2_000
 
     try:
         while True:
@@ -143,25 +165,25 @@ async def websocket_endpoint(websocket: WebSocket):
                 continue
 
             msg_type = message.get("type")
-            brief = str(message.get("brief", ""))[:_MAX_BRIEF_LENGTH]
+            input_text = str(message.get("brief", message.get("input", "")))[:_MAX_INPUT_LENGTH]
+            pipeline_id = message.get("pipeline", "tv_production")
 
             if msg_type == "demo":
                 if not DEMO_ENABLED:
                     await websocket.send_json({
                         "type": "error",
-                        "message": "Demo mode is disabled. Set ENABLE_DEMO=true to enable.",
+                        "message": "Demo mode is disabled. Set ENABLE_DEMO=true.",
                     })
                     continue
-                await _run_demo(websocket, brief)
+                await _run_demo(websocket, input_text)
 
             elif msg_type == "run":
-                if not brief:
+                if not input_text:
                     await websocket.send_json(
-                        {"type": "error", "message": "No brief provided"}
+                        {"type": "error", "message": "No input provided"}
                     )
                     continue
 
-                # Check global rate limit before running
                 limit_msg = rate_limiter.check()
                 if limit_msg:
                     await websocket.send_json(
@@ -170,7 +192,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     continue
 
                 rate_limiter.record()
-                await _run_pipeline(websocket, brief)
+                await _run_pipeline(websocket, input_text, pipeline_id)
 
             else:
                 await websocket.send_json(
@@ -181,8 +203,8 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.info("Client disconnected")
 
 
-async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
-    """Run the pipeline in a thread, emitting events over WebSocket."""
+async def _run_pipeline(websocket: WebSocket, input_text: str, pipeline_id: str) -> None:
+    """Run a pipeline in a thread, emitting events over WebSocket."""
     loop = asyncio.get_event_loop()
 
     async def emit(event: dict) -> None:
@@ -194,7 +216,7 @@ async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
     def sync_emit(event: dict) -> None:
         asyncio.run_coroutine_threadsafe(emit(event), loop)
 
-    # Set up live commentary engine (utility-tier LLM)
+    # Set up live commentary engine
     config = load_config("config.yaml")
     commentary = CommentaryEngine(
         client=create_client(config),
@@ -203,48 +225,57 @@ async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
     )
 
     def sync_emit_with_commentary(event: dict) -> None:
-        """Emit event to client AND feed it to the commentary engine."""
         sync_emit(event)
         commentary.ingest(event)
 
-    await emit({"type": "pipeline_start", "brief": brief})
+    await emit({"type": "pipeline_start", "brief": input_text, "pipeline": pipeline_id})
 
     def run_blocking():
-        orchestrator = Orchestrator(config_path="config.yaml")
-        orchestrator.set_event_callback(sync_emit_with_commentary)
-        return orchestrator.run(brief)
+        pipeline = create_pipeline(pipeline_id, global_config_path="config.yaml")
+        pipeline.set_event_callback(sync_emit_with_commentary)
+        return pipeline.run(input_text)
 
     try:
         result = await loop.run_in_executor(None, run_blocking)
 
         if result.success:
-            # Generate PPTX first (needs rendered_imagery bytes)
             run_id = secrets.token_hex(6)
-            pptx_dir = Path("output/web")
-            pptx_dir.mkdir(parents=True, exist_ok=True)
-            pptx_path = pptx_dir / f"{run_id}.pptx"
-            if result.pitch_deck:
-                export_pitch_deck(result.pitch_deck, str(pptx_path))
-                _generated_files[run_id] = pptx_path
+            download_url = None
 
-            # Strip binary rendered_imagery before JSON serialization
-            deck_for_json = {
-                k: v for k, v in (result.pitch_deck or {}).items()
+            # TV Production: generate PPTX
+            if pipeline_id == "tv_production" and result.output:
+                try:
+                    from src.pptx_exporter import export_pitch_deck
+                    pptx_dir = Path("output/web")
+                    pptx_dir.mkdir(parents=True, exist_ok=True)
+                    pptx_path = pptx_dir / f"{run_id}.pptx"
+                    export_pitch_deck(result.output, str(pptx_path))
+                    _generated_files[run_id] = pptx_path
+                    download_url = f"/download/{run_id}"
+                except Exception:
+                    pass
+
+            # Strip binary data before JSON serialization
+            output_for_json = {
+                k: v for k, v in (result.output or {}).items()
                 if k != "rendered_imagery"
-            } if result.pitch_deck else None
+            } if result.output else None
 
             # Generate outro commentary
-            if deck_for_json:
+            if output_for_json:
                 outro_text = await loop.run_in_executor(
-                    None, commentary.generate_outro, deck_for_json
+                    None, commentary.generate_outro, output_for_json
                 )
                 await emit({"type": "outro", "text": outro_text})
 
             await emit({
                 "type": "pipeline_complete",
-                "pitch_deck": deck_for_json,
+                "pipeline": pipeline_id,
+                "output": output_for_json,
                 "evidence": result.evidence,
-                "download_url": f"/download/{run_id}" if result.pitch_deck else None,
+                "download_url": download_url,
+                # Backward compat for TV production frontend
+                "pitch_deck": output_for_json if pipeline_id == "tv_production" else None,
             })
         else:
             await emit({
@@ -255,14 +286,14 @@ async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
         logger.exception("Pipeline error: %s", exc)
         await emit({
             "type": "pipeline_error",
-            "error": "An error occurred processing your brief. Please try again.",
+            "error": "An error occurred. Please try again.",
         })
     finally:
         commentary.shutdown()
 
 
 async def _run_demo(websocket: WebSocket, brief: str) -> None:
-    """Run the demo pipeline, emitting events over WebSocket."""
+    """Run the demo pipeline (TV Production fixture data)."""
 
     async def emit(event: dict) -> None:
         try:
@@ -274,19 +305,21 @@ async def _run_demo(websocket: WebSocket, brief: str) -> None:
         result = await run_demo_pipeline(emit, brief)
         pitch_deck = result.get("pitch_deck")
 
-        # Generate PPTX from demo data, same as the real pipeline
         run_id = "demo-" + secrets.token_hex(6)
         pptx_dir = Path("output/web")
         pptx_dir.mkdir(parents=True, exist_ok=True)
         pptx_path = pptx_dir / f"{run_id}.pptx"
         download_url = None
         if pitch_deck:
+            from src.pptx_exporter import export_pitch_deck
             export_pitch_deck(pitch_deck, str(pptx_path))
             _generated_files[run_id] = pptx_path
             download_url = f"/download/{run_id}"
 
         await emit({
             "type": "pipeline_complete",
+            "pipeline": "tv_production",
+            "output": pitch_deck,
             "pitch_deck": pitch_deck,
             "evidence": result.get("evidence"),
             "download_url": download_url,

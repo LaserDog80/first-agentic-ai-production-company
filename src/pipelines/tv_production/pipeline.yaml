@@ -1,0 +1,94 @@
+id: tv_production
+name: "TV Production"
+description: "Transform a one-line TV show idea into a broadcast-ready pitch deck with research, creative treatment, and feasibility assessment."
+category: "Media & Entertainment"
+version: "1.0"
+
+input:
+  type: text
+  label: "Commissioning Brief"
+  placeholder: "A 3x60 documentary about the last lighthouse keepers in Britain"
+  max_length: 2000
+
+agents:
+  series_producer:
+    role: "Series Producer"
+    model_tier: strong
+    max_iterations: 5
+  producer:
+    role: "Producer"
+    model_tier: strong
+    max_iterations: 5
+  researcher:
+    role: "Researcher"
+    model_tier: research
+    max_iterations: 5
+  director:
+    role: "Director"
+    model_tier: strong
+    max_iterations: 5
+  production_manager:
+    role: "Production Manager"
+    model_tier: strong
+    max_iterations: 5
+  artist:
+    role: "Artist"
+    model_tier: strong
+    max_iterations: 1
+
+steps:
+  - id: editorial_vision
+    agent: series_producer
+    label: "Editorial Vision"
+    description: "Shapes the creative direction from the initial brief"
+    phase: phase_a
+  - id: specialist_briefs
+    agent: producer
+    label: "Specialist Briefs"
+    description: "Decomposes the vision into targeted briefs for each specialist"
+    phase: briefing
+  - id: research
+    agent: researcher
+    label: "Research"
+    description: "Investigates the subject with web search for facts, characters, and locations"
+    phase: research
+    tools: [web_search]
+  - id: creative_treatment
+    agent: director
+    label: "Creative Treatment"
+    description: "Crafts the narrative arc, sequences, and visual approach"
+    phase: treatment
+    tools: [reference_research]
+  - id: feasibility
+    agent: production_manager
+    label: "Feasibility Assessment"
+    description: "Assesses budget, crew, logistics, and production viability"
+    phase: feasibility
+    tools: [lookup_rates]
+  - id: collation
+    agent: producer
+    label: "Collation"
+    description: "Assembles all specialist outputs into a coherent episode package"
+    phase: collation
+    tools: [flag_gap]
+  - id: review
+    agent: series_producer
+    label: "Editorial Review"
+    description: "Reviews the episode package and approves or requests rework"
+    phase: phase_b
+  - id: evidence
+    agent: evidence_generator
+    label: "Evidence Trail"
+    description: "Documents the complete pipeline run for auditability"
+    phase: evidence
+
+review:
+  enabled: true
+  max_rework_cycles: 2
+  reviewer_agent: series_producer
+  cascade_graph:
+    researcher: [director, production_manager, producer_collation]
+    director: [producer_collation]
+    production_manager: [producer_collation]
+
+output_format: json

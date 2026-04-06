@@ -7,9 +7,7 @@
 
 ## Project Overview
 
-<!-- Update this section when the project scope changes -->
-
-[Project name and one-line description]
+**Agent Orchestrator** — A multi-agent orchestration framework that runs configurable AI pipelines with tool use, validation, and rework loops. Bundled pipelines: TV Production, Research Report, Startup Pitch.
 
 ---
 
@@ -82,11 +80,18 @@ pytest && git add -A && git commit -m "message"
 
 ```
 project/
-├── src/              # Main source code
-├── tests/            # Test files (mirror src/ structure)
-├── requirements.txt  # Dependencies
-├── app.py            # Entry point (if web-based)
-└── README.md         # User-facing documentation
+├── src/
+│   ├── core/              # Framework (agent, pipeline, registry, schemas)
+│   ├── pipelines/         # Pipeline plugins (tv_production, research_report, startup_pitch)
+│   ├── tools/             # Shared tools (search, tool decorator)
+│   ├── provider.py        # Config-driven LLM client
+│   └── main.py            # CLI entry point
+├── tests/                 # Test files
+├── static/                # Web UI
+├── requirements.txt       # Dependencies
+├── config.yaml            # Global config (providers, rate limits)
+├── app.py                 # FastAPI web server
+└── README.md              # User-facing documentation
 ```
 
 ---

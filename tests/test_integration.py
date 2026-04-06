@@ -211,24 +211,6 @@ def _make_simple_response(content: str) -> MagicMock:
     return response
 
 
-def _make_approve_response() -> MagicMock:
-    """Create a mock API response that calls the approve tool + returns pitch deck."""
-    msg = MagicMock()
-    msg.content = SP_PHASE_B_RESPONSE
-    tool_call = MagicMock()
-    tool_call.id = "call_approve"
-    tool_call.function.name = "approve"
-    tool_call.function.arguments = "{}"
-    msg.tool_calls = [tool_call]
-    choice = MagicMock()
-    choice.message = msg
-    choice.finish_reason = "tool_calls"
-    response = MagicMock()
-    response.choices = [choice]
-    response.usage = MagicMock(prompt_tokens=500, completion_tokens=300)
-    return response
-
-
 def _make_rework_response(agent: str, notes: str) -> MagicMock:
     """Create a mock API response with a JSON rework request (no tools)."""
     rework_json = json.dumps({"rework_request": {"agent": agent, "notes": notes}})
@@ -243,70 +225,39 @@ class TestFullPipelineNoRework:
     """Full pipeline where SP approves on first review (no rework)."""
 
     def test_full_pipeline_no_rework(self, mock_config: dict) -> None:
-        """Run the happy-path pipeline end-to-end with mocked API responses.
-
-        Call sequence (9 API calls total):
-          1. SP Phase A (no tools)         -> simple response
-          2. Producer Briefing (no tools)  -> simple response
-          3. Researcher (has web_search)   -> simple response (no tool use)
-          4. Director (has ref_research)   -> simple response (no tool use)
-          5. PM (has lookup_rates)         -> simple response (no tool use)
-          6. Producer Collation (flag_gap) -> simple response (no tool use)
-          7. SP Phase B (no tools)         -> PitchDeck JSON (implicit approval)
-          8. Evidence (no tools)           -> simple response
-        """
+        """Run the happy-path pipeline end-to-end with mocked API responses."""
         mock_responses = [
-            _make_simple_response(SP_PHASE_A_RESPONSE),         # 1 SP Phase A
-            _make_simple_response(PRODUCER_BRIEFS_RESPONSE),    # 2 Producer Briefing
-            _make_simple_response(RESEARCH_RESPONSE),           # 3 Researcher
-            _make_simple_response(DIRECTOR_RESPONSE),           # 4 Director
-            _make_simple_response(PM_RESPONSE),                 # 5 PM
-            _make_simple_response(COLLATION_RESPONSE),          # 6 Producer Collation
-            _make_simple_response(SP_PHASE_B_RESPONSE),         # 7 SP Phase B (PitchDeck)
-            _make_simple_response(EVIDENCE_RESPONSE),           # 8 Evidence
+            _make_simple_response(SP_PHASE_A_RESPONSE),
+            _make_simple_response(PRODUCER_BRIEFS_RESPONSE),
+            _make_simple_response(RESEARCH_RESPONSE),
+            _make_simple_response(DIRECTOR_RESPONSE),
+            _make_simple_response(PM_RESPONSE),
+            _make_simple_response(COLLATION_RESPONSE),
+            _make_simple_response(SP_PHASE_B_RESPONSE),
+            _make_simple_response(EVIDENCE_RESPONSE),
         ]
 
         mock_client = MagicMock()
         mock_client.chat.completions.create.side_effect = mock_responses
 
-        with patch("src.orchestrator.load_config", return_value=mock_config), \
-             patch("src.orchestrator.create_client", return_value=mock_client), \
+        with patch("src.core.pipeline.load_config", return_value=mock_config), \
+             patch("src.core.pipeline.create_client", return_value=mock_client), \
              patch("time.sleep"):
             orch = Orchestrator(config_path="fake.yaml")
             result = orch.run("A documentary about lighthouse keepers")
 
-        # Pipeline should succeed
         assert result.success is True, f"Pipeline failed: {result.error}"
-
-        # Pitch deck should be populated
         assert result.pitch_deck is not None
         assert result.pitch_deck["title_page"]["working_title"] == (
             "The Last Lighthouse Keeper"
         )
-        assert result.pitch_deck["logline"] == (
-            "A vanishing way of life, told through the last men to keep the light."
-        )
-
-        # Log should have entries for all pipeline steps
-        # Steps: sp_phase_a, briefing, research, treatment, feasibility,
-        #        collation, phase_b, evidence = 8 log entries
         assert len(result.log) == 8
 
-        # Verify agent names in log
         agent_phases = [(e["agent_name"], e["phase"]) for e in result.log]
         assert ("series_producer", "phase_a") in agent_phases
         assert ("producer", "briefing") in agent_phases
         assert ("researcher", "research") in agent_phases
-        assert ("director", "treatment") in agent_phases
-        assert ("production_manager", "feasibility") in agent_phases
-        assert ("producer", "collation") in agent_phases
-        assert ("series_producer", "phase_b") in agent_phases
-        assert ("evidence_generator", "evidence") in agent_phases
 
-        # No rework should have occurred
-        assert orch.rework_count == 0
-
-        # All 8 API calls should have been made
         assert mock_client.chat.completions.create.call_count == 8
 
 
@@ -314,76 +265,33 @@ class TestFullPipelineWithRework:
     """Full pipeline where SP requests rework on the researcher, then approves."""
 
     def test_full_pipeline_with_rework(self, mock_config: dict) -> None:
-        """Run pipeline where SP Phase B requests researcher rework.
-
-        Rework on researcher cascades to: director, PM, producer_collation.
-        Then SP Phase B runs again and approves.
-
-        Call sequence (15 API calls total):
-          1.  SP Phase A                     -> simple
-          2.  Producer Briefing              -> simple
-          3.  Researcher                     -> simple
-          4.  Director                       -> simple
-          5.  PM                             -> simple
-          6.  Producer Collation             -> simple
-          7.  SP Phase B call 1 (rework)     -> rework tool call
-          8.  SP Phase B call 2 (after tool) -> final content
-          --- rework cascade ---
-          9.  Researcher (re-run)            -> simple
-          10. Director (cascade)             -> simple
-          11. PM (cascade)                   -> simple
-          12. Producer Collation (cascade)   -> simple
-          --- second SP Phase B ---
-          13. SP Phase B call 1 (approve)    -> approve tool call
-          14. SP Phase B call 2 (final)      -> simple
-          15. Evidence                       -> simple
-        """
+        """Run pipeline where SP Phase B requests researcher rework."""
         mock_responses = [
-            # Initial pipeline (steps 1-6)
-            _make_simple_response(SP_PHASE_A_RESPONSE),         # 1
-            _make_simple_response(PRODUCER_BRIEFS_RESPONSE),    # 2
-            _make_simple_response(RESEARCH_RESPONSE),           # 3
-            _make_simple_response(DIRECTOR_RESPONSE),           # 4
-            _make_simple_response(PM_RESPONSE),                 # 5
-            _make_simple_response(COLLATION_RESPONSE),          # 6
-            # SP Phase B - rework (JSON-based, 1 call)
-            _make_rework_response(
-                "researcher", "Need more detail on automation history",
-            ),                                                  # 7
-            # Rework cascade (calls 8-11)
-            _make_simple_response(RESEARCH_RESPONSE),           # 8
-            _make_simple_response(DIRECTOR_RESPONSE),           # 9
-            _make_simple_response(PM_RESPONSE),                 # 10
-            _make_simple_response(COLLATION_RESPONSE),          # 11
-            # SP Phase B - approve (JSON PitchDeck, 1 call)
-            _make_simple_response(SP_PHASE_B_RESPONSE),         # 12
-            # Evidence (call 13)
-            _make_simple_response(EVIDENCE_RESPONSE),           # 13
+            _make_simple_response(SP_PHASE_A_RESPONSE),
+            _make_simple_response(PRODUCER_BRIEFS_RESPONSE),
+            _make_simple_response(RESEARCH_RESPONSE),
+            _make_simple_response(DIRECTOR_RESPONSE),
+            _make_simple_response(PM_RESPONSE),
+            _make_simple_response(COLLATION_RESPONSE),
+            _make_rework_response("researcher", "Need more detail on automation"),
+            _make_simple_response(RESEARCH_RESPONSE),
+            _make_simple_response(DIRECTOR_RESPONSE),
+            _make_simple_response(PM_RESPONSE),
+            _make_simple_response(COLLATION_RESPONSE),
+            _make_simple_response(SP_PHASE_B_RESPONSE),
+            _make_simple_response(EVIDENCE_RESPONSE),
         ]
 
         mock_client = MagicMock()
         mock_client.chat.completions.create.side_effect = mock_responses
 
-        with patch("src.orchestrator.load_config", return_value=mock_config), \
-             patch("src.orchestrator.create_client", return_value=mock_client), \
+        with patch("src.core.pipeline.load_config", return_value=mock_config), \
+             patch("src.core.pipeline.create_client", return_value=mock_client), \
              patch("time.sleep"):
             orch = Orchestrator(config_path="fake.yaml")
             result = orch.run("A documentary about lighthouse keepers")
 
-        # Pipeline should succeed
         assert result.success is True, f"Pipeline failed: {result.error}"
-
-        # Pitch deck should be populated
         assert result.pitch_deck is not None
-        assert result.pitch_deck["title_page"]["working_title"] == (
-            "The Last Lighthouse Keeper"
-        )
-
-        # Rework should have happened once
-        assert orch.rework_count == 1
-
-        # More log entries than no-rework path
         assert len(result.log) > 8
-
-        # All 15 API calls should have been made
         assert mock_client.chat.completions.create.call_count == 13

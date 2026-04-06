@@ -1,0 +1,81 @@
+id: startup_pitch
+name: "Startup Pitch"
+description: "Transform a business idea into an investor-ready pitch with market research, business model, competitive analysis, and financial projections."
+category: "Business & Strategy"
+version: "1.0"
+
+input:
+  type: text
+  label: "Business Idea"
+  placeholder: "An AI-powered platform that matches freelance translators with niche legal document work"
+  max_length: 2000
+
+agents:
+  strategist:
+    role: "Chief Strategist"
+    model_tier: strong
+    max_iterations: 5
+  market_researcher:
+    role: "Market Researcher"
+    model_tier: research
+    max_iterations: 8
+  business_architect:
+    role: "Business Architect"
+    model_tier: strong
+    max_iterations: 5
+  financial_modeller:
+    role: "Financial Modeller"
+    model_tier: strong
+    max_iterations: 5
+  pitch_writer:
+    role: "Pitch Writer"
+    model_tier: strong
+    max_iterations: 5
+  investor_reviewer:
+    role: "Investor Reviewer"
+    model_tier: strong
+    max_iterations: 3
+
+steps:
+  - id: strategic_framing
+    agent: strategist
+    label: "Strategic Framing"
+    description: "Defines the value proposition, target market, and strategic thesis"
+    phase: framing
+  - id: market_research
+    agent: market_researcher
+    label: "Market Research"
+    description: "Researches market size, competitors, trends, and customer segments"
+    phase: research
+    tools: [web_search]
+  - id: business_model
+    agent: business_architect
+    label: "Business Model"
+    description: "Designs revenue model, go-to-market strategy, and operational plan"
+    phase: modelling
+  - id: financials
+    agent: financial_modeller
+    label: "Financial Projections"
+    description: "Projects revenue, costs, and key metrics over 3 years"
+    phase: financials
+  - id: pitch_assembly
+    agent: pitch_writer
+    label: "Pitch Assembly"
+    description: "Assembles all components into a compelling investor narrative"
+    phase: assembly
+  - id: investor_review
+    agent: investor_reviewer
+    label: "Investor Review"
+    description: "Reviews from an investor perspective — flags weaknesses and gaps"
+    phase: review
+
+review:
+  enabled: true
+  max_rework_cycles: 1
+  reviewer_agent: investor_reviewer
+  cascade_graph:
+    market_researcher: [business_architect, financial_modeller, pitch_writer]
+    business_architect: [financial_modeller, pitch_writer]
+    financial_modeller: [pitch_writer]
+
+output_format: json

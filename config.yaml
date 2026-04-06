@@ -7,28 +7,7 @@ providers:
       research: "deepseek-ai/DeepSeek-V3-0324"
       utility: "Qwen/Qwen3-30B-A3B-Instruct-2507"
 
-agents:
-  series_producer:
-    model_tier: "strong"
-    max_iterations: 5
-  producer:
-    model_tier: "strong"
-    max_iterations: 5
-  researcher:
-    model_tier: "research"
-    max_iterations: 5
-  director:
-    model_tier: "strong"
-    max_iterations: 5
-  production_manager:
-    model_tier: "strong"
-    max_iterations: 5
-  artist:
-    model_tier: "strong"
-    max_iterations: 1
-
 pipeline:
-  max_rework_cycles: 2  # TOTAL pipeline-wide cap, not per-agent
   agent_timeout_seconds: 300
 
 rate_limiting:

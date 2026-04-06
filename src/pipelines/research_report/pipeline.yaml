@@ -1,0 +1,71 @@
+id: research_report
+name: "Research Report"
+description: "Deep-dive into any topic — produces a structured research report with sourced findings, analysis, and recommendations."
+category: "Knowledge & Research"
+version: "1.0"
+
+input:
+  type: text
+  label: "Research Topic"
+  placeholder: "The impact of microplastics on freshwater ecosystems in Europe"
+  max_length: 2000
+
+agents:
+  research_director:
+    role: "Research Director"
+    model_tier: strong
+    max_iterations: 5
+  investigator:
+    role: "Investigator"
+    model_tier: research
+    max_iterations: 8
+  analyst:
+    role: "Analyst"
+    model_tier: strong
+    max_iterations: 5
+  writer:
+    role: "Writer"
+    model_tier: strong
+    max_iterations: 5
+  reviewer:
+    role: "Reviewer"
+    model_tier: strong
+    max_iterations: 3
+
+steps:
+  - id: research_plan
+    agent: research_director
+    label: "Research Plan"
+    description: "Defines the scope, key questions, and methodology"
+    phase: planning
+  - id: investigation
+    agent: investigator
+    label: "Investigation"
+    description: "Conducts web research across all defined angles"
+    phase: investigation
+    tools: [web_search]
+  - id: analysis
+    agent: analyst
+    label: "Analysis"
+    description: "Synthesises findings into themes, identifies gaps, and draws conclusions"
+    phase: analysis
+  - id: writing
+    agent: writer
+    label: "Report Writing"
+    description: "Produces the final structured report with executive summary"
+    phase: writing
+  - id: review
+    agent: reviewer
+    label: "Quality Review"
+    description: "Reviews for accuracy, balance, and actionability"
+    phase: review
+
+review:
+  enabled: true
+  max_rework_cycles: 1
+  reviewer_agent: reviewer
+  cascade_graph:
+    investigator: [analyst, writer]
+    analyst: [writer]
+
+output_format: json

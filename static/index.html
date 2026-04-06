@@ -1,2419 +1,672 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Agentic Production Company</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --bg-dark: #1a1a2e;
-            --bg-mid: #16213e;
-            --bg-light: #0f3460;
-            --accent: #e94560;
-            --gold: #f5c542;
-            --green: #4ecca3;
-            --text: #eaeaea;
-            --text-dim: #8892b0;
-            --pixel-size: 4px;
-        }
-
-        body {
-            background: var(--bg-dark);
-            color: var(--text);
-            font-family: 'Press Start 2P', monospace;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
-        }
-
-        /* ── HEADER ── */
-        .header {
-            text-align: center;
-            padding: 24px 16px 12px;
-            background: linear-gradient(180deg, var(--bg-mid) 0%, var(--bg-dark) 100%);
-            border-bottom: 4px solid var(--accent);
-        }
-
-        .header h1 {
-            font-size: 14px;
-            color: var(--gold);
-            letter-spacing: 2px;
-            text-shadow: 2px 2px 0 #000;
-            margin-bottom: 8px;
-        }
-
-        .header p {
-            font-size: 8px;
-            color: var(--text-dim);
-        }
-
-        /* ── INPUT AREA ── */
-        .input-area {
-            display: flex;
-            justify-content: center;
-            padding: 20px 16px;
-            gap: 8px;
-        }
-
-        .input-area input {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 10px;
-            padding: 12px 16px;
-            background: var(--bg-mid);
-            border: 3px solid var(--bg-light);
-            color: var(--text);
-            width: 100%;
-            max-width: 560px;
-            outline: none;
-            image-rendering: pixelated;
-        }
-
-        .input-area input:focus {
-            border-color: var(--gold);
-        }
-
-        .input-area input::placeholder {
-            color: var(--text-dim);
-            font-size: 8px;
-        }
-
-        .input-area button {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 10px;
-            padding: 12px 20px;
-            background: var(--accent);
-            border: none;
-            color: #fff;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: background 0.15s;
-        }
-
-        .input-area button:hover {
-            background: #ff5a75;
-        }
-
-        .input-area button:disabled {
-            background: #555;
-            cursor: not-allowed;
-        }
-
-        /* ── STAGE ── */
-        .stage {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: flex-end;
-            padding: 12px 20px 0;
-            gap: 16px;
-            min-height: 280px;
-            position: relative;
-        }
-
-        /* Studio floor */
-        .stage::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 40px;
-            background: linear-gradient(
-                180deg,
-                #2a2a3e 0%,
-                #222236 100%
-            );
-            border-top: 2px solid #3a3a52;
-            image-rendering: pixelated;
-        }
-
-        /* ── CHARACTER SLOT ── */
-        .character-slot {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            position: relative;
-            z-index: 1;
-            width: 160px;
-            min-height: 240px;
-            justify-content: flex-end;
-            padding-bottom: 44px;
-        }
-
-        /* ── SPEECH BUBBLE ── */
-        .speech-bubble {
-            position: relative;
-            background: #fff;
-            color: #222;
-            font-size: 7px;
-            line-height: 1.6;
-            padding: 10px 12px;
-            border: 3px solid #222;
-            max-width: 150px;
-            min-height: 40px;
-            margin-bottom: 12px;
-            opacity: 0;
-            transform: translateY(8px);
-            transition: opacity 0.3s, transform 0.3s;
-            word-break: break-word;
-        }
-
-        .speech-bubble.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .speech-bubble::after {
-            content: '';
-            position: absolute;
-            bottom: -12px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-top: 12px solid #222;
-        }
-
-        .speech-bubble::before {
-            content: '';
-            position: absolute;
-            bottom: -8px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 0;
-            height: 0;
-            border-left: 6px solid transparent;
-            border-right: 6px solid transparent;
-            border-top: 9px solid #fff;
-            z-index: 1;
-        }
-
-        .bubble-label {
-            font-size: 6px;
-            color: #888;
-            margin-bottom: 4px;
-            text-transform: uppercase;
-        }
-
-        .bubble-text {
-            color: #333;
-        }
-
-        /* ── PIXEL CHARACTER ── */
-        .pixel-character {
-            width: 64px;
-            height: 80px;
-            image-rendering: pixelated;
-            position: relative;
-            transition: transform 0.2s;
-        }
-
-        .character-slot.active .pixel-character {
-            animation: bounce 0.6s ease-in-out infinite;
-        }
-
-        .character-slot.done .pixel-character {
-            filter: drop-shadow(0 0 6px var(--green));
-        }
-
-        .character-slot.rework .pixel-character {
-            animation: shake 0.3s ease-in-out;
-            filter: drop-shadow(0 0 6px var(--accent));
-        }
-
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-8px); }
-        }
-
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-4px); }
-            75% { transform: translateX(4px); }
-        }
-
-        /* ── PIXEL ART CHARACTERS (CSS pixel art) ── */
-        .pixel-art {
-            display: grid;
-            width: 64px;
-            height: 80px;
-        }
-
-        .pixel-art canvas {
-            width: 64px;
-            height: 80px;
-            image-rendering: pixelated;
-        }
-
-        /* ── CHARACTER NAME ── */
-        .char-name {
-            font-size: 7px;
-            color: var(--text);
-            text-align: center;
-            margin-top: 6px;
-            text-shadow: 1px 1px 0 #000;
-            position: relative;
-            z-index: 2;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            max-width: 100%;
-            line-height: 1.6;
-        }
-
-        .char-role {
-            font-size: 6px;
-            color: var(--text-dim);
-            text-align: center;
-            margin-top: 3px;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            max-width: 100%;
-            line-height: 1.6;
-        }
-
-        /* ── STATUS BAR ── */
-        .status-bar {
-            background: var(--bg-mid);
-            border-top: 4px solid var(--bg-light);
-            padding: 12px 20px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            min-height: 56px;
-        }
-
-        .progress-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .progress-text {
-            font-size: 8px;
-            color: var(--text);
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 12px;
-            background: var(--bg-dark);
-            border: 2px solid var(--bg-light);
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: var(--green);
-            width: 0%;
-            transition: width 0.5s ease;
-        }
-
-        .progress-fill.error {
-            background: var(--accent);
-        }
-
-        .step-counter {
-            font-size: 8px;
-            color: var(--gold);
-            white-space: nowrap;
-        }
-
-        /* ── LOG PANEL ── */
-        .log-panel {
-            background: var(--bg-dark);
-            border-top: 2px solid var(--bg-mid);
-            padding: 8px 20px;
-            max-height: 120px;
-            overflow-y: auto;
-            font-size: 7px;
-            line-height: 2;
-        }
-
-        .log-entry {
-            color: var(--text-dim);
-        }
-
-        .log-entry .timestamp {
-            color: var(--bg-light);
-            margin-right: 8px;
-        }
-
-        .log-entry.event-agent_start { color: var(--gold); }
-        .log-entry.event-agent_done { color: var(--green); }
-        .log-entry.event-rework { color: var(--accent); }
-        .log-entry.event-tool_call { color: #7ec8e3; }
-
-        /* ── RESULT OVERLAY ── */
-        .result-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.85);
-            z-index: 100;
-            overflow-y: auto;
-            padding: 40px 20px;
-        }
-
-        .result-overlay.visible {
-            display: block;
-        }
-
-        .result-content {
-            max-width: 700px;
-            margin: 0 auto;
-            background: var(--bg-mid);
-            border: 4px solid var(--gold);
-            padding: 24px;
-        }
-
-        .result-content h2 {
-            font-size: 12px;
-            color: var(--gold);
-            margin-bottom: 16px;
-            text-align: center;
-        }
-
-        .result-actions {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 16px;
-        }
-
-        .btn-download {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 10px;
-            padding: 14px 28px;
-            background: var(--green);
-            border: none;
-            color: #000;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            transition: background 0.15s;
-        }
-
-        .btn-download:hover {
-            background: #6fe8c0;
-        }
-
-        /* ── RESULT TABS ── */
-        .result-tabs {
-            display: flex;
-            border-bottom: 3px solid var(--bg-light);
-            margin-bottom: 16px;
-            gap: 0;
-        }
-
-        .result-tab {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 8px;
-            padding: 10px 16px;
-            background: var(--bg-dark);
-            border: 2px solid var(--bg-light);
-            border-bottom: none;
-            color: var(--text-dim);
-            cursor: pointer;
-            transition: background 0.15s, color 0.15s;
-            margin-right: -2px;
-            position: relative;
-            bottom: -3px;
-        }
-
-        .result-tab:hover {
-            color: var(--text);
-            background: var(--bg-mid);
-        }
-
-        .result-tab.active {
-            color: var(--gold);
-            background: var(--bg-mid);
-            border-color: var(--gold);
-            border-bottom: 3px solid var(--bg-mid);
-        }
-
-        .tab-panel {
-            display: none;
-        }
-
-        .tab-panel.visible {
-            display: block;
-        }
-
-        /* ── PITCH DECK SECTIONS ── */
-        .deck-section {
-            margin-bottom: 32px;
-            border: 2px solid var(--bg-light);
-            padding: 20px 24px;
-        }
-
-        .deck-section.deck-title-page {
-            padding: 32px 24px;
-            border-color: var(--gold);
-            border-width: 3px;
-            margin-bottom: 40px;
-        }
-
-        .deck-section h3 {
-            font-size: 9px;
-            color: var(--gold);
-            margin-bottom: 14px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .deck-section p, .deck-section li {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 7px;
-            line-height: 2.4;
-            color: var(--text-dim);
-        }
-
-        .deck-section ul {
-            list-style: none;
-            padding-left: 0;
-        }
-
-        .deck-section li::before {
-            content: '> ';
-            color: var(--accent);
-        }
-
-        .deck-label {
-            font-size: 6px;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            margin-bottom: 4px;
-            letter-spacing: 1px;
-        }
-
-        .deck-value {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 7px;
-            line-height: 2;
-            color: var(--text);
-            margin-bottom: 14px;
-        }
-
-        .deck-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 6px;
-        }
-
-        .deck-table th, .deck-table td {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 6px;
-            line-height: 2;
-            padding: 8px 10px;
-            text-align: left;
-            border-bottom: 1px solid var(--bg-light);
-        }
-
-        .deck-table th {
-            color: var(--gold);
-            text-transform: uppercase;
-        }
-
-        .deck-table td {
-            color: var(--text);
-        }
-
-        .character-cards {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 16px;
-            margin-top: 8px;
-        }
-
-        .character-card {
-            border: 2px solid var(--bg-light);
-            padding: 16px;
-            background: var(--bg-dark);
-        }
-
-        .character-card-name {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 8px;
-            color: var(--gold);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-        }
-
-        .character-card-role {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 6px;
-            color: var(--accent);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 10px;
-        }
-
-        .character-card-angle {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 7px;
-            line-height: 2.4;
-            color: var(--text-dim);
-        }
-
-        .feasibility-badge {
-            display: inline-block;
-            font-family: 'Press Start 2P', monospace;
-            font-size: 8px;
-            padding: 4px 12px;
-            border: 2px solid;
-            text-transform: uppercase;
-        }
-
-        .feasibility-badge.green { color: var(--green); border-color: var(--green); }
-        .feasibility-badge.amber { color: var(--gold); border-color: var(--gold); }
-        .feasibility-badge.red { color: var(--accent); border-color: var(--accent); }
-
-        /* ── EVIDENCE TRAIL ── */
-        .evidence-narrative {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 7px;
-            line-height: 2.4;
-            color: var(--text);
-        }
-
-        .evidence-intro {
-            color: var(--text);
-            margin-bottom: 16px;
-            padding: 10px 12px;
-            border: 2px solid var(--bg-light);
-            background: var(--bg-dark);
-        }
-
-        .evidence-chapter {
-            margin-bottom: 14px;
-            padding-left: 12px;
-            border-left: 3px solid var(--bg-light);
-        }
-
-        .evidence-chapter.has-tools {
-            border-left-color: #7ec8e3;
-        }
-
-        .evidence-chapter.has-rework {
-            border-left-color: var(--accent);
-        }
-
-        .evidence-who {
-            color: var(--gold);
-            margin-bottom: 2px;
-        }
-
-        .evidence-what {
-            color: var(--text);
-        }
-
-        .evidence-tools {
-            color: #7ec8e3;
-            font-style: italic;
-        }
-
-        .evidence-time {
-            color: var(--text-dim);
-            font-size: 6px;
-        }
-
-        .evidence-footer {
-            margin-top: 12px;
-            padding-top: 8px;
-            border-top: 1px solid var(--bg-light);
-            color: var(--text-dim);
-            font-size: 7px;
-        }
-
-        .evidence-rework-note {
-            color: var(--accent);
-            margin-top: 8px;
-            padding: 8px 12px;
-            border: 2px solid var(--accent);
-            background: rgba(233,69,96,0.1);
-        }
-
-        .result-close {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 10px;
-            padding: 10px 24px;
-            background: var(--accent);
-            border: none;
-            color: #fff;
-            cursor: pointer;
-            display: block;
-            margin: 16px auto 0;
-        }
-
-        /* ── INTRO OVERLAY ── */
-        .intro-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0;
-            z-index: 200;
-            background: linear-gradient(
-                to bottom,
-                var(--bg-dark) 0%,
-                var(--bg-dark) 55%,
-                rgba(26,26,46,0.7) 75%,
-                rgba(26,26,46,0) 100%
-            );
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            padding: 40px 20px 20px;
-            min-height: 50vh;
-            transition: opacity 0.8s;
-        }
-
-        .intro-overlay.fade-out {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .intro-overlay.hidden {
-            display: none;
-        }
-
-        .intro-text-area {
-            max-width: 640px;
-            width: 100%;
-            text-align: left;
-            margin-bottom: 20px;
-            max-height: 55vh;
-            overflow-y: auto;
-            scrollbar-width: none;
-        }
-
-        .intro-text-area::-webkit-scrollbar {
-            display: none;
-        }
-
-        .intro-line {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 9px;
-            line-height: 2;
-            color: var(--text);
-            opacity: 0;
-            transform: translateY(6px);
-            transition: opacity 0.4s, transform 0.4s;
-            margin-bottom: 8px;
-        }
-
-        .intro-line.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .intro-line.highlight-line {
-            color: var(--gold);
-        }
-
-        .intro-cursor {
-            display: inline-block;
-            width: 7px;
-            height: 11px;
-            background: var(--gold);
-            animation: blink 0.6s step-end infinite;
-            vertical-align: middle;
-            margin-left: 2px;
-        }
-
-        @keyframes blink {
-            50% { opacity: 0; }
-        }
-
-        .intro-skip {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 8px;
-            padding: 10px 20px;
-            background: transparent;
-            border: 2px solid var(--text-dim);
-            color: var(--text-dim);
-            cursor: pointer;
-            transition: color 0.2s, border-color 0.2s;
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 201;
-        }
-
-        .intro-skip:hover {
-            color: var(--gold);
-            border-color: var(--gold);
-        }
-
-        /* Highlight glow on characters during intro */
-        .character-slot.intro-highlight .pixel-character {
-            filter: drop-shadow(0 0 12px var(--gold));
-            animation: bounce 0.6s ease-in-out infinite;
-        }
-
-        .character-slot.intro-dim {
-            opacity: 0.35;
-            transition: opacity 0.5s;
-        }
-
-        /* Hide input area until intro is done — use visibility to reserve space */
-        .input-area.intro-hidden {
-            visibility: hidden;
-            pointer-events: none;
-        }
-
-        /* ── NARRATION BAR ── */
-        .narration-bar {
-            background: var(--bg-mid);
-            border-left: 4px solid var(--gold);
-            padding: 12px 24px;
-            min-height: 36px;
-            font-family: 'Press Start 2P', monospace;
-            font-size: 10px;
-            line-height: 2.2;
-            color: var(--text);
-            text-align: center;
-            opacity: 0;
-            transition: opacity 0.4s;
-            margin: 0 20px;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-        }
-
-        .narration-bar.visible {
-            opacity: 1;
-        }
-
-        .narration-cursor {
-            display: inline-block;
-            width: 6px;
-            height: 10px;
-            background: var(--gold);
-            animation: blink 0.6s step-end infinite;
-            vertical-align: middle;
-            margin-left: 2px;
-        }
-
-        /* ── OUTRO BLOCK (in result overlay) ── */
-        .outro-block {
-            border-left: 4px solid var(--gold);
-            padding: 12px 16px;
-            margin-bottom: 16px;
-            font-family: 'Press Start 2P', monospace;
-            font-size: 8px;
-            line-height: 2.2;
-            color: var(--text);
-            background: var(--bg-dark);
-        }
-
-        /* ── SPOTLIGHT OUTRO ── */
-        .spotlight-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            z-index: 150;
-            background: rgba(0,0,0,0);
-            transition: background 1s;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 40px 20px;
-        }
-
-        .spotlight-overlay.visible {
-            display: flex;
-            background: rgba(0,0,0,0.92);
-        }
-
-        .spotlight-text {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 12px;
-            line-height: 2.4;
-            color: var(--gold);
-            text-align: center;
-            max-width: 600px;
-            opacity: 0;
-            transform: translateY(10px);
-            transition: opacity 0.6s, transform 0.6s;
-        }
-
-        .spotlight-text.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .spotlight-cursor {
-            display: inline-block;
-            width: 9px;
-            height: 15px;
-            background: var(--gold);
-            animation: blink 0.6s step-end infinite;
-            vertical-align: middle;
-            margin-left: 3px;
-        }
-
-        @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 8px rgba(78,204,163,0.4); }
-            50% { box-shadow: 0 0 24px rgba(78,204,163,0.8); }
-        }
-
-        .spotlight-continue {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 12px;
-            padding: 18px 36px;
-            background: var(--green);
-            border: none;
-            color: #000;
-            cursor: pointer;
-            margin-top: 32px;
-            transition: box-shadow 0.3s;
-            animation: pulse-glow 1.5s ease-in-out infinite;
-        }
-
-        .spotlight-continue:hover {
-            box-shadow: 0 0 30px rgba(78,204,163,0.9);
-        }
-
-        /* ── RESPONSIVE ── */
-        @media (max-width: 900px) {
-            .stage {
-                gap: 8px;
-                padding: 8px 8px 0;
-            }
-            .character-slot { width: 120px; }
-            .speech-bubble { max-width: 110px; font-size: 6px; }
-        }
-
-        @media (max-width: 640px) {
-            .header h1 { font-size: 10px; }
-            .header p { font-size: 7px; }
-
-            .input-area {
-                padding: 12px 10px;
-            }
-            .input-area input {
-                font-size: 8px;
-                padding: 10px 12px;
-                min-width: 0;
-            }
-            .input-area button {
-                font-size: 8px;
-                padding: 10px 14px;
-            }
-
-            .stage {
-                flex-wrap: nowrap;
-                overflow-x: auto;
-                justify-content: flex-start;
-                min-height: auto;
-                padding: 8px 10px 0;
-                gap: 10px;
-                -webkit-overflow-scrolling: touch;
-            }
-            .character-slot {
-                width: 100px;
-                min-width: 100px;
-                min-height: 160px;
-                padding-bottom: 36px;
-            }
-            .pixel-character { transform: scale(0.75); transform-origin: bottom center; }
-            .char-name { font-size: 5px; }
-            .char-role { font-size: 4px; }
-            .speech-bubble {
-                max-width: 95px;
-                font-size: 5px;
-                padding: 5px 6px;
-                min-height: 24px;
-                line-height: 1.4;
-            }
-
-            .narration-bar {
-                font-size: 8px;
-                padding: 8px 12px;
-                margin: 0 8px;
-            }
-
-            .status-bar { padding: 8px 10px; }
-            .progress-text { font-size: 7px; }
-            .step-counter { font-size: 7px; }
-            .log-panel { font-size: 6px; padding: 6px 10px; }
-
-            .intro-overlay { padding: 24px 14px 14px; }
-            .intro-line { font-size: 8px; line-height: 1.8; margin-bottom: 6px; }
-            .intro-skip { top: 12px; right: 12px; font-size: 7px; padding: 8px 14px; }
-
-            .result-content { padding: 16px; }
-            .result-content h2 { font-size: 10px; }
-            .result-tab { font-size: 7px; padding: 8px 10px; }
-            .spotlight-text { font-size: 9px; }
-            .spotlight-continue { font-size: 10px; padding: 14px 24px; }
-
-            .deck-section { padding: 14px 16px; }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Orchestrator</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface-2: #1a1a26;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #6c63ff;
+      --accent-glow: rgba(108, 99, 255, 0.15);
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --radius: 8px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Header */
+    .header {
+      padding: 24px 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header h1 {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .header .tag {
+      font-size: 11px;
+      color: var(--text-dim);
+      background: var(--surface-2);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    /* Layout */
+    .main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px;
+    }
+
+    /* Pipeline Selector */
+    .pipeline-selector {
+      margin-bottom: 32px;
+    }
+    .pipeline-selector h2 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+    .pipeline-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 12px;
+    }
+    .pipeline-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .pipeline-card:hover {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+    .pipeline-card.selected {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+    .pipeline-card .name {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .pipeline-card .category {
+      font-size: 11px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .pipeline-card .desc {
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+    .pipeline-card .meta {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      gap: 16px;
+    }
+
+    /* Input Area */
+    .input-area {
+      margin-bottom: 24px;
+    }
+    .input-area label {
+      display: block;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+    .input-row {
+      display: flex;
+      gap: 12px;
+    }
+    .input-area textarea {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 12px 16px;
+      resize: vertical;
+      min-height: 64px;
+      max-height: 200px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .input-area textarea:focus {
+      border-color: var(--accent);
+    }
+    .input-area textarea::placeholder {
+      color: var(--text-dim);
+    }
+    .run-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      padding: 12px 24px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .run-btn:hover { opacity: 0.9; }
+    .run-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* Pipeline View (shown during/after run) */
+    .pipeline-view {
+      display: none;
+    }
+    .pipeline-view.active { display: block; }
+
+    /* Progress Bar */
+    .progress-header {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .progress-header .status {
+      font-size: 13px;
+      flex: 1;
+    }
+    .progress-header .timer {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .progress-track {
+      height: 4px;
+      background: var(--surface-2);
+      border-radius: 0 0 4px 4px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.5s ease;
+      width: 0%;
+    }
+
+    /* Steps */
+    .steps-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    .step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 0.3s;
+    }
+    .step.active {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+    .step.done {
+      border-color: var(--green);
+      opacity: 0.7;
+    }
+    .step.rework {
+      border-color: var(--amber);
+    }
+    .step-indicator {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .step.active .step-indicator { border-color: var(--accent); color: var(--accent); }
+    .step.done .step-indicator { border-color: var(--green); color: var(--green); }
+    .step-info { flex: 1; }
+    .step-label { font-size: 13px; font-weight: 600; }
+    .step-agent { font-size: 11px; color: var(--text-dim); }
+    .step-message {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 2px;
+      font-style: italic;
+    }
+
+    /* Event Log */
+    .event-log {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      max-height: 250px;
+      overflow-y: auto;
+      margin-bottom: 24px;
+    }
+    .event-log h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+    .event-entry {
+      font-size: 12px;
+      padding: 3px 0;
+      border-bottom: 1px solid var(--surface-2);
+      display: flex;
+      gap: 8px;
+    }
+    .event-entry:last-child { border-bottom: none; }
+    .event-time { color: var(--text-dim); white-space: nowrap; }
+    .event-text { color: var(--text); }
+    .event-entry.tool .event-text { color: var(--amber); }
+    .event-entry.rework .event-text { color: var(--red); }
+    .event-entry.commentary .event-text { color: var(--accent); font-style: italic; }
+
+    /* Result */
+    .result-panel {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--green);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    .result-panel.active { display: block; }
+    .result-panel h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--green);
+    }
+    .result-json {
+      background: var(--bg);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-size: 12px;
+      line-height: 1.6;
+      max-height: 500px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .result-actions {
+      margin-top: 16px;
+      display: flex;
+      gap: 12px;
+    }
+    .result-actions button {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 16px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .result-actions button:hover { border-color: var(--accent); }
+
+    /* Error */
+    .error-banner {
+      display: none;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid var(--red);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: var(--red);
+    }
+    .error-banner.active { display: block; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--surface); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
 </head>
 <body>
+  <div class="header">
+    <h1>Agent Orchestrator</h1>
+    <span class="tag">Multi-Pipeline Framework</span>
+  </div>
 
-    <div class="intro-overlay" id="introOverlay">
-        <div class="intro-text-area" id="introTextArea"></div>
-        <button class="intro-skip" id="introSkip" onclick="skipIntro()">SKIP INTRO &gt;</button>
+  <div class="main">
+    <!-- Pipeline Selector -->
+    <div class="pipeline-selector" id="pipelineSelector">
+      <h2>Select Pipeline</h2>
+      <div class="pipeline-cards" id="pipelineCards"></div>
     </div>
 
-    <div class="header">
-        <h1>THE AGENTIC PRODUCTION CO.</h1>
-        <p>AI agents collaborate to turn your unscripted TV idea into a pitch deck</p>
+    <!-- Input -->
+    <div class="input-area" id="inputArea">
+      <label id="inputLabel">Input</label>
+      <div class="input-row">
+        <textarea id="inputText" placeholder="Select a pipeline above..." maxlength="2000"></textarea>
+        <button class="run-btn" id="runBtn" disabled>Run</button>
+      </div>
     </div>
 
-    <div class="input-area intro-hidden" id="inputArea">
-        <input type="text" id="briefInput"
-               placeholder="Enter an unscripted show idea... e.g. A 3x60 doc about lighthouse keepers"
-               autocomplete="off">
-        <button id="runBtn" onclick="startPipeline()">GO!</button>
-        <button id="demoBtn" onclick="startDemo()" title="Test without API calls" style="display:none;background:transparent;border:2px solid var(--gold);color:var(--gold);font-family:'Press Start 2P',monospace;font-size:8px;padding:12px 14px;cursor:pointer;white-space:nowrap;transition:background 0.15s,color 0.15s;">DEMO</button>
+    <!-- Error -->
+    <div class="error-banner" id="errorBanner"></div>
+
+    <!-- Pipeline View -->
+    <div class="pipeline-view" id="pipelineView">
+      <div class="progress-header">
+        <div class="status" id="statusText">Starting...</div>
+        <div class="timer" id="timerText">0s</div>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+
+      <div class="steps-container" id="stepsContainer"></div>
+
+      <div class="event-log" id="eventLog">
+        <h3>Event Log</h3>
+      </div>
     </div>
 
-    <div class="narration-bar" id="narrationBar">
-        <span id="narrationText"></span>
+    <!-- Result -->
+    <div class="result-panel" id="resultPanel">
+      <h3 id="resultTitle">Pipeline Complete</h3>
+      <div class="result-json" id="resultJson"></div>
+      <div class="result-actions">
+        <button id="copyBtn">Copy JSON</button>
+        <button id="downloadBtn" style="display:none">Download PPTX</button>
+        <button id="resetBtn">Run Another</button>
+      </div>
     </div>
+  </div>
 
-    <div class="stage" id="stage">
-        <!-- Characters generated by JS -->
-    </div>
-
-    <div class="status-bar">
-        <div class="progress-container">
-            <div class="progress-text" id="statusText">Ready. Enter a brief to begin.</div>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-        </div>
-        <div class="step-counter" id="stepCounter">-/-</div>
-    </div>
-
-    <div class="log-panel" id="logPanel"></div>
-
-    <div class="spotlight-overlay" id="spotlightOverlay">
-        <div class="spotlight-text" id="spotlightText"></div>
-        <button class="spotlight-continue" id="spotlightContinue" onclick="dismissSpotlight()" style="opacity:0;transition:opacity 0.6s">SEE THE FULL DECK &gt;</button>
-    </div>
-
-    <div class="result-overlay" id="resultOverlay">
-        <div class="result-content">
-            <h2>PITCH DECK COMPLETE</h2>
-            <div class="outro-block" id="outroBlock" style="display:none"></div>
-            <div class="result-actions" id="resultActions"></div>
-            <div class="result-tabs" id="resultTabs">
-                <button class="result-tab active" onclick="switchTab('deck')">PITCH DECK</button>
-                <button class="result-tab" onclick="switchTab('evidence')">EVIDENCE TRAIL</button>
-                <button class="result-tab" onclick="switchTab('json')">RAW JSON</button>
-                <button class="result-tab" onclick="switchTab('learn')">WHAT JUST HAPPENED</button>
-            </div>
-            <div class="tab-panel visible" id="tabDeck"></div>
-            <div class="tab-panel" id="tabEvidence"></div>
-            <div class="tab-panel" id="tabJson"></div>
-            <div class="tab-panel" id="tabLearn"></div>
-            <button class="result-close" onclick="closeResult()">CLOSE</button>
-        </div>
-    </div>
-
-    <script>
-    // ── CHARACTER DEFINITIONS ──
-    const CHARACTERS = [
-        {
-            id: 'series_producer',
-            name: 'SERIES PRODUCER',
-            role: 'Editorial Vision',
-            // Pixel art: professional woman with glasses and blazer
-            pixels: [
-                // Hair (dark brown, longer — frames face)
-                { color: '#2c1810', coords: [[2,-1],[3,-1],[4,-1],[5,-1],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[0,2],[1,2],[6,2],[7,2],[0,3],[7,3],[0,4],[7,4],[0,5],[7,5]] },
-                // Face (skin)
-                { color: '#f4c089', coords: [[2,2],[3,2],[4,2],[5,2],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[5,4]] },
-                // Glasses
-                { color: '#6a5acd', coords: [[1,3],[6,3]] },
-                // Eyes
-                { color: '#1a1a1a', coords: [[3,3],[5,3]] },
-                // Lips
-                { color: '#d4636a', coords: [[3,4],[4,4]] },
-                // Blazer (dark navy)
-                { color: '#1a237e', coords: [[1,5],[2,5],[5,5],[6,5],[1,6],[2,6],[5,6],[6,6],[1,7],[2,7],[5,7],[6,7],[1,8],[2,8],[5,8],[6,8]] },
-                // Blouse (cream)
-                { color: '#f5f0e8', coords: [[3,5],[4,5],[3,6],[4,6],[3,7],[4,7]] },
-                // Necklace accent
-                { color: '#f5c542', coords: [[3,5],[4,5]] },
-                // Hands (skin)
-                { color: '#f4c089', coords: [[0,8],[7,8]] },
-                // Skirt (dark)
-                { color: '#0d1b4a', coords: [[2,9],[3,9],[4,9],[5,9],[2,10],[3,10],[4,10],[5,10]] },
-                // Shoes (heels)
-                { color: '#1a237e', coords: [[1,11],[2,11],[3,11],[4,11],[5,11],[6,11]] },
-            ]
-        },
-        {
-            id: 'producer',
-            name: 'PRODUCER',
-            role: 'Creative Coordinator',
-            pixels: [
-                // Headset
-                { color: '#555', coords: [[1,0],[6,0],[0,1],[7,1],[0,2],[7,2]] },
-                // Headset mic
-                { color: '#e94560', coords: [[0,3],[0,4]] },
-                // Hair
-                { color: '#8b4513', coords: [[2,0],[3,0],[4,0],[5,0],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1]] },
-                // Face
-                { color: '#d4a574', coords: [[2,2],[3,2],[4,2],[5,2],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[5,4]] },
-                // Eyes
-                { color: '#1a1a1a', coords: [[3,3],[5,3]] },
-                // Mouth (smile)
-                { color: '#c4785a', coords: [[3,4],[4,4]] },
-                // Jacket (warm brown)
-                { color: '#8d6e63', coords: [[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[1,8],[2,8],[5,8],[6,8]] },
-                // Clipboard
-                { color: '#f5f5dc', coords: [[6,8],[7,8],[7,7]] },
-                // Shirt
-                { color: '#fff', coords: [[3,5],[4,5],[3,6],[4,6]] },
-                // Hands
-                { color: '#d4a574', coords: [[0,8],[7,9]] },
-                // Pants
-                { color: '#37474f', coords: [[2,9],[3,9],[4,9],[5,9],[2,10],[3,10],[4,10],[5,10]] },
-                // Shoes
-                { color: '#5d4037', coords: [[1,11],[2,11],[3,11],[4,11],[5,11],[6,11]] },
-            ]
-        },
-        {
-            id: 'researcher',
-            name: 'RESEARCHER',
-            role: 'Fact Finder',
-            pixels: [
-                // Hair (red/auburn)
-                { color: '#b33a2d', coords: [[2,0],[3,0],[4,0],[5,0],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[1,2],[6,2]] },
-                // Face
-                { color: '#fdd9b5', coords: [[2,2],[3,2],[4,2],[5,2],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[5,4]] },
-                // Glasses (round)
-                { color: '#4fc3f7', coords: [[1,3],[6,3]] },
-                // Eyes
-                { color: '#1a1a1a', coords: [[3,3],[5,3]] },
-                // Mouth
-                { color: '#c4785a', coords: [[4,4]] },
-                // Lab coat (white)
-                { color: '#eceff1', coords: [[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[0,8],[1,8],[2,8],[5,8],[6,8],[7,8]] },
-                // Shirt underneath
-                { color: '#4caf50', coords: [[3,5],[4,5]] },
-                // Magnifying glass
-                { color: '#ffd54f', coords: [[7,5],[7,4]] },
-                { color: '#81d4fa', coords: [[7,3]] },
-                // Hands
-                { color: '#fdd9b5', coords: [[0,9],[7,9]] },
-                // Pants
-                { color: '#455a64', coords: [[2,9],[3,9],[4,9],[5,9],[2,10],[3,10],[4,10],[5,10]] },
-                // Shoes
-                { color: '#795548', coords: [[1,11],[2,11],[3,11],[4,11],[5,11],[6,11]] },
-            ]
-        },
-        {
-            id: 'director',
-            name: 'DIRECTOR',
-            role: 'Creative Visionary',
-            // Pixel art: creative woman with beret and flowing hair
-            pixels: [
-                // Beret
-                { color: '#880e4f', coords: [[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[2,-1],[3,-1],[4,-1]] },
-                // Hair (dark, longer — flows past face)
-                { color: '#1a1a1a', coords: [[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[0,2],[7,2],[0,3],[7,3],[0,4],[7,4],[0,5],[7,5],[0,6],[7,6]] },
-                // Face
-                { color: '#e8b88a', coords: [[2,2],[3,2],[4,2],[5,2],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[5,4]] },
-                // Sunglasses (stylish, slightly wider)
-                { color: '#111', coords: [[2,3],[3,3],[5,3],[6,3]] },
-                // Lips
-                { color: '#c4505a', coords: [[3,4],[4,4]] },
-                // Turtleneck (black)
-                { color: '#212121', coords: [[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[1,8],[2,8],[5,8],[6,8]] },
-                // Scarf accent (red)
-                { color: '#e94560', coords: [[3,5],[4,5],[3,6],[4,6]] },
-                // Hands
-                { color: '#e8b88a', coords: [[0,8],[7,8]] },
-                // Slim trousers
-                { color: '#1a1a1a', coords: [[2,9],[3,9],[4,9],[5,9],[2,10],[3,10],[4,10],[5,10]] },
-                // Boots (stylish)
-                { color: '#4e342e', coords: [[1,11],[2,11],[3,11],[4,11],[5,11],[6,11]] },
-            ]
-        },
-        {
-            id: 'production_manager',
-            name: 'PROD. MANAGER',
-            role: 'Logistics & Budget',
-            pixels: [
-                // Hard hat
-                { color: '#ffc107', coords: [[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[0,0],[7,0],[2,-1],[3,-1],[4,-1],[5,-1]] },
-                // Hair
-                { color: '#5d4037', coords: [[2,1],[3,1],[4,1],[5,1]] },
-                // Face
-                { color: '#c9956b', coords: [[2,2],[3,2],[4,2],[5,2],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[5,4]] },
-                // Eyes
-                { color: '#1a1a1a', coords: [[3,3],[5,3]] },
-                // Smile
-                { color: '#a0604a', coords: [[3,4],[4,4],[5,4]] },
-                // Hi-vis vest
-                { color: '#ff9800', coords: [[1,5],[2,5],[5,5],[6,5],[0,6],[1,6],[6,6],[7,6],[0,7],[1,7],[6,7],[7,7]] },
-                // Vest stripes
-                { color: '#ffeb3b', coords: [[2,6],[5,6],[2,7],[5,7]] },
-                // Shirt (dark)
-                { color: '#37474f', coords: [[3,5],[4,5],[2,5],[3,6],[4,6],[3,7],[4,7],[1,8],[2,8],[5,8],[6,8]] },
-                // Calculator
-                { color: '#90a4ae', coords: [[7,7],[7,8]] },
-                { color: '#4caf50', coords: [[7,6]] },
-                // Hands
-                { color: '#c9956b', coords: [[0,8],[7,9]] },
-                // Pants (work)
-                { color: '#455a64', coords: [[2,9],[3,9],[4,9],[5,9],[2,10],[3,10],[4,10],[5,10]] },
-                // Boots
-                { color: '#3e2723', coords: [[1,11],[2,11],[3,11],[4,11],[5,11],[6,11]] },
-            ]
-        }
-    ];
-
-    // ── STATE ──
+  <script>
     let ws = null;
-    let isRunning = false;
-    let introComplete = false;
-    let narrationInterval = null;
-    let outroText = null;
+    let pipelines = [];
+    let selectedPipeline = null;
+    let running = false;
+    let startTime = 0;
+    let timerInterval = null;
 
-    // ── INTRO SCRIPT ──
-    const INTRO_SCRIPT = [
-        {
-            text: "Welcome to The Agentic Production Company.",
-            highlight: null,
-            pause: 2000
-        },
-        {
-            text: "You're about to watch something different.",
-            highlight: null,
-            pause: 1500
-        },
-        {
-            text: "This isn't one AI answering a question. These are five independent AI agents — each running its own large language model — built for unscripted and factual television.",
-            highlight: null,
-            pause: 3000
-        },
-        {
-            text: "Each agent reasons on its own, uses real tools, and makes its own decisions. That's what \"agentic\" means.",
-            highlight: null,
-            pause: 3000
-        },
-        {
-            text: "They collaborate like a real production team — passing work between them, building on each other's output.",
-            highlight: null,
-            pause: 3000
-        },
-        {
-            text: "Meet the Series Producer. She sets the editorial vision and has the final say on quality.",
-            highlight: "series_producer",
-            pause: 2500
-        },
-        {
-            text: "The Producer. He coordinates the team, creates specialist briefs, and assembles the final package.",
-            highlight: "producer",
-            pause: 2500
-        },
-        {
-            text: "The Researcher. An independent LLM agent that searches the real web for facts, competitors, and locations.",
-            highlight: "researcher",
-            pause: 2500
-        },
-        {
-            text: "The Director. She crafts the narrative arc, visual approach, and key sequences.",
-            highlight: "director",
-            pause: 2500
-        },
-        {
-            text: "The Production Manager. His own AI agent running the numbers — budget, crew, shooting days, logistics.",
-            highlight: "production_manager",
-            pause: 2500
-        },
-        {
-            text: "The Series Producer can even send work back if quality isn't good enough. Real feedback loops between independent agents.",
-            highlight: "series_producer",
-            pause: 2500
-        },
-        {
-            text: "Enter a show idea below and watch them work.",
-            highlight: null,
-            pause: 0
-        }
-    ];
+    const pipelineCards = document.getElementById('pipelineCards');
+    const inputLabel = document.getElementById('inputLabel');
+    const inputText = document.getElementById('inputText');
+    const runBtn = document.getElementById('runBtn');
+    const errorBanner = document.getElementById('errorBanner');
+    const pipelineView = document.getElementById('pipelineView');
+    const stepsContainer = document.getElementById('stepsContainer');
+    const statusText = document.getElementById('statusText');
+    const timerText = document.getElementById('timerText');
+    const progressFill = document.getElementById('progressFill');
+    const eventLog = document.getElementById('eventLog');
+    const resultPanel = document.getElementById('resultPanel');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultJson = document.getElementById('resultJson');
+    const copyBtn = document.getElementById('copyBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const resetBtn = document.getElementById('resetBtn');
 
-    // ── INIT ──
-    function init() {
-        const stage = document.getElementById('stage');
-        CHARACTERS.forEach(char => {
-            const slot = document.createElement('div');
-            slot.className = 'character-slot';
-            slot.id = `slot-${char.id}`;
-            slot.innerHTML = `
-                <div class="speech-bubble" id="bubble-${char.id}">
-                    <div class="bubble-label"></div>
-                    <div class="bubble-text">Waiting...</div>
-                </div>
-                <div class="pixel-character">
-                    <canvas id="canvas-${char.id}" width="64" height="80"></canvas>
-                </div>
-                <div class="char-name">${char.name}</div>
-                <div class="char-role">${char.role}</div>
-            `;
-            stage.appendChild(slot);
-            drawCharacter(char);
-        });
-
-        document.getElementById('briefInput').addEventListener('keypress', e => {
-            if (e.key === 'Enter') startPipeline();
-        });
-
-        // Check if user has seen intro before
-        if (localStorage.getItem('introSeen')) {
-            finishIntro();
-        } else {
-            runIntro();
-        }
+    async function loadPipelines() {
+      try {
+        const resp = await fetch('/api/pipelines');
+        pipelines = await resp.json();
+        renderPipelineCards();
+      } catch (e) {
+        showError('Failed to load pipelines. Is the server running?');
+      }
     }
 
-    // ── INTRO ENGINE (stacked narrative) ──
-    let introTimer = null;
-    let introTypeInterval = null;
-    let introIndex = 0;
-
-    function runIntro() {
-        // Dim all characters initially
-        CHARACTERS.forEach(c => {
-            const slot = document.getElementById(`slot-${c.id}`);
-            if (slot) slot.classList.add('intro-dim');
-        });
-        introIndex = 0;
-        playIntroLine();
+    function renderPipelineCards() {
+      pipelineCards.innerHTML = '';
+      pipelines.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'pipeline-card';
+        card.dataset.id = p.id;
+        const agentNames = Object.values(p.agents).map(a => a.role).join(', ');
+        card.innerHTML = `
+          <div class="name">${esc(p.name)}</div>
+          <div class="category">${esc(p.category)}</div>
+          <div class="desc">${esc(p.description)}</div>
+          <div class="meta">
+            <span>${p.steps.length} steps</span>
+            <span>${Object.keys(p.agents).length} agents</span>
+            ${p.has_review ? '<span>+ review</span>' : ''}
+          </div>
+        `;
+        card.onclick = () => selectPipeline(p, card);
+        pipelineCards.appendChild(card);
+      });
     }
 
-    function playIntroLine() {
-        if (introIndex >= INTRO_SCRIPT.length) {
-            localStorage.setItem('introSeen', '1');
-            endIntroAnimation();
-            return;
-        }
-
-        const frame = INTRO_SCRIPT[introIndex];
-        const area = document.getElementById('introTextArea');
-
-        // Create a new line element
-        const line = document.createElement('div');
-        line.className = 'intro-line' + (frame.highlight ? ' highlight-line' : '');
-        area.appendChild(line);
-
-        // Update character highlights
-        CHARACTERS.forEach(c => {
-            const slot = document.getElementById(`slot-${c.id}`);
-            if (!slot) return;
-            slot.classList.remove('intro-highlight');
-            if (frame.highlight && c.id === frame.highlight) {
-                slot.classList.remove('intro-dim');
-                slot.classList.add('intro-highlight');
-            } else if (frame.highlight) {
-                slot.classList.add('intro-dim');
-            } else {
-                slot.classList.remove('intro-dim');
-            }
-        });
-
-        // Typewriter into this line
-        let i = 0;
-        const cursor = '<span class="intro-cursor"></span>';
-        if (introTypeInterval) clearInterval(introTypeInterval);
-
-        introTypeInterval = setInterval(() => {
-            if (i < frame.text.length) {
-                line.innerHTML = escHtml(frame.text.slice(0, i + 1)) + cursor;
-                i++;
-                // Keep scrolled to bottom as text types
-                area.scrollTop = area.scrollHeight;
-            } else {
-                clearInterval(introTypeInterval);
-                introTypeInterval = null;
-                line.innerHTML = escHtml(frame.text);
-                line.classList.add('visible');
-
-                area.scrollTop = area.scrollHeight;
-
-                // Pause then advance
-                const pause = frame.pause || 1500;
-                introTimer = setTimeout(() => {
-                    introIndex++;
-                    playIntroLine();
-                }, pause);
-            }
-        }, 30);
-
-        // Make line visible immediately (for typewriter to show)
-        requestAnimationFrame(() => line.classList.add('visible'));
+    function selectPipeline(p, card) {
+      selectedPipeline = p;
+      document.querySelectorAll('.pipeline-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      inputLabel.textContent = p.input.label;
+      inputText.placeholder = p.input.placeholder;
+      inputText.maxLength = p.input.max_length;
+      runBtn.disabled = false;
+      errorBanner.classList.remove('active');
     }
 
-    function escHtml(str) {
-        const d = document.createElement('div');
-        d.textContent = str;
-        return d.innerHTML;
-    }
-
-    function endIntroAnimation() {
-        const overlay = document.getElementById('introOverlay');
-        overlay.classList.add('fade-out');
-        setTimeout(() => {
-            overlay.classList.add('hidden');
-            finishIntro();
-        }, 800);
-    }
-
-    function skipIntro() {
-        if (introTimer) clearTimeout(introTimer);
-        if (introTypeInterval) clearInterval(introTypeInterval);
-        localStorage.setItem('introSeen', '1');
-        const overlay = document.getElementById('introOverlay');
-        overlay.classList.add('hidden');
-        finishIntro();
-    }
-
-    function finishIntro() {
-        introComplete = true;
-        const inputArea = document.getElementById('inputArea');
-        inputArea.classList.remove('intro-hidden');
-        // Focus the input to invite typing
-        document.getElementById('briefInput').focus();
-        document.getElementById('introOverlay').classList.add('hidden');
-        CHARACTERS.forEach(c => {
-            const slot = document.getElementById(`slot-${c.id}`);
-            if (slot) slot.classList.remove('intro-dim', 'intro-highlight');
-        });
-    }
-
-    // ── NARRATION BAR ──
-    function showNarration(text) {
-        const bar = document.getElementById('narrationBar');
-        const textEl = document.getElementById('narrationText');
-
-        // Cancel any ongoing narration typewriter
-        if (narrationInterval) clearInterval(narrationInterval);
-
-        bar.classList.add('visible');
-        let i = 0;
-        const cursor = '<span class="narration-cursor"></span>';
-        narrationInterval = setInterval(() => {
-            if (i < text.length) {
-                textEl.innerHTML = esc(text.slice(0, i + 1)) + cursor;
-                i++;
-            } else {
-                clearInterval(narrationInterval);
-                narrationInterval = null;
-                textEl.innerHTML = esc(text);
-            }
-        }, 20);
-    }
-
-    function hideNarration() {
-        const bar = document.getElementById('narrationBar');
-        bar.classList.remove('visible');
-    }
-
-    // ── SPOTLIGHT OUTRO ──
-    let spotlightTypeInterval = null;
-
-    function showSpotlight() {
-        const overlay = document.getElementById('spotlightOverlay');
-        const textEl = document.getElementById('spotlightText');
-        const continueBtn = document.getElementById('spotlightContinue');
-
-        // Hide narration bar
-        hideNarration();
-
-        // Show overlay with dim effect
-        overlay.style.display = 'flex';
-        requestAnimationFrame(() => {
-            overlay.classList.add('visible');
-        });
-
-        // Beat of silence (1.5s), then typewriter the outro text
-        const text = outroText || 'Five AI agents just turned a single sentence into a pitch deck.';
-        setTimeout(() => {
-            textEl.classList.add('visible');
-            // Typewriter in gold
-            let i = 0;
-            const cursor = '<span class="spotlight-cursor"></span>';
-            spotlightTypeInterval = setInterval(() => {
-                if (i < text.length) {
-                    textEl.innerHTML = escHtml(text.slice(0, i + 1)).replace(/\n/g, '<br>') + cursor;
-                    i++;
-                } else {
-                    clearInterval(spotlightTypeInterval);
-                    spotlightTypeInterval = null;
-                    textEl.innerHTML = escHtml(text).replace(/\n/g, '<br>');
-                    // Show continue button after typing finishes
-                    setTimeout(() => {
-                        continueBtn.style.opacity = '1';
-                    }, 800);
-                }
-            }, 35);
-        }, 1500);
-    }
-
-    function dismissSpotlight() {
-        if (spotlightTypeInterval) clearInterval(spotlightTypeInterval);
-        const overlay = document.getElementById('spotlightOverlay');
-        // Show the result overlay FIRST (behind the spotlight)
-        const r = window._pendingResult;
-        if (r) {
-            showResult(r.pitchDeck, r.downloadUrl, r.evidence);
-            window._pendingResult = null;
-        }
-        // Then fade out the spotlight on top
-        requestAnimationFrame(() => {
-            overlay.classList.remove('visible');
-            setTimeout(() => {
-                overlay.style.display = 'none';
-            }, 400);
-        });
-    }
-
-    function drawCharacter(char) {
-        const canvas = document.getElementById(`canvas-${char.id}`);
-        const ctx = canvas.getContext('2d');
-        const scale = 6;
-
-        // Offset to center the 8-wide character in the 64px canvas
-        const offsetX = 8;
-        const offsetY = 12;
-
-        char.pixels.forEach(group => {
-            ctx.fillStyle = group.color;
-            group.coords.forEach(([x, y]) => {
-                ctx.fillRect(
-                    offsetX + x * scale,
-                    offsetY + y * scale,
-                    scale,
-                    scale
-                );
-            });
-        });
-    }
-
-    // ── PIPELINE ──
-    function startPipeline() {
-        if (!introComplete) return;
-        const input = document.getElementById('briefInput');
-        const brief = input.value.trim();
-        if (!brief || isRunning) return;
-
-        isRunning = true;
-        document.getElementById('runBtn').disabled = true;
-        resetUI();
-
-        // Connect WebSocket
-        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${protocol}//${location.host}/ws`);
-
-        ws.onopen = () => {
-            ws.send(JSON.stringify({ type: 'run', brief }));
-            setStatus('Pipeline starting...', 0);
-            addLog('pipeline_start', `Brief: "${brief}"`);
-        };
-
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            handleEvent(data);
-        };
-
-        ws.onclose = () => {
-            if (isRunning) {
-                setStatus('Connection lost. The agents may be busy — try refreshing in a moment.', 0, true);
-                isRunning = false;
-                document.getElementById('runBtn').disabled = false;
-                document.getElementById('demoBtn').disabled = false;
-            }
-        };
-
-        ws.onerror = () => {
-            setStatus('Unable to reach the AI agents. Check your connection and try refreshing.', 0, true);
-            isRunning = false;
-            document.getElementById('runBtn').disabled = false;
-            document.getElementById('demoBtn').disabled = false;
-        };
-    }
-
-    // ── DEMO MODE (server-side, with PPTX generation) ──
-    function startDemo() {
-        if (!introComplete || isRunning) return;
-
-        isRunning = true;
-        document.getElementById('runBtn').disabled = true;
-        document.getElementById('demoBtn').disabled = true;
-        resetUI();
-
-        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${protocol}//${location.host}/ws`);
-
-        ws.onopen = () => {
-            ws.send(JSON.stringify({ type: 'demo' }));
-            setStatus('Demo pipeline starting...', 0);
-            addLog('pipeline_start', 'Demo mode — no API calls');
-        };
-
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            handleEvent(data);
-        };
-
-        ws.onclose = () => {
-            if (isRunning) {
-                setStatus('Connection lost.', 0, true);
-                isRunning = false;
-                document.getElementById('runBtn').disabled = false;
-                document.getElementById('demoBtn').disabled = false;
-            }
-        };
-
-        ws.onerror = () => {
-            setStatus('Unable to connect for demo.', 0, true);
-            isRunning = false;
-            document.getElementById('runBtn').disabled = false;
-            document.getElementById('demoBtn').disabled = false;
-        };
-    }
-
-    function handleEvent(event) {
-        switch (event.type) {
-            case 'pipeline_start':
-                setStatus('Pipeline started!', 0);
-                break;
-
-            case 'agent_start':
-                setCharacterState(event.agent, 'active');
-                setBubble(event.agent, event.phase || '', event.message);
-                setStatus(event.message, ((event.step - 1) / event.total_steps) * 100);
-                setStep(event.step, event.total_steps);
-                addLog('agent_start', `${agentLabel(event.agent)} started: ${event.message}`);
-                break;
-
-            case 'agent_done':
-                setCharacterState(event.agent, 'done');
-                setBubble(event.agent, 'Done', event.message);
-                addLog('agent_done', `${agentLabel(event.agent)} finished: ${event.message}`);
-                break;
-
-            case 'tool_call':
-                setBubble(event.agent, event.tool, formatToolArgs(event));
-                addLog('tool_call', `${agentLabel(event.agent)} using ${event.tool}`);
-                break;
-
-            case 'rework':
-                setCharacterState(event.target, 'rework');
-                setBubble('series_producer', 'Rework!', event.message);
-                setStatus(`Rework cycle ${event.cycle}: ${event.notes}`, null);
-                addLog('rework', event.message);
-                // After a brief delay, reset the target to active
-                setTimeout(() => setCharacterState(event.target, 'active'), 600);
-                break;
-
-            case 'status':
-                setStatus(event.message, ((event.step - 1) / event.total_steps) * 100);
-                setStep(event.step, event.total_steps);
-                addLog('status', event.message);
-                break;
-
-            case 'pipeline_complete':
-                setStatus('Pitch deck complete!', 100);
-                setStep(9, 9);
-                addLog('agent_done', 'Pipeline complete!');
-                isRunning = false;
-                document.getElementById('runBtn').disabled = false;
-                document.getElementById('demoBtn').disabled = false;
-                if (ws) ws.close();
-                // Store result data for after spotlight
-                window._pendingResult = {
-                    pitchDeck: event.pitch_deck,
-                    downloadUrl: event.download_url,
-                    evidence: event.evidence,
-                };
-                showSpotlight();
-                break;
-
-            case 'pipeline_error':
-                setStatus(`Something went wrong: ${event.error}. Try running again — the agents can be unpredictable!`, null, true);
-                addLog('rework', `Pipeline error: ${event.error}`);
-                isRunning = false;
-                document.getElementById('runBtn').disabled = false;
-                document.getElementById('demoBtn').disabled = false;
-                if (ws) ws.close();
-                break;
-
-            case 'commentary':
-                showNarration(event.text);
-                addLog('status', `Narrator: ${event.text}`);
-                break;
-
-            case 'outro':
-                outroText = event.text;
-                addLog('agent_done', `Outro: ${event.text}`);
-                break;
-
-            case 'error':
-                setStatus(event.message, null, true);
-                break;
-        }
-    }
-
-    // ── UI HELPERS ──
-    function resetUI() {
-        CHARACTERS.forEach(char => {
-            setCharacterState(char.id, '');
-            const bubble = document.getElementById(`bubble-${char.id}`);
-            bubble.classList.remove('visible');
-        });
-        document.getElementById('progressFill').style.width = '0%';
-        document.getElementById('progressFill').classList.remove('error');
-        document.getElementById('stepCounter').textContent = '-/-';
-        document.getElementById('logPanel').innerHTML = '';
-        document.getElementById('resultOverlay').classList.remove('visible');
-        // Reset narration, outro, and spotlight
-        hideNarration();
-        outroText = null;
-        window._pendingResult = null;
-        document.getElementById('outroBlock').style.display = 'none';
-        const spotlight = document.getElementById('spotlightOverlay');
-        spotlight.classList.remove('visible');
-        spotlight.style.display = 'none';
-        document.getElementById('spotlightText').innerHTML = '';
-        document.getElementById('spotlightText').classList.remove('visible');
-        document.getElementById('spotlightContinue').style.opacity = '0';
-    }
-
-    function setCharacterState(agentId, state) {
-        const slot = document.getElementById(`slot-${agentId}`);
-        if (!slot) return;
-        slot.className = 'character-slot';
-        if (state) slot.classList.add(state);
-    }
-
-    function setBubble(agentId, label, text) {
-        const bubble = document.getElementById(`bubble-${agentId}`);
-        if (!bubble) return;
-        // Filter out internal schema/validation noise
-        if (text && /schema|validation|JSON|parsing|integer|string values|downstream processing/i.test(text)) {
-            text = 'Working...';
-        }
-        // Truncate long messages
-        const maxLen = 120;
-        if (text && text.length > maxLen) {
-            text = text.slice(0, maxLen) + '...';
-        }
-        bubble.querySelector('.bubble-label').textContent = label;
-        bubble.querySelector('.bubble-text').textContent = text;
-        bubble.classList.add('visible');
-    }
-
-    function setStatus(text, percent, isError) {
-        document.getElementById('statusText').textContent = text;
-        if (percent !== null && percent !== undefined) {
-            const fill = document.getElementById('progressFill');
-            fill.style.width = percent + '%';
-            if (isError) fill.classList.add('error');
-        }
-    }
-
-    function setStep(current, total) {
-        document.getElementById('stepCounter').textContent = `${current}/${total}`;
-    }
-
-    function addLog(type, message) {
-        const panel = document.getElementById('logPanel');
-        const now = new Date().toLocaleTimeString();
-        const entry = document.createElement('div');
-        entry.className = `log-entry event-${type}`;
-        entry.innerHTML = `<span class="timestamp">[${now}]</span>${escHtml(message)}`;
-        panel.appendChild(entry);
-        panel.scrollTop = panel.scrollHeight;
-    }
-
-    function agentLabel(id) {
-        const char = CHARACTERS.find(c => c.id === id);
-        return char ? char.name : id;
-    }
-
-    function formatToolArgs(event) {
-        if (event.tool === 'web_search' && event.args?.query) {
-            return `Searching: "${event.args.query}"`;
-        }
-        if (event.tool === 'lookup_rates') {
-            return `Looking up rates for ${event.args?.role || 'crew'}`;
-        }
-        if (event.tool === 'reference_research') {
-            return `Referencing: ${event.args?.section || 'research'}`;
-        }
-        if (event.tool === 'flag_gap') {
-            return `Flagging: ${event.args?.description || 'gap'}`;
-        }
-        return event.message || 'Working...';
-    }
-
-    function showResult(pitchDeck, downloadUrl, evidence) {
-        const overlay = document.getElementById('resultOverlay');
-        const actions = document.getElementById('resultActions');
-
-        window._lastPitchDeck = pitchDeck;
-
-        // -- Outro block --
-        const outroBlock = document.getElementById('outroBlock');
-        if (outroText) {
-            outroBlock.innerHTML = escHtml(outroText).replace(/\n\n+/g, '<br>').replace(/\n/g, ' ');
-            outroBlock.style.display = 'block';
-        } else {
-            outroBlock.style.display = 'none';
-        }
-
-        // -- Download button --
-        // Only allow relative download URLs (must start with /)
-        const safeUrl = (downloadUrl && /^\/download\/[\w-]+$/.test(downloadUrl)) ? downloadUrl : null;
-        actions.innerHTML = safeUrl
-            ? `<a class="btn-download" href="${safeUrl}" download="pitch_deck_draft.pptx">DOWNLOAD PPTX DRAFT</a>`
-            : '';
-
-        // -- Populate tab panels --
-        document.getElementById('tabDeck').innerHTML = renderDeck(pitchDeck);
-        document.getElementById('tabEvidence').innerHTML = renderEvidence(evidence);
-        document.getElementById('tabJson').innerHTML = `<pre style="font-family:'Press Start 2P',monospace;font-size:7px;line-height:2;color:var(--text);white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow-y:auto">${esc(JSON.stringify(pitchDeck, null, 2))}</pre>`;
-        document.getElementById('tabLearn').innerHTML = renderLearnPanel();
-
-        // -- Reset to first tab --
-        switchTab('deck');
-
-        overlay.classList.add('visible');
-    }
-
-    function switchTab(tabName) {
-        const tabs = document.querySelectorAll('.result-tab');
-        const panels = { deck: 'tabDeck', evidence: 'tabEvidence', json: 'tabJson', learn: 'tabLearn' };
-
-        tabs.forEach(t => t.classList.remove('active'));
-        Object.values(panels).forEach(id => document.getElementById(id).classList.remove('visible'));
-
-        document.getElementById(panels[tabName]).classList.add('visible');
-        const tabIndex = { deck: 0, evidence: 1, json: 2, learn: 3 };
-        tabs[tabIndex[tabName]].classList.add('active');
-    }
-
-    function renderDeck(deck) {
-        if (!deck || Object.keys(deck).length === 0) {
-            return '<p style="color:var(--accent)">The pitch deck data was incomplete. Check the RAW JSON tab for what was returned, or try running again.</p>';
-        }
-        console.log('renderDeck input:', JSON.stringify(deck).slice(0, 500));
-        try {
-            const html = _renderDeckInner(deck);
-            // If all sections were empty, show fallback with raw data
-            if (!html || html.trim() === '') {
-                return `<div class="deck-section"><h3>Pitch Deck</h3><p>The deck was returned in an unexpected format. Here is the raw data:</p></div><pre style="font-family:'Press Start 2P',monospace;font-size:7px;line-height:2;color:var(--text);white-space:pre-wrap;word-break:break-word">${esc(JSON.stringify(deck, null, 2))}</pre>`;
-            }
-            return html;
-        }
-        catch (e) {
-            console.error('renderDeck error:', e);
-            return `<p style="color:var(--accent)">Error rendering deck: ${esc(e.message)}</p><pre style="font-family:'Press Start 2P',monospace;font-size:7px;line-height:2;color:var(--text);white-space:pre-wrap;word-break:break-word">${esc(JSON.stringify(deck, null, 2))}</pre>`;
-        }
-    }
-
-    // ── PIXEL ART GENERATORS (JS) ──
-    const PIXEL_FONT = {
-        'A':[0x0E,0x11,0x11,0x1F,0x11,0x11,0x11],'B':[0x1E,0x11,0x11,0x1E,0x11,0x11,0x1E],
-        'C':[0x0E,0x11,0x10,0x10,0x10,0x11,0x0E],'D':[0x1C,0x12,0x11,0x11,0x11,0x12,0x1C],
-        'E':[0x1F,0x10,0x10,0x1E,0x10,0x10,0x1F],'F':[0x1F,0x10,0x10,0x1E,0x10,0x10,0x10],
-        'G':[0x0E,0x11,0x10,0x17,0x11,0x11,0x0F],'H':[0x11,0x11,0x11,0x1F,0x11,0x11,0x11],
-        'I':[0x0E,0x04,0x04,0x04,0x04,0x04,0x0E],'J':[0x07,0x02,0x02,0x02,0x02,0x12,0x0C],
-        'K':[0x11,0x12,0x14,0x18,0x14,0x12,0x11],'L':[0x10,0x10,0x10,0x10,0x10,0x10,0x1F],
-        'M':[0x11,0x1B,0x15,0x15,0x11,0x11,0x11],'N':[0x11,0x19,0x15,0x13,0x11,0x11,0x11],
-        'O':[0x0E,0x11,0x11,0x11,0x11,0x11,0x0E],'P':[0x1E,0x11,0x11,0x1E,0x10,0x10,0x10],
-        'Q':[0x0E,0x11,0x11,0x11,0x15,0x12,0x0D],'R':[0x1E,0x11,0x11,0x1E,0x14,0x12,0x11],
-        'S':[0x0E,0x11,0x10,0x0E,0x01,0x11,0x0E],'T':[0x1F,0x04,0x04,0x04,0x04,0x04,0x04],
-        'U':[0x11,0x11,0x11,0x11,0x11,0x11,0x0E],'V':[0x11,0x11,0x11,0x11,0x0A,0x0A,0x04],
-        'W':[0x11,0x11,0x11,0x15,0x15,0x1B,0x11],'X':[0x11,0x11,0x0A,0x04,0x0A,0x11,0x11],
-        'Y':[0x11,0x11,0x0A,0x04,0x04,0x04,0x04],'Z':[0x1F,0x01,0x02,0x04,0x08,0x10,0x1F],
-        '0':[0x0E,0x11,0x13,0x15,0x19,0x11,0x0E],'1':[0x04,0x0C,0x04,0x04,0x04,0x04,0x0E],
-        '2':[0x0E,0x11,0x01,0x06,0x08,0x10,0x1F],'3':[0x0E,0x11,0x01,0x06,0x01,0x11,0x0E],
-        '4':[0x02,0x06,0x0A,0x12,0x1F,0x02,0x02],'5':[0x1F,0x10,0x1E,0x01,0x01,0x11,0x0E],
-        '6':[0x06,0x08,0x10,0x1E,0x11,0x11,0x0E],'7':[0x1F,0x01,0x02,0x04,0x08,0x08,0x08],
-        '8':[0x0E,0x11,0x11,0x0E,0x11,0x11,0x0E],'9':[0x0E,0x11,0x11,0x0F,0x01,0x02,0x0C],
-        ' ':[0,0,0,0,0,0,0],':':[0,4,4,0,4,4,0],'-':[0,0,0,0x1F,0,0,0],
-        "'":[4,4,8,0,0,0,0],'.':[0,0,0,0,0,4,4],',':[0,0,0,0,0,4,8],
-        '!':[4,4,4,4,4,0,4],'?':[0x0E,0x11,1,2,4,0,4],'&':[0x0C,0x12,0x0C,0x1A,0x13,0x13,0x0D],
+    runBtn.onclick = () => {
+      if (!selectedPipeline || running) return;
+      const input = inputText.value.trim();
+      if (!input) { showError('Please enter some input.'); return; }
+      startRun(input);
     };
 
-    const GENRE_PALETTES = {
-        documentary: ['#1a2632','#d4c5a9','#8b7355','#5c6b4f','#3d5a80'],
-        observational: ['#1c2333','#b0c4de','#6b8cae','#4a6670','#8898aa'],
-        entertainment: ['#1a1a2e','#f0c987','#e86833','#4ecca3','#3d5a80'],
-        factual: ['#1a2632','#d4c5a9','#8b7355','#5c6b4f','#3d5a80'],
-        comedy: ['#2d1b3d','#f5e663','#e94560','#4ecca3','#ff9a3c'],
-        drama: ['#1a1a2e','#e8d5b7','#c45b3e','#6b3a5c','#2a4a6b'],
-        reality: ['#2a1f2e','#f0c987','#e86833','#c43a6b','#4a9080'],
-        true_crime: ['#0d0d0d','#c0392b','#e74c3c','#7f8c8d','#2c3e50'],
-        nature: ['#0f2419','#a8d08d','#5b8a3c','#3d6b4f','#7eb89a'],
-        travel: ['#162447','#e8a87c','#d4956b','#41729f','#5c8a97'],
-        history: ['#1a1410','#d4a76a','#8b6914','#5c4033','#3a2820'],
-    };
-    const DEFAULT_PALETTE = ['#16213e','#eaeaea','#f5c542','#4ecca3','#e94560'];
+    inputText.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runBtn.click(); }
+    });
 
-    function _getGenrePalette(genre, tone) {
-        const g = (genre || '').toLowerCase();
-        for (const [key, pal] of Object.entries(GENRE_PALETTES)) {
-            if (g.includes(key)) return pal;
-        }
-        const t = (tone || '').toLowerCase();
-        if (t.includes('warm') || t.includes('intimate')) return GENRE_PALETTES.documentary;
-        if (t.includes('dark') || t.includes('gritty')) return GENRE_PALETTES.true_crime;
-        if (t.includes('light') || t.includes('funny')) return GENRE_PALETTES.comedy;
-        return DEFAULT_PALETTE;
+    function startRun(input) {
+      running = true;
+      runBtn.disabled = true;
+      errorBanner.classList.remove('active');
+      resultPanel.classList.remove('active');
+      pipelineView.classList.add('active');
+
+      stepsContainer.innerHTML = '';
+      selectedPipeline.steps.forEach((s, i) => {
+        const step = document.createElement('div');
+        step.className = 'step';
+        step.id = `step-${s.id}`;
+        step.innerHTML = `
+          <div class="step-indicator">${i + 1}</div>
+          <div class="step-info">
+            <div class="step-label">${esc(s.label)}</div>
+            <div class="step-agent">${esc(selectedPipeline.agents[s.agent]?.role || s.agent)}</div>
+            <div class="step-message" id="msg-${s.id}"></div>
+          </div>
+        `;
+        stepsContainer.appendChild(step);
+      });
+
+      startTime = Date.now();
+      timerInterval = setInterval(() => {
+        timerText.textContent = Math.floor((Date.now() - startTime) / 1000) + 's';
+      }, 1000);
+
+      eventLog.innerHTML = '<h3>Event Log</h3>';
+
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${proto}//${location.host}/ws`);
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          type: 'run',
+          pipeline: selectedPipeline.id,
+          input: input,
+          brief: input,
+        }));
+      };
+      ws.onmessage = (e) => handleEvent(JSON.parse(e.data));
+      ws.onerror = () => showError('WebSocket connection failed.');
+      ws.onclose = () => { if (running) { running = false; clearInterval(timerInterval); } };
     }
 
-    function _hexToRgb(hex) {
-        const h = hex.replace('#','');
-        return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+    function handleEvent(ev) {
+      switch (ev.type) {
+        case 'pipeline_start':
+          statusText.textContent = 'Pipeline started...';
+          logEntry('Pipeline started');
+          break;
+        case 'agent_start':
+          statusText.textContent = ev.message || `${ev.agent} starting...`;
+          if (ev.step && ev.total_steps) progressFill.style.width = ((ev.step - 1) / ev.total_steps * 100) + '%';
+          activateStep(ev.agent, ev.message);
+          logEntry(ev.message || `${ev.agent} started`);
+          break;
+        case 'agent_done':
+          markDone(ev.agent);
+          logEntry(ev.message || `${ev.agent} done`);
+          break;
+        case 'tool_call':
+          logEntry(`${ev.agent}: ${ev.message || ev.tool}`, 'tool');
+          break;
+        case 'rework':
+          statusText.textContent = `Rework: ${ev.target}`;
+          logEntry(`Rework: ${ev.message || ev.target}`, 'rework');
+          markRework(ev.target);
+          break;
+        case 'commentary':
+        case 'outro':
+          if (ev.text) logEntry(ev.text, 'commentary');
+          break;
+        case 'status':
+          statusText.textContent = ev.message || 'Processing...';
+          if (ev.step && ev.total_steps) progressFill.style.width = ((ev.step - 1) / ev.total_steps * 100) + '%';
+          logEntry(ev.message || 'Status update');
+          break;
+        case 'pipeline_complete': {
+          running = false;
+          clearInterval(timerInterval);
+          progressFill.style.width = '100%';
+          statusText.textContent = 'Complete!';
+          const output = ev.output || ev.pitch_deck;
+          resultTitle.textContent = `${selectedPipeline.name} \u2014 Complete`;
+          resultJson.textContent = JSON.stringify(output, null, 2);
+          resultPanel.classList.add('active');
+          downloadBtn.style.display = ev.download_url ? '' : 'none';
+          if (ev.download_url) downloadBtn.onclick = () => window.open(ev.download_url);
+          logEntry('Pipeline complete');
+          break;
+        }
+        case 'pipeline_error':
+          running = false;
+          clearInterval(timerInterval);
+          showError(ev.error || 'Pipeline failed.');
+          logEntry(`Error: ${ev.error}`, 'rework');
+          break;
+        case 'error':
+          showError(ev.message || 'An error occurred.');
+          break;
+      }
     }
 
-    function _lcg(state) {
-        state = (state * 1103515245 + 12345) & 0x7FFFFFFF;
-        return [state, state / 0x7FFFFFFF];
+    function activateStep(agent, message) {
+      for (const s of selectedPipeline.steps) {
+        if (s.agent === agent) {
+          const el = document.getElementById(`step-${s.id}`);
+          if (el) { el.classList.add('active'); el.classList.remove('done'); }
+          const msg = document.getElementById(`msg-${s.id}`);
+          if (msg && message) msg.textContent = message;
+          return;
+        }
+      }
     }
 
-    function generateTitleCardDataUrl(title, genre, tone) {
-        const palette = _getGenrePalette(genre, tone);
-        const bg = _hexToRgb(palette[0]);
-        const text = _hexToRgb(palette[1]);
-        const accent = _hexToRgb(palette[2]);
-        const scale = 3;
-        const padding = 16;
-        const glyphW = 5 * scale, glyphH = 7 * scale;
-        const spaceW = 2 * scale, lineGap = 2 * scale;
-        const maxW = 660;
-        const contentW = maxW - 2 * padding;
-
-        // Word wrap
-        const words = title.toUpperCase().split(' ');
-        const lines = [];
-        let cur = '';
-        for (const w of words) {
-            const test = cur ? cur + ' ' + w : w;
-            if (test.length * (glyphW + spaceW) - spaceW > contentW && cur) {
-                lines.push(cur); cur = w;
-            } else { cur = test; }
+    function markDone(agent) {
+      for (const s of selectedPipeline.steps) {
+        if (s.agent === agent) {
+          const el = document.getElementById(`step-${s.id}`);
+          if (el) { el.classList.remove('active'); el.classList.add('done'); }
+          return;
         }
-        if (cur) lines.push(cur);
-
-        const totalH = lines.length * glyphH + (lines.length - 1) * lineGap;
-        const imgH = totalH + 2 * padding + 4 * scale;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = maxW;
-        canvas.height = imgH;
-        const ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = false;
-
-        // Background
-        ctx.fillStyle = `rgb(${bg[0]},${bg[1]},${bg[2]})`;
-        ctx.fillRect(0, 0, maxW, imgH);
-
-        // Accent bars
-        ctx.fillStyle = `rgb(${accent[0]},${accent[1]},${accent[2]})`;
-        for (let x = 0; x < maxW; x += scale * 2) ctx.fillRect(x, 0, scale, scale);
-        for (let x = scale; x < maxW; x += scale * 2) ctx.fillRect(x, imgH - scale, scale, scale);
-
-        // Draw text
-        ctx.fillStyle = `rgb(${text[0]},${text[1]},${text[2]})`;
-        let yOff = padding + 2 * scale;
-        for (const line of lines) {
-            const lineW = line.length * (glyphW + spaceW) - spaceW;
-            let xOff = (maxW - lineW) / 2;
-            for (const ch of line) {
-                const glyph = PIXEL_FONT[ch];
-                if (!glyph) { xOff += glyphW + spaceW; continue; }
-                for (let row = 0; row < 7; row++) {
-                    for (let col = 0; col < 5; col++) {
-                        if (glyph[row] & (0x10 >> col)) {
-                            ctx.fillRect(xOff + col * scale, yOff + row * scale, scale, scale);
-                        }
-                    }
-                }
-                xOff += glyphW + spaceW;
-            }
-            yOff += glyphH + lineGap;
-        }
-        return canvas.toDataURL('image/png');
+      }
     }
 
-    function generateMoodArtDataUrl(genre, tone, width, height, seed) {
-        const palette = _getGenrePalette(genre, tone);
-        const colors = palette.map(_hexToRgb);
-        const ps = 5;
-        const cols = Math.floor(width / ps);
-        const rows = Math.floor(height / ps);
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = false;
-
-        let state = seed || 42;
-        const _fill = (c) => { ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`; };
-        const _clamp = (c,v) => c.map(ch => Math.max(0,Math.min(255,ch+v)));
-
-        // Use seed to pick pattern variant — ensures variety across sections
-        const patternIdx = (seed || 0) % 6;
-
-        if (patternIdx === 0) {
-            // Diagonal bands with texture
-            for (let y = 0; y < rows; y++) {
-                for (let x = 0; x < cols; x++) {
-                    const band = Math.floor((x + y * 1.5) * colors.length / (cols + rows));
-                    [state] = _lcg(state); const r = state / 0x7FFFFFFF;
-                    const base = colors[Math.min(band, colors.length - 1)];
-                    _fill(_clamp(base, Math.floor((r-0.5)*18)));
-                    ctx.fillRect(x*ps, y*ps, ps, ps);
-                }
-            }
-        } else if (patternIdx === 1) {
-            // Mosaic blocks — irregular rectangles
-            ctx.fillStyle = `rgb(${colors[0][0]},${colors[0][1]},${colors[0][2]})`;
-            ctx.fillRect(0, 0, width, height);
-            for (let i = 0; i < 60; i++) {
-                [state] = _lcg(state); const rx = state / 0x7FFFFFFF;
-                [state] = _lcg(state); const ry = state / 0x7FFFFFFF;
-                [state] = _lcg(state); const rw = state / 0x7FFFFFFF;
-                [state] = _lcg(state); const rh = state / 0x7FFFFFFF;
-                [state] = _lcg(state); const rc = state / 0x7FFFFFFF;
-                const bx = Math.floor(rx * cols) * ps;
-                const by = Math.floor(ry * rows) * ps;
-                const bw = (Math.floor(rw * 6) + 2) * ps;
-                const bh = (Math.floor(rh * 3) + 1) * ps;
-                const c = colors[Math.floor(rc * colors.length)];
-                [state] = _lcg(state); const rv = state / 0x7FFFFFFF;
-                _fill(_clamp(c, Math.floor((rv-0.5)*25)));
-                ctx.fillRect(bx, by, bw, bh);
-            }
-        } else if (patternIdx === 2) {
-            // Wave pattern — sine curves
-            for (let y = 0; y < rows; y++) {
-                for (let x = 0; x < cols; x++) {
-                    [state] = _lcg(state); const r = state / 0x7FFFFFFF;
-                    const wave = Math.sin(x * 0.15 + y * 0.4 + (seed||0) * 0.1) * 0.5 + 0.5;
-                    const idx = Math.floor(wave * (colors.length - 1));
-                    const base = colors[Math.min(idx, colors.length - 1)];
-                    _fill(_clamp(base, Math.floor((r-0.5)*15)));
-                    ctx.fillRect(x*ps, y*ps, ps, ps);
-                }
-            }
-        } else if (patternIdx === 3) {
-            // Scattered bright blocks on dark (confetti style)
-            _fill(colors[0]); ctx.fillRect(0, 0, width, height);
-            for (let i = 0; i < cols * rows / 2; i++) {
-                [state] = _lcg(state); const rx = state / 0x7FFFFFFF;
-                [state] = _lcg(state); const ry = state / 0x7FFFFFFF;
-                [state] = _lcg(state); const rc = state / 0x7FFFFFFF;
-                [state] = _lcg(state); const rs = state / 0x7FFFFFFF;
-                const c = colors[1 + Math.floor(rc * (colors.length - 1))];
-                _fill(c);
-                const sz = rs > 0.7 ? ps * 2 : ps;
-                ctx.fillRect(Math.floor(rx*cols)*ps, Math.floor(ry*rows)*ps, sz, sz);
-            }
-        } else if (patternIdx === 4) {
-            // Horizontal strata with accent highlights
-            for (let y = 0; y < rows; y++) {
-                const band = Math.floor(y * colors.length / rows);
-                const base = colors[Math.min(band, colors.length - 1)];
-                for (let x = 0; x < cols; x++) {
-                    [state] = _lcg(state); const r = state / 0x7FFFFFFF;
-                    if (r > 0.9) {
-                        _fill(colors[2]); // accent highlight
-                    } else {
-                        _fill(_clamp(base, Math.floor((r-0.5)*22)));
-                    }
-                    ctx.fillRect(x*ps, y*ps, ps, ps);
-                }
-            }
-        } else {
-            // Diamond/chevron pattern
-            for (let y = 0; y < rows; y++) {
-                for (let x = 0; x < cols; x++) {
-                    const cx = cols / 2, cy = rows / 2;
-                    const dist = Math.abs(x - cx) + Math.abs(y - cy);
-                    const idx = Math.floor(dist * colors.length / (cx + cy));
-                    [state] = _lcg(state); const r = state / 0x7FFFFFFF;
-                    const base = colors[Math.min(idx, colors.length - 1)];
-                    _fill(_clamp(base, Math.floor((r-0.5)*20)));
-                    ctx.fillRect(x*ps, y*ps, ps, ps);
-                }
-            }
+    function markRework(target) {
+      for (const s of selectedPipeline.steps) {
+        if (s.agent === target) {
+          const el = document.getElementById(`step-${s.id}`);
+          if (el) { el.classList.remove('done'); el.classList.add('rework'); }
         }
-        return canvas.toDataURL('image/png');
+      }
     }
 
-    function _renderDeckInner(deck) {
-        let html = '';
-
-        // Extract genre/tone for pixel art
-        const ft_art = deck.format_and_tone || {};
-        const art_genre = ft_art.genre || '';
-        const art_tone = ft_art.tone || '';
-
-        // Title page with pixel art title card
-        const tp = deck.title_page;
-        if (tp) {
-            const titleImg = generateTitleCardDataUrl(tp.working_title || 'Untitled', art_genre, art_tone);
-            const moodBg = generateMoodArtDataUrl(art_genre, art_tone, 660, 80, 999);
-            html += `<div class="deck-section deck-title-page" style="text-align:center">
-                <img src="${moodBg}" style="width:100%;image-rendering:pixelated;margin-bottom:8px" alt="">
-                <img src="${titleImg}" style="width:100%;max-width:660px;image-rendering:pixelated;margin-bottom:12px" alt="${esc(tp.working_title || '')}">
-                <div class="deck-label">Genre</div><div class="deck-value">${esc(tp.genre || '')}</div>
-                <div class="deck-label">Format</div><div class="deck-value">${esc(tp.format || '')}</div>
-                <div class="deck-label">Target Broadcaster</div><div class="deck-value">${esc(tp.target_broadcaster || '')}</div>
-            </div>`;
-        }
-
-        // Logline with mood art
-        if (deck.logline) {
-            const moodImg1 = generateMoodArtDataUrl(art_genre, art_tone, 660, 60, 1001);
-            html += `<div class="deck-section">
-                <h3>Logline</h3>
-                <img src="${moodImg1}" style="width:100%;image-rendering:pixelated;margin-bottom:8px" alt="">
-                <p>${esc(deck.logline)}</p>
-            </div>`;
-        }
-
-        // Format & tone
-        const ft = deck.format_and_tone;
-        if (ft) {
-            html += `<div class="deck-section">
-                <h3>Format & Tone</h3>
-                <div class="deck-label">Series Length</div><div class="deck-value">${esc(ft.series_length || '')}</div>
-                <div class="deck-label">Genre</div><div class="deck-value">${esc(ft.genre || '')}</div>
-                <div class="deck-label">Tone</div><div class="deck-value">${esc(ft.tone || '')}</div>
-            </div>`;
-        }
-
-        // Target audience
-        if (deck.target_audience) {
-            html += `<div class="deck-section">
-                <h3>Target Audience</h3>
-                <p>${esc(deck.target_audience)}</p>
-            </div>`;
-        }
-
-        // Competitive landscape
-        if (deck.competitive_landscape && deck.competitive_landscape.length) {
-            html += `<div class="deck-section">
-                <h3>Competitive Landscape</h3>
-                <table class="deck-table">
-                    <tr><th>Title</th><th>Broadcaster</th><th>Year</th><th>Relevance</th></tr>
-                    ${deck.competitive_landscape.map(c => `<tr><td>${esc(c.title)}</td><td>${esc(c.broadcaster)}</td><td>${esc(c.year)}</td><td>${esc(c.relevance)}</td></tr>`).join('')}
-                </table>
-            </div>`;
-        }
-
-        // Key characters
-        if (deck.key_characters && deck.key_characters.length) {
-            html += `<div class="deck-section">
-                <h3>Key Characters</h3>
-                <div class="character-cards">
-                    ${deck.key_characters.map(c => `<div class="character-card">
-                        <div class="character-card-name">${esc(c.name)}</div>
-                        <div class="character-card-role">${esc(c.role)}</div>
-                        <div class="character-card-angle">${esc(c.story_angle)}</div>
-                    </div>`).join('')}
-                </div>
-            </div>`;
-        }
-
-        // Episode breakdown
-        const eb = deck.episode_breakdown;
-        if (eb) {
-            const moodArc = generateMoodArtDataUrl(art_genre, art_tone, 660, 48, 2002);
-            html += `<div class="deck-section">
-                <h3>Episode: ${esc(eb.episode_title || '')}</h3>
-                <img src="${moodArc}" style="width:100%;image-rendering:pixelated;margin-bottom:8px" alt="">`;
-            if (eb.narrative_arc) {
-                const na = eb.narrative_arc;
-                html += `<div class="deck-label">Opening</div><div class="deck-value">${esc(na.opening)}</div>
-                    <div class="deck-label">Development</div><div class="deck-value">${esc(na.development)}</div>
-                    <div class="deck-label">Climax</div><div class="deck-value">${esc(na.climax)}</div>
-                    <div class="deck-label">Resolution</div><div class="deck-value">${esc(na.resolution)}</div>`;
-            }
-            if (eb.key_sequences && eb.key_sequences.length) {
-                html += `<div class="deck-label" style="margin-top:8px">Key Sequences</div>
-                    <table class="deck-table">
-                        <tr><th>Sequence</th><th>Style</th><th>Mins</th></tr>
-                        ${eb.key_sequences.map(s => `<tr><td>${esc(s.name)}<br><span style="color:var(--text-dim)">${esc(s.description)}</span></td><td>${esc(s.visual_style)}</td><td>${s.duration_mins}</td></tr>`).join('')}
-                    </table>`;
-            }
-            if (eb.visual_approach) {
-                html += `<div class="deck-label" style="margin-top:8px">Visual Approach</div><div class="deck-value">${esc(eb.visual_approach)}</div>`;
-            }
-            html += `</div>`;
-        }
-
-        // Feasibility
-        const fs = deck.feasibility_summary;
-        if (fs) {
-            const rating = fs.feasibility_rating || 'green';
-            html += `<div class="deck-section">
-                <h3>Feasibility</h3>
-                <span class="feasibility-badge ${rating}">${rating}</span>
-                <div style="margin-top:8px">
-                    <div class="deck-label">Shooting Days</div><div class="deck-value">${fs.shooting_days || '?'}</div>`;
-            if (fs.budget_bracket) {
-                const bb = fs.budget_bracket;
-                html += `<div class="deck-label">Budget</div><div class="deck-value">${bb.currency || ''} ${(bb.low || 0).toLocaleString()} – ${(bb.high || 0).toLocaleString()}</div>
-                    <div class="deck-label">Notes</div><div class="deck-value">${esc(bb.notes || '')}</div>`;
-            }
-            if (fs.key_risks && fs.key_risks.length) {
-                html += `<div class="deck-label">Key Risks</div><ul>${fs.key_risks.map(r => `<li>${esc(r)}</li>`).join('')}</ul>`;
-            }
-            html += `</div></div>`;
-        }
-
-        // Why now
-        if (deck.why_now) {
-            html += `<div class="deck-section">
-                <h3>Why Now?</h3>
-                <p>${esc(deck.why_now)}</p>
-            </div>`;
-        }
-
-        // SP review notes
-        if (deck.sp_review_notes) {
-            html += `<div class="deck-section">
-                <h3>Series Producer Review</h3>
-                <p>${esc(deck.sp_review_notes)}</p>
-            </div>`;
-        }
-
-        // Unresolved concerns
-        if (deck.unresolved_concerns && deck.unresolved_concerns.length) {
-            html += `<div class="deck-section">
-                <h3>Unresolved Concerns</h3>
-                <ul>${deck.unresolved_concerns.map(c => `<li>${esc(c)}</li>`).join('')}</ul>
-            </div>`;
-        }
-
-        return html;
+    function logEntry(text, type = '') {
+      const entry = document.createElement('div');
+      entry.className = `event-entry ${type}`;
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      entry.innerHTML = `<span class="event-time">${elapsed}s</span><span class="event-text">${esc(text)}</span>`;
+      eventLog.appendChild(entry);
+      eventLog.scrollTop = eventLog.scrollHeight;
     }
 
-    const AGENT_NAMES = {
-        series_producer: 'The Series Producer',
-        producer: 'The Producer',
-        researcher: 'The Researcher',
-        director: 'The Director',
-        production_manager: 'The Production Manager',
-        evidence_generator: 'The Evidence Generator',
+    function showError(msg) {
+      errorBanner.textContent = msg;
+      errorBanner.classList.add('active');
+    }
+
+    function esc(text) {
+      const d = document.createElement('div');
+      d.textContent = text;
+      return d.innerHTML;
+    }
+
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(resultJson.textContent);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => copyBtn.textContent = 'Copy JSON', 1500);
     };
 
-    const PHASE_VERBS = {
-        phase_a: 'read the brief and shaped the editorial vision',
-        briefing: 'broke the vision down into specialist assignments',
-        research: 'went out into the world to gather facts',
-        treatment: 'crafted the creative treatment and narrative arc',
-        feasibility: 'ran the numbers on budget, crew, and logistics',
-        collation: 'pulled everything together into an episode package',
-        phase_b: 'reviewed the full package and made the final call',
-        evidence: 'compiled the evidence trail',
+    resetBtn.onclick = () => {
+      pipelineView.classList.remove('active');
+      resultPanel.classList.remove('active');
+      errorBanner.classList.remove('active');
+      progressFill.style.width = '0%';
+      statusText.textContent = 'Starting...';
+      runBtn.disabled = !selectedPipeline;
+      inputText.value = '';
+      if (ws) { ws.close(); ws = null; }
     };
 
-    function renderEvidence(evidence) {
-        if (!evidence) return '<p style="color:var(--text-dim);font-size:7px">No evidence trail available for this run.</p>';
-
-        let html = '<div class="evidence-narrative">';
-
-        // Intro
-        if (evidence.pipeline_summary) {
-            html += `<div class="evidence-intro">${esc(evidence.pipeline_summary)}</div>`;
-        }
-
-        // Story steps
-        if (evidence.steps && evidence.steps.length) {
-            evidence.steps.forEach((step) => {
-                const who = AGENT_NAMES[step.agent_name] || step.agent_name;
-                const verb = PHASE_VERBS[step.phase] || step.phase;
-                const hasTools = step.tools_used && step.tools_used.length > 0;
-                const cls = hasTools ? 'evidence-chapter has-tools' : 'evidence-chapter';
-                const secs = (step.duration_ms / 1000).toFixed(1);
-
-                html += `<div class="${cls}">`;
-                html += `<div class="evidence-who">${esc(who)}</div>`;
-                html += `<div class="evidence-what">${esc(who)} ${esc(verb)}.</div>`;
-
-                if (step.what_received) {
-                    html += `<div class="evidence-what">Starting from: ${esc(step.what_received)}</div>`;
-                }
-                if (step.what_produced) {
-                    html += `<div class="evidence-what">They delivered: ${esc(step.what_produced)}</div>`;
-                }
-                if (hasTools) {
-                    const toolStr = step.tools_used.length === 1
-                        ? `using ${esc(step.tools_used[0])}`
-                        : `using ${step.tools_used.slice(0, -1).map(esc).join(', ')} and ${esc(step.tools_used[step.tools_used.length - 1])}`;
-                    html += `<div class="evidence-tools">${toolStr}</div>`;
-                }
-                html += `<div class="evidence-time">${secs}s</div>`;
-                html += `</div>`;
-            });
-        }
-
-        // Rework details
-        if (evidence.rework_count > 0 && evidence.rework_details && evidence.rework_details.length) {
-            html += `<div class="evidence-rework-note">`;
-            html += `The Series Producer sent work back ${evidence.rework_count} time${evidence.rework_count > 1 ? 's' : ''}:`;
-            evidence.rework_details.forEach(d => {
-                html += `<br>&gt; ${esc(d)}`;
-            });
-            html += `</div>`;
-        }
-
-        // Footer
-        if (evidence.total_duration_ms) {
-            const totalSecs = (evidence.total_duration_ms / 1000).toFixed(1);
-            const mins = Math.floor(totalSecs / 60);
-            const remSecs = (totalSecs % 60).toFixed(0);
-            const timeStr = mins > 0 ? `${mins}m ${remSecs}s` : `${totalSecs}s`;
-            html += `<div class="evidence-footer">The entire pipeline took ${timeStr} from brief to pitch deck.</div>`;
-        }
-
-        html += '</div>';
-        return html;
-    }
-
-    function renderLearnPanel() {
-        return `
-        <div class="deck-section">
-            <h3>What you just watched</h3>
-            <p>Five independent AI agents — each running its own large language model — just collaborated to turn a single sentence into a structured pitch deck for an unscripted television show.</p>
-            <p>This is not one AI answering a question. Each agent reasoned independently, made its own decisions, and passed its work to the next.</p>
-        </div>
-        <div class="deck-section">
-            <h3>What makes this "agentic"?</h3>
-            <ul>
-                <li><strong>Independent reasoning</strong> — each agent has its own role, instructions, and judgement. The Researcher doesn't know what the Director will do with its findings.</li>
-                <li><strong>Real tool use</strong> — the Researcher searched the actual web. The Production Manager calculated real budgets. These aren't canned responses.</li>
-                <li><strong>Feedback loops</strong> — the Series Producer reviewed the final package and could send work back for revision. Agents can reject each other's output.</li>
-                <li><strong>Collaboration, not conversation</strong> — work flows between specialists, building on what came before. No single prompt produced this deck.</li>
-            </ul>
-        </div>
-        <div class="deck-section">
-            <h3>How is this different from ChatGPT?</h3>
-            <p>A chatbot gives you one response to one prompt. This pipeline ran multiple AI models in sequence, each with different expertise, passing structured data between them — with quality control built in.</p>
-            <p>The same architecture powers autonomous coding assistants, research agents, automated content pipelines, and AI-driven workflows across industries.</p>
-        </div>
-        <div class="deck-section">
-            <h3>Where is this heading?</h3>
-            <p>What you saw is early — the output isn't perfect yet. But the pattern is real: AI agents that can reason, use tools, collaborate, and self-correct.</p>
-            <p>In production, this means AI as a development tool — not replacing the team, but accelerating the work between the brief and the first draft.</p>
-        </div>`;
-    }
-
-    function esc(str) {
-        if (str == null) return '';
-        const div = document.createElement('div');
-        div.textContent = String(str);
-        return div.innerHTML;
-    }
-
-    function closeResult() {
-        document.getElementById('resultOverlay').classList.remove('visible');
-        // Reset the main page to fresh state
-        CHARACTERS.forEach(char => {
-            const bubble = document.getElementById(`bubble-${char.id}`);
-            if (bubble) bubble.classList.remove('visible');
-            setCharacterState(char.id, 'idle');
-        });
-        document.getElementById('progressFill').style.width = '0%';
-        document.getElementById('progressFill').classList.remove('error');
-        document.getElementById('statusText').textContent = 'Ready. Enter a brief to begin.';
-        document.getElementById('stepCounter').textContent = '-/-';
-        document.getElementById('logPanel').innerHTML = '';
-        hideNarration();
-        outroText = null;
-        window._pendingResult = null;
-        document.getElementById('outroBlock').style.display = 'none';
-        const spotlight = document.getElementById('spotlightOverlay');
-        spotlight.classList.remove('visible');
-        spotlight.style.display = 'none';
-        document.getElementById('spotlightText').innerHTML = '';
-        document.getElementById('spotlightText').classList.remove('visible');
-        document.getElementById('spotlightContinue').style.opacity = '0';
-        document.getElementById('briefInput').value = '';
-    }
-
-    // ── DEMO MODE (for testing without backend) ──
-    function runDemo() {
-        resetUI();
-        const demoEvents = [
-            { type: 'pipeline_start', brief: 'Demo run' },
-            { type: 'agent_start', agent: 'series_producer', phase: 'phase_a', step: 1, total_steps: 9, message: 'Reading the brief and shaping editorial vision...' },
-            { type: 'agent_done', agent: 'series_producer', phase: 'phase_a', message: 'Editorial vision set. Producer brief ready.' },
-            { type: 'agent_start', agent: 'producer', phase: 'briefing', step: 2, total_steps: 9, message: 'Creating briefs for the specialist team...' },
-            { type: 'agent_done', agent: 'producer', phase: 'briefing', message: 'Specialist briefs dispatched to the team.' },
-            { type: 'agent_start', agent: 'researcher', phase: 'research', step: 3, total_steps: 9, message: 'Searching the web for facts, competitors, and locations...' },
-            { type: 'tool_call', agent: 'researcher', tool: 'web_search', args: { query: 'lighthouse keepers documentary' }, message: 'Using web_search...' },
-            { type: 'tool_call', agent: 'researcher', tool: 'web_search', args: { query: 'famous lighthouses UK' }, message: 'Using web_search...' },
-            { type: 'agent_done', agent: 'researcher', phase: 'research', message: 'Research pack compiled.' },
-            { type: 'agent_start', agent: 'director', phase: 'treatment', step: 4, total_steps: 9, message: 'Crafting the narrative arc and visual style...' },
-            { type: 'tool_call', agent: 'director', tool: 'reference_research', args: { section: 'locations' }, message: 'Using reference_research...' },
-            { type: 'agent_done', agent: 'director', phase: 'treatment', message: 'Creative treatment complete.' },
-            { type: 'agent_start', agent: 'production_manager', phase: 'feasibility', step: 5, total_steps: 9, message: 'Calculating budget, crew, and logistics...' },
-            { type: 'tool_call', agent: 'production_manager', tool: 'lookup_rates', args: { role: 'camera_operator', region: 'UK' }, message: 'Using lookup_rates...' },
-            { type: 'agent_done', agent: 'production_manager', phase: 'feasibility', message: 'Feasibility assessment done.' },
-            { type: 'agent_start', agent: 'producer', phase: 'collation', step: 6, total_steps: 9, message: 'Collating all outputs into episode package...' },
-            { type: 'agent_done', agent: 'producer', phase: 'collation', message: 'Episode package assembled.' },
-            { type: 'agent_start', agent: 'series_producer', phase: 'phase_b', step: 7, total_steps: 9, message: 'Reviewing the episode package...' },
-            { type: 'agent_done', agent: 'series_producer', phase: 'phase_b', message: 'Pitch deck approved!' },
-            { type: 'pipeline_complete', pitch_deck: { title_page: { working_title: 'Keepers of the Light', genre: 'Documentary', format: '3x60', target_broadcaster: 'BBC Two' }, logline: 'A 3x60 documentary exploring the vanishing world of lighthouse keepers.' }, download_url: null, evidence: { pipeline_summary: 'Demo run — no real agents executed.', steps: [], total_duration_ms: 0, rework_count: 0, rework_details: [] } },
-        ];
-
-        let i = 0;
-        function next() {
-            if (i < demoEvents.length) {
-                handleEvent(demoEvents[i]);
-                i++;
-                setTimeout(next, 800 + Math.random() * 600);
-            }
-        }
-        next();
-    }
-
-    // Config-driven feature flags
-    (async function loadConfig() {
-        try {
-            const resp = await fetch('/config');
-            if (resp.ok) {
-                const config = await resp.json();
-                if (config.demo_enabled) {
-                    document.getElementById('demoBtn').style.display = '';
-                }
-            }
-        } catch (e) {
-            // Server unreachable — demo button stays hidden
-        }
-    })();
-
-    // Boot
-    init();
-    </script>
+    loadPipelines();
+  </script>
 </body>
 </html>

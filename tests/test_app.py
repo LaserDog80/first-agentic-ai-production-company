@@ -18,7 +18,7 @@ def test_index_serves_html(client):
     response = client.get("/")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "AGENTIC PRODUCTION" in response.text
+    assert "Agent Orchestrator" in response.text
 
 
 def test_static_files(client):
@@ -34,7 +34,7 @@ def test_websocket_rejects_empty_brief(client):
         ws.send_json({"type": "run", "brief": ""})
         data = ws.receive_json()
         assert data["type"] == "error"
-        assert "No brief" in data["message"]
+        assert "No" in data["message"] and "provided" in data["message"]
 
 
 def test_download_returns_400_for_invalid_run_id():
