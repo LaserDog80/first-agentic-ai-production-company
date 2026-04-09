@@ -11,8 +11,9 @@ logger = logging.getLogger(__name__)
 from src.provider import load_config, create_client, get_model_name
 from src.agent import AgentRuntime, AgentResult
 from src.schemas import (
-    ProducerBrief, ResearchPack, CreativeTreatment, FeasibilityAssessment,
-    EpisodePackage, PitchDeck, LogEntry, ToolCallLog, EvidencePack,
+    ProducerBrief, SpecialistBriefs, ResearchPack, CreativeTreatment,
+    FeasibilityAssessment, EpisodePackage, PitchDeck, LogEntry, ToolCallLog,
+    EvidencePack,
 )
 from src.tools import get_openai_tools_schema, execute_tool
 from src.tools.search import web_search
@@ -183,8 +184,12 @@ class Orchestrator:
             json.dumps(producer_brief)[:200], briefing_result,
             duration_ms=duration_ms,
         )
-        specialist_briefs = json.loads(
-            _strip_markdown_json(briefing_result.output)
+        specialist_briefs = self._parse_and_validate(
+            briefing_result.output, SpecialistBriefs, "producer",
+            system_prompt=producer.build_briefing_prompt(),
+            user_message=json.dumps(producer_brief),
+            tools=[],
+            model_tier=self.config["agents"]["producer"]["model_tier"],
         )
         outputs["research_brief"] = specialist_briefs["research_brief"]
         outputs["director_brief"] = specialist_briefs["director_brief"]

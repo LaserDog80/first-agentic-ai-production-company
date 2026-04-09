@@ -387,3 +387,67 @@ class TestFullPipelineWithRework:
 
         # All 15 API calls should have been made
         assert mock_client.chat.completions.create.call_count == 13
+
+
+class TestProducerBriefingValidation:
+    """Producer briefing step is resilient to malformed LLM output."""
+
+    def test_producer_briefing_retries_on_missing_key(
+        self, mock_config: dict
+    ) -> None:
+        """Regression test: if the Producer's first response is missing the
+        required `research_brief` key, the pipeline should retry via
+        `_parse_and_validate` rather than crashing with KeyError.
+
+        This reproduces the intermittent `Pipeline error: 'research_brief'`
+        crash that occurred when the LLM occasionally deviated from the
+        required JSON schema.
+        """
+        # Malformed first response: missing the `research_brief` key entirely.
+        malformed = json.dumps({
+            "director_brief": {
+                "topic": "The Last Lighthouse Keeper",
+                "creative_steer": "Intimate, observational",
+                "tone_guidance": "Warm, cinematic, unhurried",
+                "key_questions": ["What does a day look like?"],
+                "quality_bar": "Visually compelling treatment",
+            },
+            "pm_brief": {
+                "topic": "The Last Lighthouse Keeper",
+                "format": {
+                    "series_length": "3x60",
+                    "genre": "factual",
+                    "tone": "warm",
+                },
+                "known_requirements": ["Remote island location"],
+                "quality_bar": "Realistic feasibility assessment",
+            },
+        })
+
+        mock_responses = [
+            _make_simple_response(SP_PHASE_A_RESPONSE),         # 1 SP Phase A
+            _make_simple_response(malformed),                   # 2 Producer (bad)
+            _make_simple_response(PRODUCER_BRIEFS_RESPONSE),    # 2b Producer retry
+            _make_simple_response(RESEARCH_RESPONSE),           # 3 Researcher
+            _make_simple_response(DIRECTOR_RESPONSE),           # 4 Director
+            _make_simple_response(PM_RESPONSE),                 # 5 PM
+            _make_simple_response(COLLATION_RESPONSE),          # 6 Collation
+            _make_simple_response(SP_PHASE_B_RESPONSE),         # 7 SP Phase B
+            _make_simple_response(EVIDENCE_RESPONSE),           # 8 Evidence
+        ]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = mock_responses
+
+        with patch("src.orchestrator.load_config", return_value=mock_config), \
+             patch("src.orchestrator.create_client", return_value=mock_client), \
+             patch("time.sleep"):
+            orch = Orchestrator(config_path="fake.yaml")
+            result = orch.run("A documentary about lighthouse keepers")
+
+        # Pipeline should recover via retry, not crash with KeyError.
+        assert result.success is True, f"Pipeline failed: {result.error}"
+        assert result.pitch_deck is not None
+
+        # The retry should have caused one extra Producer call (9 total).
+        assert mock_client.chat.completions.create.call_count == 9
