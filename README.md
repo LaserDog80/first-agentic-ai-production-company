@@ -1,5 +1,5 @@
 ---
-title: Agentic Production Company
+title: Agentic Playground
 emoji: 🎬
 colorFrom: purple
 colorTo: blue
@@ -7,139 +7,83 @@ sdk: docker
 pinned: false
 ---
 
-# The Agentic Production Company
+# Agentic Playground
 
-> A multi-agent pipeline that turns a one-line TV show idea into a structured pitch deck.
+> A node-based canvas where you build a team of AI agents, draw delegation lines between them, attach skills, and run the whole graph live. Pixel-art aesthetic. Like ComfyUI, but for agents.
 
-## Status
+## What it does
 
-Phase 1 (Engine) — built, pending live testing with API keys.
-Phase 2 (Frontend) — pixel art web UI with real-time WebSocket updates.
+You compose AI agents on a canvas. Each agent is a node with its own system prompt and model tier. You connect agents to each other to set up delegation (who can ask whom to do work), and you connect skill nodes (web search, lookup tools, static text sources) to grant agents abilities. Then you type a brief into the input, click **RUN**, and watch the graph execute live — nodes light up gold while running, gold sparks travel along edges as one agent delegates to another.
 
-## What It Does
+Two presets ship with the app:
 
-You give it a one-line show idea (e.g. *"A 3x60 documentary about the last lighthouse keepers in Britain"*) and five AI agents collaborate to produce a broadcast-ready pitch deck:
+- **Pitch Deck Pipeline** — five agents (Series Producer → Producer → Researcher / Director / Production Manager) collaborating to turn a one-line TV idea into a broadcast-ready pitch deck. Originally the proof-of-concept for this engine; now just one preset among many.
+- **Research Assistant** — a single agent with web search. The simplest possible playground graph; useful as a starting template.
 
-1. **Series Producer** — parses the brief into a structured creative direction
-2. **Producer** — breaks the brief into specialist assignments
-3. **Researcher** — searches the web (via Tavily) for real facts, people, and competing shows
-4. **Director** — shapes a creative treatment with narrative arc and key sequences
-5. **Production Manager** — assesses feasibility, budget, crew, and logistics
+You can save your own graphs to localStorage, swap presets in and out, and build new agents from the library panel.
 
-The Series Producer reviews the final package and can send work back for revision — making this genuinely agentic (real tool use and feedback loops) rather than a simple prompt chain.
+## How it works
 
-## How It Works
+Three layers:
 
-Three-layer architecture:
-- **Provider Client** — config-driven OpenAI-compatible client (currently Nebius Token Factory, swappable via config)
-- **Agent Runtime** — generic ReAct loop: model calls tools, gets results, loops until done
-- **Orchestrator** — sequences agents, handles rework loops (max 2), logs every step
+- **Graph runtime** (`src/graph/`) — a graph is a JSON document of `nodes` and `edges`. The `GraphExecutor` walks the graph by recursion: each agent node becomes an `AgentRuntime` (the existing ReAct loop) whose tool list is built dynamically from its incoming edges. A `delegate` edge from A → B becomes a `delegate_to_b` tool on agent A; calling it runs B and returns its output. A `skill` edge from a web-search node to an agent becomes the `web_search` tool on that agent.
+- **Agent runtime** (`src/agent.py`) — generic ReAct loop. Unchanged from the original engine. Calls the LLM, executes tool calls, feeds results back, loops until done.
+- **Provider client** (`src/provider.py`) — config-driven OpenAI-compatible client. Three model tiers (`strong`/`research`/`utility`) are mapped to concrete model IDs in `config.yaml`.
 
-Output is a structured JSON pitch deck with an evidence pack tracing every decision.
+The frontend is a custom Canvas2D node editor in `static/js/editor.js` (~600 lines, no external library). It renders nodes as bordered rectangles with stepped 90° edges, animates running nodes with a pulsing gold border, and listens to a WebSocket for `node_started` / `edge_fired` / `node_finished` events emitted by the executor.
 
-## Quick Start
+## Installation
 
 ```bash
-# Clone and set up
 git clone <repo-url>
 cd first-agentic-ai-production-company
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Configure API keys
 cp .env.example .env
-# Edit .env with your NEBIUS_API_KEY and TAVILY_API_KEY
-
-# Run the pipeline
-python -m src.main "A 3x60 documentary about the last lighthouse keepers in Britain"
-
-# Save output to files
-python -m src.main "Your show idea here" --output output/run1
+# Edit .env with NEBIUS_API_KEY (LLM provider)
+# and TAVILY_API_KEY or LINKUP_API_KEY (web search)
 ```
 
 ## Usage
 
-### Web UI (recommended)
-
 ```bash
-# Start the web server
 python app.py
-# Open http://localhost:8000 in your browser
+# Open http://localhost:8000
 ```
 
-The web UI features:
-- **Pixel art characters** standing in a row — one for each agent role
-- **Speech bubbles** showing what each agent is currently doing or generating
-- **Live status bar** with progress tracking and step counter
-- **Event log** with timestamped updates as the pipeline runs
-- **Result overlay** displaying the final pitch deck
+The first thing you see is the canvas with the **Pitch Deck Pipeline** preset already loaded. Type a brief into the top input (e.g. *"A 3x60 doc about the last lighthouse keepers in Britain"*) and click **RUN**.
 
-### CLI
+Building your own graph:
+
+1. Drop an **INPUT** and an **OUTPUT** node from the left library panel.
+2. Add an **AGENT**. The wizard prompts for a name and system prompt.
+3. Drag from the agent's bottom slot to another agent's top slot to set up delegation. Drag from a skill node to an agent to grant it that skill. Connect input → root agent and root agent → output to complete the graph.
+4. Type a brief, click **RUN**.
+
+Controls: click a library item to add a node, drag nodes to position, drag bottom-slot to top-slot to connect, double-click an edge to delete it, **DEL** to delete the selected node, scroll to zoom, shift+drag to pan, **F** to fit to view.
+
+The pitch deck preset has an output node with `subtype: "pitch_deck"` — when its run completes, the server tries to parse the output as a pitch deck JSON and exposes a **↓ PPTX** download in the bottom log bar.
+
+## Tests
 
 ```bash
-# Basic usage
-python -m src.main "Your one-line show idea"
-
-# With custom config and output directory
-python -m src.main "Your idea" --config config.yaml --output output/
-
-# Run tests
-pytest -v
+pytest -q
 ```
 
-Output includes:
-- `pitch_deck.json` — the full pitch deck
-- `evidence.json` — evidence pack tracing every agent's contribution
-- `log.json` — detailed orchestration log with token usage and timing
+70+ tests cover the graph schema and validator, the executor with stubbed LLM clients, preset integrity, the FastAPI/WebSocket protocol, the agent runtime, the tool registry, the PPTX exporter, and rate limiting.
 
-### Demo Mode
+## Deployment (Hugging Face Spaces)
 
-Demo mode runs the pipeline with fixture data and no API calls — useful for testing the UI and pipeline flow without incurring costs.
+1. Create a new Docker Space.
+2. Add secrets `NEBIUS_API_KEY` and `TAVILY_API_KEY` (or `LINKUP_API_KEY`).
+3. `git push` to the Space remote.
 
-**CLI** (always available):
-```bash
-python -m src.main --demo
-```
+## Development notes
 
-**Web UI** (must be explicitly enabled):
-```bash
-ENABLE_DEMO=true python app.py
-```
-
-When `ENABLE_DEMO=true` is set, a "DEMO" button appears next to the input field. Demo mode is disabled by default.
-
-## Deployment
-
-### Hugging Face Spaces
-
-This app can be deployed as a [Hugging Face Space](https://huggingface.co/spaces) using the Docker SDK.
-
-1. **Create a new Space** on Hugging Face with SDK type **Docker**.
-
-2. **Add secrets** in the Space settings:
-   - `NEBIUS_API_KEY` — your Nebius API key
-   - `TAVILY_API_KEY` — your Tavily search API key
-   - (Optional) `ENABLE_DEMO` — set to `true` to show the demo button
-
-3. **Push the repo** to the Space:
-   ```bash
-   git remote add hf https://huggingface.co/spaces/YOUR_USER/YOUR_SPACE
-   git push hf main
-   ```
-
-The Dockerfile is pre-configured for HF Spaces (port 7860, health check included). The app will be available at `https://YOUR_USER-YOUR_SPACE.hf.space`.
-
-## Development
-
-See `CLAUDE.md` for development conventions and workflow.
-
-### Running Tests
-
-```bash
-pytest -v          # all tests
-pytest -v -k test_integration  # integration tests only
-```
+- The original linear orchestrator is gone. Its logic lives on entirely as `src/graph/presets/pitch_deck.json` plus the generic `GraphExecutor`. If you want to bring back the rework / cascade behaviour, encode it as a graph rather than as procedural code.
+- The frontend is intentionally framework-free. Vanilla JS, single canvas, ~1100 lines including the page chrome. If you find yourself reaching for React or a graph library, ask whether the pixel aesthetic survives.
 
 ## Licence
 

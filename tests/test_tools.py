@@ -5,7 +5,6 @@ import pytest
 from unittest.mock import patch, MagicMock
 from src.tools import tool, get_openai_tools_schema, execute_tool
 from src.tools.search import web_search
-from src.tools.rework import request_rework, approve, flag_gap
 from src.tools.research import create_reference_research
 from src.tools.rates import lookup_rates
 
@@ -38,29 +37,6 @@ def test_execute_tool():
 def test_execute_tool_unknown():
     with pytest.raises(KeyError):
         execute_tool("nonexistent", {}, [])
-
-
-# --- request_rework ---
-
-def test_request_rework():
-    result = request_rework(agent="researcher", notes="Thin competitive landscape")
-    assert result["status"] == "rework_requested"
-    assert result["agent"] == "researcher"
-
-
-# --- approve ---
-
-def test_approve():
-    result = approve()
-    assert result["status"] == "approved"
-
-
-# --- flag_gap ---
-
-def test_flag_gap():
-    result = flag_gap(description="No archive sources identified")
-    assert result["status"] == "gap_flagged"
-    assert "No archive" in result["description"]
 
 
 # --- web_search (mocked) ---
