@@ -20,7 +20,9 @@ def test_load_config_missing_file():
 def test_get_model_name():
     config = load_config("config.yaml")
     assert "Qwen3-235B" in get_model_name(config, "strong")
-    assert "DeepSeek" in get_model_name(config, "research")
+    # research currently shares Qwen with strong — DeepSeek-V3.2 on Nebius
+    # is unreliable for OpenAI-format tool calling.
+    assert get_model_name(config, "research")
     assert "Qwen3-30B" in get_model_name(config, "utility")
 
 
