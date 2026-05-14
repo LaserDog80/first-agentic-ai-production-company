@@ -131,6 +131,12 @@ class PMBrief(BaseModel):
     quality_bar: str
 
 
+class SpecialistBriefs(BaseModel):
+    research_brief: ResearchBrief
+    director_brief: DirectorBrief
+    pm_brief: PMBrief
+
+
 class ResearchPack(BaseModel):
     competitive_landscape: list[CompetitorEntry]
     characters: list[CharacterEntry]
