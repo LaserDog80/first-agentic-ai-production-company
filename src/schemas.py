@@ -166,6 +166,16 @@ class FeasibilityAssessment(BaseModel):
     cost_saving_opportunities: list[str]
 
 
+class EditorialContribution(BaseModel):
+    """The Producer's actual contribution to the EpisodePackage.
+
+    Kept separate from EpisodePackage so the Producer LLM is only asked to
+    generate its own additions, not echo back the (large) specialist outputs.
+    """
+    editorial_narrative: str
+    gaps_and_conflicts: list[str]
+
+
 class EpisodePackage(BaseModel):
     sp_brief: ProducerBrief
     research: ResearchPack
