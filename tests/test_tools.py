@@ -54,9 +54,13 @@ LINKUP_RESULT.results = [
 LINKUP_RESULT.results[0].name = "LinkItem"
 
 
-@patch.dict(os.environ, {"TAVILY_API_KEY": "test-key"})
+@patch.dict(
+    os.environ, {"SEARCH_PROVIDER": "tavily", "TAVILY_API_KEY": "test-key"}
+)
 @patch("src.tools.search.TavilyClient")
 def test_web_search(mock_tavily_class):
+    # Pin to tavily so this baseline test isn't affected by which provider
+    # is primary in "auto" mode (see test_web_search_provider_auto_fallback).
     mock_client = MagicMock()
     mock_client.search.return_value = TAVILY_RESULT
     mock_tavily_class.return_value = mock_client
@@ -104,33 +108,34 @@ def test_web_search_provider_linkup(mock_linkup_class):
 def test_web_search_provider_auto_fallback(
     mock_tavily_class, mock_linkup_class
 ):
-    """SEARCH_PROVIDER=auto should fall back to Linkup on Tavily failure."""
-    mock_tavily_client = MagicMock()
-    mock_tavily_client.search.side_effect = RuntimeError("boom")
-    mock_tavily_class.return_value = mock_tavily_client
-
+    """SEARCH_PROVIDER=auto should fall back to Tavily on Linkup failure."""
     mock_linkup_client = MagicMock()
-    mock_linkup_client.search.return_value = LINKUP_RESULT
+    mock_linkup_client.search.side_effect = RuntimeError("boom")
     mock_linkup_class.return_value = mock_linkup_client
 
-    result = web_search("query")
-    assert result["results"][0]["url"] == "http://link.com"
-    mock_tavily_client.search.assert_called_once()
-    mock_linkup_client.search.assert_called_once()
-
-
-@patch.dict(os.environ, {"TAVILY_API_KEY": "k"}, clear=False)
-@patch("src.tools.search.TavilyClient")
-def test_web_search_provider_unset_defaults_auto(mock_tavily_class):
-    """When SEARCH_PROVIDER is unset it should behave like 'auto'."""
-    # Remove SEARCH_PROVIDER if present
-    os.environ.pop("SEARCH_PROVIDER", None)
-    mock_client = MagicMock()
-    mock_client.search.return_value = TAVILY_RESULT
-    mock_tavily_class.return_value = mock_client
+    mock_tavily_client = MagicMock()
+    mock_tavily_client.search.return_value = TAVILY_RESULT
+    mock_tavily_class.return_value = mock_tavily_client
 
     result = web_search("query")
     assert result == TAVILY_RESULT
+    mock_linkup_client.search.assert_called_once()
+    mock_tavily_client.search.assert_called_once()
+
+
+@patch.dict(
+    os.environ, {"LINKUP_API_KEY": "k", "TAVILY_API_KEY": "k"}, clear=False
+)
+@patch("src.tools.search.LinkupClient")
+def test_web_search_provider_unset_defaults_auto(mock_linkup_class):
+    """When SEARCH_PROVIDER is unset it should behave like 'auto' — Linkup first."""
+    os.environ.pop("SEARCH_PROVIDER", None)
+    mock_client = MagicMock()
+    mock_client.search.return_value = LINKUP_RESULT
+    mock_linkup_class.return_value = mock_client
+
+    result = web_search("query")
+    assert result["results"][0]["url"] == "http://link.com"
 
 
 # --- reference_research (closure — model only sees `section` param) ---

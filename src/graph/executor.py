@@ -166,6 +166,9 @@ class GraphExecutor:
             ev = {**ev, "node_id": node_id}
             emit(ev)
 
+        agent_max_tokens = (
+            self.config.get("pipeline", {}).get("agent_max_tokens")
+        )
         runtime = AgentRuntime(
             name=node.label or node.id,
             system_prompt=node.system_prompt or "You are a helpful assistant.",
@@ -174,6 +177,7 @@ class GraphExecutor:
             model=get_model_name(self.config, node.model_tier),
             max_iterations=node.max_iterations or 5,
             event_callback=per_node_event,
+            max_tokens=agent_max_tokens,
         )
         result = runtime.run(message)
 

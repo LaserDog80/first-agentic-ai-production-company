@@ -4,7 +4,12 @@ providers:
     api_key_env: "NEBIUS_API_KEY"
     models:
       strong: "Qwen/Qwen3-235B-A22B-Instruct-2507"
-      research: "deepseek-ai/DeepSeek-V3-0324"
+      # Research tier needs reliable OpenAI-format tool calling. DeepSeek
+      # V3-0324 was removed from Nebius, and DeepSeek-V3.2 non-deterministically
+      # emits its proprietary DSML <｜DSML｜functioncall> markup as text content
+      # instead of using the structured tool_calls field — so web_search calls
+      # fail mid-run. Qwen handles the OpenAI tool format correctly.
+      research: "Qwen/Qwen3-235B-A22B-Instruct-2507"
       utility: "Qwen/Qwen3-30B-A3B-Instruct-2507"
 
 agents:
@@ -28,8 +33,13 @@ agents:
     max_iterations: 1
 
 pipeline:
-  max_rework_cycles: 2  # TOTAL pipeline-wide cap, not per-agent
+  max_rework_cycles: 2  # TOTAL pipeline-wide cap (legacy orchestrator field, retained for future presets that want rework loops)
   agent_timeout_seconds: 300
+  # Default completion-tokens budget per LLM call across every graph node.
+  # Researcher's ResearchPack output is ~3KB of JSON; without an explicit
+  # cap, providers can default to 2-4K tokens and truncate to an empty
+  # final message — which then poisons every downstream agent.
+  agent_max_tokens: 8192
 
 rate_limiting:
   hourly_limit: 10    # Max pipeline runs per hour (global, all users)
