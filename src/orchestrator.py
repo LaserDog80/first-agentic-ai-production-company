@@ -83,6 +83,9 @@ class Orchestrator:
         self.agent_timeout: int = self.config["pipeline"].get(
             "agent_timeout_seconds", 60
         )
+        self.agent_max_tokens: int = self.config["pipeline"].get(
+            "agent_max_tokens", 8192
+        )
         self._event_callback: Any = None
 
     def set_event_callback(self, callback: Any) -> None:
@@ -636,6 +639,7 @@ class Orchestrator:
                     max_iterations=max_iterations,
                     timeout=self.agent_timeout,
                     event_callback=self._event_callback,
+                    max_tokens=self.agent_max_tokens,
                 )
                 return runtime.run(user_message)
             except Exception as exc:
@@ -826,10 +830,11 @@ class Orchestrator:
                 model_class.model_validate(data)
                 return data
             except (json.JSONDecodeError, Exception) as exc2:
+                preview = (retry_cleaned or "")[:500]
                 logger.warning(
                     "%s: retry also failed validation (%s). "
-                    "Accepting raw output.",
-                    agent_name, exc2,
+                    "Raw output length=%d, preview=%r. Accepting raw output.",
+                    agent_name, exc2, len(retry_cleaned or ""), preview,
                 )
                 try:
                     return json.loads(retry_cleaned)

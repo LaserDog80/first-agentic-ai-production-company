@@ -16,7 +16,7 @@ agents:
     max_iterations: 5
   researcher:
     model_tier: "research"
-    max_iterations: 5
+    max_iterations: 8
   director:
     model_tier: "strong"
     max_iterations: 5
@@ -30,6 +30,10 @@ agents:
 pipeline:
   max_rework_cycles: 2  # TOTAL pipeline-wide cap, not per-agent
   agent_timeout_seconds: 300
+  # Default completion-tokens budget per LLM call. Researcher's ResearchPack
+  # output is ~3KB of JSON; without an explicit cap, providers can default
+  # to 2-4K tokens and truncate to an empty final message.
+  agent_max_tokens: 8192
 
 rate_limiting:
   hourly_limit: 10    # Max pipeline runs per hour (global, all users)
