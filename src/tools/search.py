@@ -1,4 +1,4 @@
-"""Web search tool using Tavily API with Linkup fallback."""
+"""Web search tool using Linkup API with Tavily fallback."""
 import logging
 import os
 
@@ -96,24 +96,24 @@ def web_search(query: str) -> dict:
     if provider == "linkup":
         return _search_linkup(query)
 
-    # provider == "auto": try Tavily first, fall back to Linkup
-    tavily_err: Exception | None = None
-    try:
-        return _search_tavily(query)
-    except Exception as exc:
-        tavily_err = exc
-        logger.warning(
-            "Tavily search failed (%s), trying Linkup fallback",
-            tavily_err,
-        )
+    # provider == "auto": try Linkup first, fall back to Tavily
+    linkup_err: Exception | None = None
     try:
         return _search_linkup(query)
-    except Exception as linkup_err:
-        logger.error("Linkup fallback also failed: %s", linkup_err)
+    except Exception as exc:
+        linkup_err = exc
+        logger.warning(
+            "Linkup search failed (%s), trying Tavily fallback",
+            linkup_err,
+        )
+    try:
+        return _search_tavily(query)
+    except Exception as tavily_err:
+        logger.error("Tavily fallback also failed: %s", tavily_err)
         return {
             "results": [],
             "error": (
                 f"All search providers failed. "
-                f"Tavily: {tavily_err}, Linkup: {linkup_err}"
+                f"Linkup: {linkup_err}, Tavily: {tavily_err}"
             ),
         }

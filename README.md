@@ -22,7 +22,7 @@ You give it a one-line show idea (e.g. *"A 3x60 documentary about the last light
 
 1. **Series Producer** — parses the brief into a structured creative direction
 2. **Producer** — breaks the brief into specialist assignments
-3. **Researcher** — searches the web (via Tavily) for real facts, people, and competing shows
+3. **Researcher** — searches the web (LinkUp primary, Tavily fallback) for real facts, people, and competing shows
 4. **Director** — shapes a creative treatment with narrative arc and key sequences
 5. **Production Manager** — assesses feasibility, budget, crew, and logistics
 
@@ -119,7 +119,8 @@ This app can be deployed as a [Hugging Face Space](https://huggingface.co/spaces
 
 2. **Add secrets** in the Space settings:
    - `NEBIUS_API_KEY` — your Nebius API key
-   - `TAVILY_API_KEY` — your Tavily search API key
+   - `LINKUP_API_KEY` — your LinkUp search API key (primary)
+   - `TAVILY_API_KEY` — your Tavily search API key (fallback)
    - (Optional) `ENABLE_DEMO` — set to `true` to show the demo button
 
 3. **Push the repo** to the Space:

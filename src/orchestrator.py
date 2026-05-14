@@ -13,6 +13,7 @@ from src.agent import AgentRuntime, AgentResult
 from src.schemas import (
     ProducerBrief, ResearchPack, CreativeTreatment, FeasibilityAssessment,
     EpisodePackage, PitchDeck, LogEntry, ToolCallLog, EvidencePack,
+    SpecialistBriefs,
 )
 from src.tools import get_openai_tools_schema, execute_tool
 from src.tools.search import web_search
@@ -183,9 +184,24 @@ class Orchestrator:
             json.dumps(producer_brief)[:200], briefing_result,
             duration_ms=duration_ms,
         )
-        specialist_briefs = json.loads(
-            _strip_markdown_json(briefing_result.output)
+        specialist_briefs = self._parse_and_validate(
+            output=briefing_result.output,
+            model_class=SpecialistBriefs,
+            agent_name="producer",
+            system_prompt=producer.build_briefing_prompt(),
+            user_message=json.dumps(producer_brief),
+            tools=[],
+            model_tier=self.config["agents"]["producer"]["model_tier"],
         )
+        missing = [
+            k for k in ("research_brief", "director_brief", "pm_brief")
+            if k not in specialist_briefs
+        ]
+        if missing:
+            raise ValueError(
+                f"Producer briefing missing required keys after retry: {missing}. "
+                f"Got keys: {list(specialist_briefs.keys())}"
+            )
         outputs["research_brief"] = specialist_briefs["research_brief"]
         outputs["director_brief"] = specialist_briefs["director_brief"]
         outputs["pm_brief"] = specialist_briefs["pm_brief"]
