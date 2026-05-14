@@ -4,7 +4,12 @@ providers:
     api_key_env: "NEBIUS_API_KEY"
     models:
       strong: "Qwen/Qwen3-235B-A22B-Instruct-2507"
-      research: "deepseek-ai/DeepSeek-V3.2"
+      # Researcher needs reliable OpenAI-format tool calling. DeepSeek-V3.2
+      # on Nebius non-deterministically emits its proprietary DSML
+      # <｜DSML｜functioncall> markup as text content instead of using the
+      # structured tool_calls field, so web_search calls fail mid-run.
+      # Qwen handles OpenAI tool format correctly — same model as 'strong'.
+      research: "Qwen/Qwen3-235B-A22B-Instruct-2507"
       utility: "Qwen/Qwen3-30B-A3B-Instruct-2507"
 
 agents:
