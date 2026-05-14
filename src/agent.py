@@ -35,6 +35,7 @@ class AgentRuntime:
         max_iterations: int,
         timeout: int | None = None,
         event_callback: Any = None,
+        max_tokens: int | None = None,
     ) -> None:
         self.name = name
         self.system_prompt = system_prompt
@@ -45,6 +46,7 @@ class AgentRuntime:
         self.timeout = timeout
         self.tool_schemas = get_openai_tools_schema(tools) if tools else []
         self._event_callback = event_callback
+        self.max_tokens = max_tokens
 
     def run(self, user_message: str) -> AgentResult:
         """Execute the ReAct loop for the given user message.
@@ -74,6 +76,8 @@ class AgentRuntime:
                 kwargs["tools"] = self.tool_schemas
             if self.timeout is not None:
                 kwargs["timeout"] = self.timeout
+            if self.max_tokens is not None:
+                kwargs["max_tokens"] = self.max_tokens
 
             response = self.client.chat.completions.create(**kwargs)
 
