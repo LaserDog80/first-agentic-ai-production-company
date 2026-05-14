@@ -102,8 +102,16 @@ async def download_pptx(run_id: str):
 
 @app.get("/")
 async def index():
-    """Serve the main frontend page."""
-    return FileResponse("static/index.html")
+    """Serve the main frontend page.
+
+    `no-store` keeps users on the freshly-deployed HTML — without it,
+    browser/CDN caching had been masking JS fixes between deploys
+    (e.g. the ticker coalesce regression in issue #28).
+    """
+    return FileResponse(
+        "static/index.html",
+        headers={"Cache-Control": "no-store, must-revalidate"},
+    )
 
 
 @app.get("/config")
