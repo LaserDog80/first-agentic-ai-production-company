@@ -36,8 +36,40 @@ def test_execute_tool():
 
 
 def test_execute_tool_unknown():
-    with pytest.raises(KeyError):
-        execute_tool("nonexistent", {}, [])
+    """Unknown tool names return a structured error instead of raising,
+    so the ReAct loop can recover. See src/tools/__init__.py."""
+    result = execute_tool("nonexistent", {}, [])
+    assert "error" in result
+    assert "nonexistent" in result["error"]
+
+
+def test_execute_tool_ignores_unexpected_kwargs():
+    """Models sometimes emit extra args (e.g. web_search(query=..., title=...)).
+    The runtime should drop unknown kwargs and call the tool successfully
+    rather than crashing the ReAct loop with a TypeError."""
+    @tool
+    def search(query: str) -> dict:
+        """Search."""
+        return {"query": query}
+
+    result = execute_tool(
+        "search", {"query": "hi", "title": "junk", "extra": 1}, [search],
+    )
+    assert result["query"] == "hi"
+    assert "_warning" in result
+    assert "title" in result["_warning"]
+    assert "extra" in result["_warning"]
+
+
+def test_execute_tool_missing_required_kwarg_returns_error():
+    """Missing required args should be reported, not raised."""
+    @tool
+    def search(query: str) -> dict:
+        """Search."""
+        return {"query": query}
+
+    result = execute_tool("search", {}, [search])
+    assert "error" in result
 
 
 # --- request_rework ---

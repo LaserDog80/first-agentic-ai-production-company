@@ -1,9 +1,12 @@
 """Generic ReAct agent runtime for tool-augmented LLM calls."""
 import json
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from src.tools import execute_tool, get_openai_tools_schema
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -147,11 +150,61 @@ class AgentRuntime:
 
             last_content = message.content or ""
 
-        # max_iterations reached without a final text response
+        # max_iterations reached without a final text response. The model
+        # may have been chaining tool_calls forever with no text. Make one
+        # last call WITHOUT tools to force a synthesis from accumulated
+        # tool results — otherwise the loop returns "" and downstream parse
+        # blows up (issue #23).
+        synthesis_output = self._force_synthesis(messages, token_usage)
+        final_output = synthesis_output or last_content
+        logger.warning(
+            "%s: hit max_iterations=%d. last_content_len=%d, "
+            "synthesis_len=%d, tool_calls_run=%d",
+            self.name, self.max_iterations, len(last_content),
+            len(synthesis_output or ""), len(tool_calls_log),
+        )
         return AgentResult(
-            output=last_content,
+            output=final_output,
             tool_calls=tool_calls_log,
             iterations=iterations,
             token_usage=token_usage,
             hit_max_iterations=True,
         )
+
+    def _force_synthesis(
+        self, messages: list[dict], token_usage: dict
+    ) -> str:
+        """Make one tools-disabled call to coax a final text response.
+
+        Used when the ReAct loop exits without the model ever producing a
+        text turn. Appends a stern instruction and re-calls the model with
+        no tools available, so it has to write final content.
+        """
+        synthesis_messages = list(messages) + [{
+            "role": "user",
+            "content": (
+                "You have reached the maximum number of tool calls. "
+                "Stop searching and synthesise everything you have learned "
+                "into the final required JSON now. Do not call any tools. "
+                "Return ONLY the JSON object — no prose, no code fences, "
+                "no <tool_call> tags."
+            ),
+        }]
+        kwargs: dict[str, Any] = {
+            "model": self.model,
+            "messages": synthesis_messages,
+        }
+        if self.timeout is not None:
+            kwargs["timeout"] = self.timeout
+        if self.max_tokens is not None:
+            kwargs["max_tokens"] = self.max_tokens
+        try:
+            response = self.client.chat.completions.create(**kwargs)
+        except Exception as exc:
+            logger.warning(
+                "%s: forced synthesis call failed: %s", self.name, exc,
+            )
+            return ""
+        token_usage["prompt"] += response.usage.prompt_tokens
+        token_usage["completion"] += response.usage.completion_tokens
+        return response.choices[0].message.content or ""

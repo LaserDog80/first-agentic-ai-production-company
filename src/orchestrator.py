@@ -6,7 +6,15 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+import openai
+
 logger = logging.getLogger(__name__)
+
+# Backoff schedule (seconds) for provider transient errors. Length defines
+# total attempts: len(schedule) + 1. Current: 3 attempts total, sleep 1s
+# then 3s between them. See issue #25 ("Already borrowed" 400s from Nebius).
+_PROVIDER_BACKOFF_SECONDS = [1, 3]
+_NON_PROVIDER_BACKOFF_SECONDS = [1]
 
 from src.provider import load_config, create_client, get_model_name
 from src.agent import AgentRuntime, AgentResult
@@ -315,7 +323,11 @@ class Orchestrator:
         return outputs
 
     def _run_researcher(self, outputs: dict) -> dict:
-        """Step 3: Researcher produces a ResearchPack."""
+        """Step 3: Researcher produces a ResearchPack.
+
+        If the pack comes back empty/garbage, raise immediately rather than
+        cascading into 8+ doomed agent calls (issue #26).
+        """
         start = time.time()
         research_result = self._run_agent(
             name="researcher",
@@ -337,8 +349,47 @@ class Orchestrator:
             tools=[web_search],
             model_tier=self.config["agents"]["researcher"]["model_tier"],
         )
+        self._assert_research_pack_usable(research_pack)
         outputs["research_pack"] = research_pack
         return outputs
+
+    @staticmethod
+    def _research_pack_is_usable(pack: dict) -> bool:
+        """A pack is usable if at least one core list has any content.
+
+        Empty list / missing key / None all count as empty for that field.
+        """
+        if not isinstance(pack, dict):
+            return False
+        core_fields = (
+            "competitive_landscape",
+            "characters",
+            "key_facts",
+            "archive_sources",
+            "locations",
+        )
+        return any(
+            isinstance(pack.get(f), list) and len(pack[f]) > 0
+            for f in core_fields
+        )
+
+    def _assert_research_pack_usable(self, pack: dict) -> None:
+        """Halt the pipeline if the research pack has no usable content."""
+        if self._research_pack_is_usable(pack):
+            return
+        message = (
+            "Researcher returned an empty/unusable ResearchPack — halting "
+            "before downstream agents waste tokens on a doomed run. "
+            "Check researcher logs for empty output or tool-call failures."
+        )
+        logger.error(message)
+        self._emit({
+            "type": "pipeline_error",
+            "agent": "researcher",
+            "phase": "research",
+            "message": message,
+        })
+        raise RuntimeError(message)
 
     def _run_artist(self, outputs: dict) -> dict:
         """Step 3b: Artist renders deck imagery as pixel art.
@@ -623,12 +674,25 @@ class Orchestrator:
         tools: list,
         model_tier: str,
     ) -> AgentResult:
-        """Create an AgentRuntime and run it. Retries once on failure."""
+        """Create an AgentRuntime and run it.
+
+        Retry policy:
+        - Transient provider errors (openai.APIError subclasses): 3 attempts
+          total with exponential backoff (1s, 3s). Covers Nebius's
+          intermittent 'Already borrowed' 400s and 5xxs (issue #25).
+        - Other exceptions (code bugs etc.): 2 attempts with 1s sleep —
+          same as before; retrying a code bug rarely helps.
+        """
         model = get_model_name(self.config, model_tier)
         agent_config = self.config["agents"].get(name, {})
         max_iterations = agent_config.get("max_iterations", 5)
 
-        for attempt in range(2):
+        provider_schedule = _PROVIDER_BACKOFF_SECONDS
+        non_provider_schedule = _NON_PROVIDER_BACKOFF_SECONDS
+        # Cap attempts at the longer of the two schedules.
+        max_attempts = max(len(provider_schedule), len(non_provider_schedule)) + 1
+
+        for attempt in range(max_attempts):
             try:
                 runtime = AgentRuntime(
                     name=name,
@@ -642,24 +706,28 @@ class Orchestrator:
                     max_tokens=self.agent_max_tokens,
                 )
                 return runtime.run(user_message)
+            except openai.APIError as exc:
+                # Provider-side error — use longer schedule
+                logger.warning(
+                    "%s: provider error (attempt %d/%d): %s",
+                    name, attempt + 1, len(provider_schedule) + 1, exc,
+                )
+                if attempt < len(provider_schedule):
+                    time.sleep(provider_schedule[attempt])
+                    continue
+                break
             except Exception as exc:
                 logger.warning(
-                    "%s: agent call failed (attempt %d): %s",
-                    name, attempt + 1, exc,
+                    "%s: agent call failed (attempt %d/%d): %s",
+                    name, attempt + 1, len(non_provider_schedule) + 1, exc,
                 )
-                if attempt == 0:
-                    time.sleep(1)
+                if attempt < len(non_provider_schedule):
+                    time.sleep(non_provider_schedule[attempt])
                     continue
-                # Second failure — return placeholder
-                return AgentResult(
-                    output="{}",
-                    tool_calls=[],
-                    iterations=0,
-                    token_usage={"prompt": 0, "completion": 0},
-                    hit_max_iterations=False,
-                )
-        # Should not reach here, but satisfy type checker
-        return AgentResult(  # pragma: no cover
+                break
+
+        # All attempts exhausted — return placeholder
+        return AgentResult(
             output="{}",
             tool_calls=[],
             iterations=0,
@@ -810,18 +878,28 @@ class Orchestrator:
         except (json.JSONDecodeError, Exception) as exc:
             error_msg = str(exc)
 
-        # Retry with correction prompt if we have context to re-run
+        # Retry with correction prompt if we have context to re-run.
+        # The retry is a REFORMAT, not a redo: we strip tools so the model
+        # is forced to produce final JSON text (re-passing tools encourages
+        # it to start another research loop and sometimes emit tool calls
+        # as XML/text in the content field — see issue #24).
         if system_prompt and user_message and model_tier:
+            raw_preview = (cleaned or "")[:2000]
             correction = (
-                f"Your previous output failed validation with this error:\n"
+                "Your previous output failed validation:\n"
                 f"{error_msg}\n\n"
-                f"Please return ONLY valid JSON matching the required schema."
+                "Previous output (verbatim, possibly truncated):\n"
+                f"{raw_preview}\n\n"
+                "Reformat this into valid JSON matching the required schema. "
+                "Do NOT call any tools. Do NOT do additional research. "
+                "Return ONLY the JSON object — no prose, no code fences, "
+                "no <tool_call> tags."
             )
             retry_result = self._run_agent(
                 name=agent_name,
                 system_prompt=system_prompt,
                 user_message=f"{user_message}\n\n{correction}",
-                tools=tools or [],
+                tools=[],
                 model_tier=model_tier,
             )
             retry_cleaned = _strip_markdown_json(retry_result.output)
