@@ -1615,7 +1615,7 @@
 
             case 'tool_call':
                 setBubble(event.agent, event.tool, formatToolArgs(event));
-                addLog('tool_call', `${agentLabel(event.agent)} using ${event.tool}`);
+                addToolLog(event.agent, event.tool);
                 break;
 
             case 'rework':
@@ -1743,6 +1743,33 @@
         const entry = document.createElement('div');
         entry.className = `log-entry event-${type}`;
         entry.innerHTML = `<span class="timestamp">[${now}]</span>${escHtml(message)}`;
+        panel.appendChild(entry);
+        panel.scrollTop = panel.scrollHeight;
+    }
+
+    function addToolLog(agent, tool) {
+        // Coalesce repeated tool calls from the same agent+tool into a single
+        // entry with a count, so a researcher running 20 web_searches doesn't
+        // flood the ticker.
+        const panel = document.getElementById('logPanel');
+        const last = panel.lastElementChild;
+        const label = `${agentLabel(agent)} using ${tool}`;
+        if (last && last.dataset.agent === agent && last.dataset.tool === tool) {
+            const count = parseInt(last.dataset.count || '1', 10) + 1;
+            last.dataset.count = String(count);
+            const ts = last.querySelector('.timestamp')?.outerHTML
+                || `<span class="timestamp">[${new Date().toLocaleTimeString()}]</span>`;
+            last.innerHTML = `${ts}${escHtml(label)} (×${count})`;
+            panel.scrollTop = panel.scrollHeight;
+            return;
+        }
+        const now = new Date().toLocaleTimeString();
+        const entry = document.createElement('div');
+        entry.className = 'log-entry event-tool_call';
+        entry.dataset.agent = agent;
+        entry.dataset.tool = tool;
+        entry.dataset.count = '1';
+        entry.innerHTML = `<span class="timestamp">[${now}]</span>${escHtml(label)}`;
         panel.appendChild(entry);
         panel.scrollTop = panel.scrollHeight;
     }

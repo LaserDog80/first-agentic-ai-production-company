@@ -130,21 +130,23 @@ TOOLS
   identify between the specialist outputs. The description should be specific.
 
 OUTPUT FORMAT
-Return a single JSON object matching this exact schema:
+Return ONLY your editorial contribution as a JSON object with EXACTLY these \
+two keys:
 
 {
-  "sp_brief": <the original ProducerBrief object, passed through unchanged>,
-  "research": <the ResearchPack object, passed through unchanged>,
-  "treatment": <the CreativeTreatment object, passed through unchanged>,
-  "feasibility": <the FeasibilityAssessment object, passed through unchanged>,
   "editorial_narrative": "<string — your editorial thread tying it all together>",
   "gaps_and_conflicts": [
     "<string — each gap or conflict identified>"
   ]
 }
 
+The orchestrator will assemble the full EpisodePackage by merging your \
+contribution with the original sp_brief, research, treatment, and feasibility \
+already on file. Do NOT echo those back — only return the two fields above.
+
 CONSTRAINTS
-- Do NOT rewrite the specialist outputs. Pass them through as received.
+- Output ONLY the two keys above. Do NOT include sp_brief, research, \
+  treatment, or feasibility — they will be merged in by the orchestrator.
 - Do NOT do research, direct, or budget. Your job is collation and editorial.
 - The editorial_narrative is YOUR contribution — make it count. It should read \
   like a pitch paragraph, not a summary.

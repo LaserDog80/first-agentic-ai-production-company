@@ -13,7 +13,7 @@ from src.agent import AgentRuntime, AgentResult
 from src.schemas import (
     ProducerBrief, ResearchPack, CreativeTreatment, FeasibilityAssessment,
     EpisodePackage, PitchDeck, LogEntry, ToolCallLog, EvidencePack,
-    SpecialistBriefs,
+    SpecialistBriefs, EditorialContribution,
 )
 from src.tools import get_openai_tools_schema, execute_tool
 from src.tools.search import web_search
@@ -449,7 +449,14 @@ class Orchestrator:
         return outputs
 
     def _run_producer_collation(self, outputs: dict) -> dict:
-        """Step 6: Producer collates all outputs into an EpisodePackage."""
+        """Step 6: Producer adds editorial narrative; orchestrator assembles.
+
+        The Producer LLM only returns its own contribution (editorial_narrative
+        and gaps_and_conflicts). The orchestrator merges that with the already-
+        validated sp_brief, research_pack, treatment, and feasibility — so the
+        EpisodePackage is guaranteed to contain real data even if the LLM
+        truncates or drops fields.
+        """
         collation_input = json.dumps({
             "sp_brief": outputs["producer_brief"],
             "research": outputs["research_pack"],
@@ -470,13 +477,29 @@ class Orchestrator:
             collation_input[:200], collation_result,
             duration_ms=duration_ms,
         )
-        episode_package = self._parse_and_validate(
-            collation_result.output, EpisodePackage, "producer",
+        contribution = self._parse_and_validate(
+            collation_result.output, EditorialContribution, "producer",
             system_prompt=producer.build_collation_prompt(),
             user_message=collation_input,
             tools=[flag_gap],
             model_tier=self.config["agents"]["producer"]["model_tier"],
         )
+        episode_package = {
+            "sp_brief": outputs["producer_brief"],
+            "research": outputs["research_pack"],
+            "treatment": outputs["treatment"],
+            "feasibility": outputs["feasibility"],
+            "editorial_narrative": contribution.get("editorial_narrative", ""),
+            "gaps_and_conflicts": contribution.get("gaps_and_conflicts", []),
+        }
+        # Validate the assembled package; if invalid, log but proceed with
+        # the dict so the pipeline can continue.
+        try:
+            EpisodePackage.model_validate(episode_package)
+        except Exception as exc:
+            logger.warning(
+                "Assembled EpisodePackage failed validation: %s", exc
+            )
         outputs["episode_package"] = episode_package
         return outputs
 
