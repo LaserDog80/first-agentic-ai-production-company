@@ -64,3 +64,41 @@ def test_rework_cap_enforced(mock_config):
     result = _mock_agent_result({"test": "output"}, tool_calls=tool_calls)
     rework = orch._detect_rework(result)
     assert rework is None
+
+
+# --- Research-pack guardrail (issue #26) ---
+
+def test_research_pack_is_usable_empty():
+    """An empty pack is not usable."""
+    assert Orchestrator._research_pack_is_usable({}) is False
+
+
+def test_research_pack_is_usable_all_empty_lists():
+    """Pack with all-empty lists is not usable."""
+    pack = {
+        "competitive_landscape": [],
+        "characters": [],
+        "key_facts": [],
+        "archive_sources": [],
+        "locations": [],
+        "risks_and_sensitivities": [],
+    }
+    assert Orchestrator._research_pack_is_usable(pack) is False
+
+
+def test_research_pack_is_usable_one_field_populated():
+    """A single non-empty core list makes the pack usable."""
+    pack = {
+        "competitive_landscape": [],
+        "characters": [{"name": "X", "role": "y", "access_notes": "",
+                        "story_angle": ""}],
+        "key_facts": [],
+    }
+    assert Orchestrator._research_pack_is_usable(pack) is True
+
+
+def test_research_pack_assert_halts_on_empty(mock_config):
+    """_assert_research_pack_usable raises RuntimeError on empty pack."""
+    orch = _make_orchestrator(mock_config)
+    with pytest.raises(RuntimeError, match="empty/unusable ResearchPack"):
+        orch._assert_research_pack_usable({})

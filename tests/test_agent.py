@@ -103,6 +103,42 @@ def test_agent_max_iterations():
     assert result.hit_max_iterations is True
 
 
+def test_agent_synthesises_on_max_iter_when_empty(monkeypatch):
+    """When the ReAct loop exits at max_iterations with no final text,
+    AgentRuntime should make one tools-disabled call to coax a final
+    response — otherwise downstream JSON parse blows up (issue #23)."""
+    client = MagicMock()
+
+    # Every iteration: model emits tool_calls, no text content.
+    tool_call = MagicMock()
+    tool_call.id = "call_1"
+    tool_call.function.name = "mock_tool"
+    tool_call.function.arguments = '{"query": "loop"}'
+    looping_response = _make_mock_response(None, tool_calls=[tool_call])
+
+    # Synthesis call (the +1 after the loop): final JSON.
+    synthesis_response = _make_mock_response('{"final": "answer"}')
+
+    client.chat.completions.create.side_effect = (
+        [looping_response] * 3 + [synthesis_response]
+    )
+
+    agent = AgentRuntime(
+        name="test_agent",
+        system_prompt="Test.",
+        tools=[mock_tool],
+        client=client,
+        model="test-model",
+        max_iterations=3,
+    )
+    result = agent.run(user_message="Loop.")
+    assert result.hit_max_iterations is True
+    assert result.output == '{"final": "answer"}'
+    # Synthesis call should NOT have included tools kwarg
+    last_call_kwargs = client.chat.completions.create.call_args_list[-1].kwargs
+    assert "tools" not in last_call_kwargs
+
+
 def test_agent_tracks_token_usage():
     """Agent accumulates token usage across iterations."""
     client = MagicMock()
