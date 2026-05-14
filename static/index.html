@@ -1751,15 +1751,23 @@
         // Coalesce repeated tool calls from the same agent+tool into a single
         // entry with a count, so a researcher running 20 web_searches doesn't
         // flood the ticker.
+        //
+        // We scan backwards for the most recent tool_call entry rather than
+        // only checking lastElementChild — intervening status/narration/log
+        // entries from other event types would otherwise break the chain
+        // and produce duplicates (issue #28).
         const panel = document.getElementById('logPanel');
-        const last = panel.lastElementChild;
         const label = `${agentLabel(agent)} using ${tool}`;
-        if (last && last.dataset.agent === agent && last.dataset.tool === tool) {
-            const count = parseInt(last.dataset.count || '1', 10) + 1;
-            last.dataset.count = String(count);
-            const ts = last.querySelector('.timestamp')?.outerHTML
+        let prevTool = null;
+        for (let el = panel.lastElementChild; el; el = el.previousElementSibling) {
+            if (el.classList.contains('event-tool_call')) { prevTool = el; break; }
+        }
+        if (prevTool && prevTool.dataset.agent === agent && prevTool.dataset.tool === tool) {
+            const count = parseInt(prevTool.dataset.count || '1', 10) + 1;
+            prevTool.dataset.count = String(count);
+            const ts = prevTool.querySelector('.timestamp')?.outerHTML
                 || `<span class="timestamp">[${new Date().toLocaleTimeString()}]</span>`;
-            last.innerHTML = `${ts}${escHtml(label)} (×${count})`;
+            prevTool.innerHTML = `${ts}${escHtml(label)} (×${count})`;
             panel.scrollTop = panel.scrollHeight;
             return;
         }

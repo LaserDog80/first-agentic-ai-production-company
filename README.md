@@ -13,8 +13,8 @@ pinned: false
 
 ## Status
 
-Phase 1 (Engine) — built, pending live testing with API keys.
-Phase 2 (Frontend) — pixel art web UI with real-time WebSocket updates.
+Phase 1 (Engine) — live and running. The pipeline has been hardened against real-world failure modes uncovered during testing: provider tool-call formatting, empty-research cascades, intermittent provider errors, and Series Producer scope drift.
+Phase 2 (Frontend) — pixel art web UI with real-time WebSocket updates, deployed on Hugging Face Spaces.
 
 ## What It Does
 
@@ -72,7 +72,7 @@ The web UI features:
 - **Pixel art characters** standing in a row — one for each agent role
 - **Speech bubbles** showing what each agent is currently doing or generating
 - **Live status bar** with progress tracking and step counter
-- **Event log** with timestamped updates as the pipeline runs
+- **Event log** with timestamped updates — repeated tool calls from the same agent coalesce into a single `(×N)` row to keep the ticker readable on research-heavy briefs
 - **Result overlay** displaying the final pitch deck
 
 ### CLI
