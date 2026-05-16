@@ -57,6 +57,7 @@ export class NodeEditor {
     this._pan = null;         // panning the canvas
     this._connecting = null;  // creating an edge {fromId, mx, my}
     this._sparks = [];        // animated dots travelling along edges
+    this._snapGuides = null;  // { x: number|null, y: number|null } while dragging
 
     this.onSelect = opts.onSelect || (() => {});
     this.onChange = opts.onChange || (() => {});
@@ -158,6 +159,7 @@ export class NodeEditor {
     ctx.scale(this.scale, this.scale);
 
     this._drawGrid();
+    this._drawSnapGuides();
 
     // Edges first (behind nodes).
     for (const e of this.graph.edges) {
@@ -198,6 +200,38 @@ export class NodeEditor {
     // Nodes.
     for (const n of this.graph.nodes) this._drawNode(n);
 
+    ctx.restore();
+  }
+
+  _drawSnapGuides() {
+    if (!this._drag || !this._snapGuides) return;
+    const { x, y } = this._snapGuides;
+    if (x === null && y === null) return;
+    const ctx = this.ctx;
+    const ox = -this.offsetX / this.scale;
+    const oy = -this.offsetY / this.scale;
+    const w = this.canvas.width / this.scale;
+    const h = this.canvas.height / this.scale;
+    ctx.save();
+    ctx.strokeStyle = "rgba(245, 197, 66, 0.55)";
+    ctx.lineWidth = 1 / this.scale;
+    ctx.setLineDash([4 / this.scale, 4 / this.scale]);
+    if (x !== null) {
+      // Vertical guide through the centre of the snapped column.
+      const gx = x + NODE_W / 2;
+      ctx.beginPath();
+      ctx.moveTo(gx, oy);
+      ctx.lineTo(gx, oy + h);
+      ctx.stroke();
+    }
+    if (y !== null) {
+      // Horizontal guide along the snapped row (top edge of nodes at this depth).
+      ctx.beginPath();
+      ctx.moveTo(ox, y);
+      ctx.lineTo(ox + w, y);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
     ctx.restore();
   }
 
@@ -367,6 +401,72 @@ export class NodeEditor {
     ctx.fill();
   }
 
+  // ── hierarchy / snap ──────────────────────────────────────────────────────
+  // BFS depth from input (or roots with no incoming flow edges). Skill/source
+  // edges are ignored — they're tool wires, not part of the agent hierarchy.
+  // Skill and source nodes get no depth and are excluded from hierarchy snap.
+  _computeDepths() {
+    const FLOW = new Set(["input", "delegate", "output"]);
+    const outgoing = {};
+    const incoming = {};
+    for (const n of this.graph.nodes) { outgoing[n.id] = []; incoming[n.id] = []; }
+    for (const e of this.graph.edges) {
+      if (!FLOW.has(e.kind)) continue;
+      if (outgoing[e.from]) outgoing[e.from].push(e.to);
+      if (incoming[e.to]) incoming[e.to].push(e.from);
+    }
+    let roots = this.graph.nodes.filter(n => n.type === "input").map(n => n.id);
+    if (!roots.length) {
+      roots = this.graph.nodes
+        .filter(n => (n.type === "agent" || n.type === "output") && incoming[n.id].length === 0)
+        .map(n => n.id);
+    }
+    const depths = {};
+    const queue = [];
+    for (const r of roots) { depths[r] = 0; queue.push(r); }
+    while (queue.length) {
+      const id = queue.shift();
+      for (const nx of outgoing[id]) {
+        if (depths[nx] === undefined) { depths[nx] = depths[id] + 1; queue.push(nx); }
+      }
+    }
+    return depths;
+  }
+
+  // Returns { x, y, guides } — final snapped position plus the snap targets used
+  // (so the draw loop can render guide lines). Falls back to 8px sub-grid.
+  _snapDraggedPosition(draggedId, rawX, rawY) {
+    const THRESHOLD = 12;
+    let nx = Math.round(rawX / 8) * 8;
+    let ny = Math.round(rawY / 8) * 8;
+    let guideX = null, guideY = null;
+
+    const depths = this._computeDepths();
+    const d = depths[draggedId];
+    if (d !== undefined) {
+      // Y-snap: same-depth nodes form a row.
+      let bestDy = THRESHOLD, bestY = null;
+      // X-snap: align with nodes at a *different* depth (parents, grandparents,
+      // cousins) — same-depth nodes share a y, so x-aligning them would overlap.
+      let bestDx = THRESHOLD, bestX = null;
+      for (const o of this.graph.nodes) {
+        if (o.id === draggedId) continue;
+        const od = depths[o.id];
+        if (od === undefined) continue;
+        if (od === d) {
+          const dy = Math.abs(ny - o.position.y);
+          if (dy < bestDy) { bestDy = dy; bestY = o.position.y; }
+        } else {
+          const dx = Math.abs(nx - o.position.x);
+          if (dx < bestDx) { bestDx = dx; bestX = o.position.x; }
+        }
+      }
+      if (bestY !== null) { ny = bestY; guideY = bestY; }
+      if (bestX !== null) { nx = bestX; guideX = bestX; }
+    }
+    return { x: nx, y: ny, guides: { x: guideX, y: guideY } };
+  }
+
   // ── geometry helpers ──────────────────────────────────────────────────────
   _node(id) { return this.graph.nodes.find(n => n.id === id) || null; }
   _hasInSlot(n) { return n.type !== "input"; }
@@ -447,7 +547,7 @@ export class NodeEditor {
     c.addEventListener("mousedown", (e) => this._onDown(e));
     c.addEventListener("mousemove", (e) => this._onMove(e));
     c.addEventListener("mouseup",   (e) => this._onUp(e));
-    c.addEventListener("mouseleave",() => { this._drag = this._pan = this._connecting = null; });
+    c.addEventListener("mouseleave",() => { this._drag = this._pan = this._connecting = null; this._snapGuides = null; });
     c.addEventListener("wheel",     (e) => this._onWheel(e), { passive: false });
     c.addEventListener("dblclick",  (e) => this._onDblClick(e));
     c.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -491,8 +591,12 @@ export class NodeEditor {
       const g = this._toGraph(mx, my);
       const n = this._node(this._drag.id);
       if (n) {
-        n.position.x = Math.round((g.x - this._drag.dx) / 8) * 8;
-        n.position.y = Math.round((g.y - this._drag.dy) / 8) * 8;
+        const snapped = this._snapDraggedPosition(
+          n.id, g.x - this._drag.dx, g.y - this._drag.dy
+        );
+        n.position.x = snapped.x;
+        n.position.y = snapped.y;
+        this._snapGuides = snapped.guides;
         this.onChange(this.graph);
       }
     } else if (this._pan) {
@@ -516,6 +620,7 @@ export class NodeEditor {
       }
     }
     this._drag = this._pan = this._connecting = null;
+    this._snapGuides = null;
   }
 
   _onWheel(e) {
