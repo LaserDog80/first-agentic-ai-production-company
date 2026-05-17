@@ -69,11 +69,11 @@ def list_available_skills() -> list[dict]:
         {
             "skill_id": "web_search",
             "label": "Web Search",
-            "description": "Search the live web (Tavily/Linkup).",
+            "description": "Live web search. Give to any agent that needs current facts.",
         },
         {
             "skill_id": "lookup_rates",
-            "label": "Lookup Rates",
-            "description": "Daily rates for TV production roles by region.",
+            "label": "Rate Lookup",
+            "description": "Look up a day rate for a role in a region. Ships with a sample dataset — swap in your own.",
         },
     ]

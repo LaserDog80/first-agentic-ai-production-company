@@ -363,27 +363,27 @@
     <h2>LIBRARY</h2>
     <div class="lib-item" data-add="agent">
       AGENT
-      <div class="desc">An LLM-driven role with a system prompt.</div>
+      <div class="desc">A reasoning agent driven by a system prompt. Add one per role in your workflow.</div>
     </div>
     <div class="lib-item" data-add="skill" data-skill="web_search">
       WEB SEARCH
-      <div class="desc">Live web search (Tavily/Linkup).</div>
+      <div class="desc">Live web search. Give to any agent that needs current facts.</div>
     </div>
     <div class="lib-item" data-add="skill" data-skill="lookup_rates">
-      LOOKUP RATES
-      <div class="desc">Daily rates for TV roles by region.</div>
+      RATE LOOKUP
+      <div class="desc">Look up a day rate for a role in a region. Ships with a sample dataset — swap in your own.</div>
     </div>
     <div class="lib-item" data-add="source">
       TEXT SOURCE
-      <div class="desc">Static text exposed as a tool.</div>
+      <div class="desc">A block of reference text exposed as a readable tool.</div>
     </div>
     <div class="lib-item" data-add="input">
       INPUT
-      <div class="desc">The brief that starts the run.</div>
+      <div class="desc">The brief or prompt that starts the run.</div>
     </div>
     <div class="lib-item" data-add="output">
       OUTPUT
-      <div class="desc">Where the final response goes.</div>
+      <div class="desc">Where the final result lands.</div>
     </div>
     <h2 style="margin-top:18px">CONTROLS</h2>
     <div style="font-size:7px;color:var(--text-dim);line-height:1.7;">
@@ -609,7 +609,7 @@ for (const item of document.querySelectorAll(".lib-item")) {
     } else if (kind === "skill") {
       const skillId = item.dataset.skill;
       editor.addNode({
-        type: "skill", label: skillId === "web_search" ? "Web Search" : "Lookup Rates",
+        type: "skill", label: skillId === "web_search" ? "Web Search" : "Rate Lookup",
         skill_id: skillId,
       });
     } else if (kind === "source") {
