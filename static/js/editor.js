@@ -144,10 +144,15 @@ export class NodeEditor {
     const key = `${fromId}->${toId}`;
     this.activeEdges.add(key);
     setTimeout(() => this.activeEdges.delete(key), 1200);
-    // Spawn a spark.
-    const a = this._slotOut(this._node(fromId));
-    const b = this._slotIn(this._node(toId));
-    if (a && b) this._sparks.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, t: 0 });
+    // Spawn a spark, routed via the same endpoints the renderer uses so the
+    // dot follows the actual edge geometry (horizontal for skill, vertical
+    // otherwise).
+    const edge = this.graph.edges.find(e => e.from === fromId && e.to === toId);
+    if (!edge) return;
+    const endpoints = this._edgeEndpoints(edge);
+    if (!endpoints) return;
+    const { a, b } = endpoints;
+    this._sparks.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, t: 0 });
   }
 
   // ── rendering ─────────────────────────────────────────────────────────────
@@ -170,17 +175,14 @@ export class NodeEditor {
 
     // Edges first (behind nodes).
     for (const e of this.graph.edges) {
-      const from = this._node(e.from);
-      const to = this._node(e.to);
-      if (!from || !to) continue;
-      this._drawEdge(from, to, e.kind);
+      this._drawEdge(e);
     }
 
     // In-progress connection.
     if (this._connecting) {
       const from = this._node(this._connecting.fromId);
       if (from) {
-        const a = this._slotOut(from);
+        const a = this._slotPos(from, this._connecting.fromSide);
         const screenX = (this._connecting.mx - this.offsetX) / this.scale;
         const screenY = (this._connecting.my - this.offsetY) / this.scale;
         ctx.strokeStyle = PALETTE.textDim;
@@ -341,20 +343,14 @@ export class NodeEditor {
       ctx.fillText("OUTPUT", x + 8, y + 38);
     }
 
-    // Slots.
-    if (this._hasInSlot(n)) {
-      const s = this._slotIn(n);
+    // Slots — render every slot this node type exposes.
+    const slots = this._slotsForType(n.type);
+    for (const s of [...slots.ins, ...slots.outs]) {
+      const p = this._slotPos(n, s.side);
       ctx.fillStyle = border;
-      ctx.fillRect(s.x - SLOT_SIZE / 2, s.y - SLOT_SIZE / 2, SLOT_SIZE, SLOT_SIZE);
+      ctx.fillRect(p.x - SLOT_SIZE / 2, p.y - SLOT_SIZE / 2, SLOT_SIZE, SLOT_SIZE);
       ctx.fillStyle = PALETTE.bgDark;
-      ctx.fillRect(s.x - 3, s.y - 3, 6, 6);
-    }
-    if (this._hasOutSlot(n)) {
-      const s = this._slotOut(n);
-      ctx.fillStyle = border;
-      ctx.fillRect(s.x - SLOT_SIZE / 2, s.y - SLOT_SIZE / 2, SLOT_SIZE, SLOT_SIZE);
-      ctx.fillStyle = PALETTE.bgDark;
-      ctx.fillRect(s.x - 3, s.y - 3, 6, 6);
+      ctx.fillRect(p.x - 3, p.y - 3, 6, 6);
     }
   }
 
@@ -377,23 +373,35 @@ export class NodeEditor {
     if (line) ctx.fillText(line, x, yy);
   }
 
-  _drawEdge(from, to, kind) {
+  _drawEdge(edge) {
     const ctx = this.ctx;
-    const a = this._slotOut(from);
-    const b = this._slotIn(to);
-    if (!a || !b) return;
+    const endpoints = this._edgeEndpoints(edge);
+    if (!endpoints) return;
+    const { a, b } = endpoints;
+    const kind = edge.kind;
     const colour = KIND_COLOR[kind] || PALETTE.textDim;
-    const isActive = this.activeEdges.has(`${from.id}->${to.id}`);
+    const isActive = this.activeEdges.has(`${edge.from}->${edge.to}`);
     const lineW = isActive ? 5 / this.scale : (kind === "skill" ? 2 : 3) / this.scale;
     const arrow = 6 / this.scale;
-    const midY = (a.y + b.y) / 2;
+    const horizontal = (kind === "skill");
 
-    // Input/output edges signal where information enters and exits the system.
-    // When they're long enough to visually cross other nodes, render them as
-    // solid chevron stubs at each endpoint with only a faint dashed bridge
-    // between — so the entry/exit points read clearly without the line
-    // dominating the middle of the graph. Active state overrides (full glow
-    // during a run so the user sees data flow).
+    // Stepped path nodes — horizontal kinds route through a midX (left↔right),
+    // vertical kinds route through a midY (top↔bottom).
+    const path = horizontal
+      ? (() => {
+          const midX = (a.x + b.x) / 2;
+          return [[a.x, a.y], [midX, a.y], [midX, b.y], [b.x, b.y]];
+        })()
+      : (() => {
+          const midY = (a.y + b.y) / 2;
+          return [[a.x, a.y], [a.x, midY], [b.x, midY], [b.x, b.y]];
+        })();
+
+    // Input/output edges signal where information enters/exits the system.
+    // When they span >200px they'd cross other nodes — render solid chevron
+    // stubs at each endpoint with a faint dashed bridge between, so the
+    // entry/exit reads clearly without the line dominating the middle of the
+    // graph. Active state overrides (full glow during a run).
     const isThrough = (kind === "input" || kind === "output");
     const longSpan = Math.abs(b.y - a.y) > 200;
     if (isThrough && longSpan && !isActive) {
@@ -403,10 +411,8 @@ export class NodeEditor {
       ctx.lineWidth = 1 / this.scale;
       ctx.setLineDash([3 / this.scale, 4 / this.scale]);
       ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(a.x, midY);
-      ctx.lineTo(b.x, midY);
-      ctx.lineTo(b.x, b.y);
+      ctx.moveTo(path[0][0], path[0][1]);
+      for (let i = 1; i < path.length; i++) ctx.lineTo(path[i][0], path[i][1]);
       ctx.stroke();
       ctx.restore();
 
@@ -420,7 +426,6 @@ export class NodeEditor {
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
 
-      // Source chevron (data leaves here, pointing away from source).
       ctx.fillStyle = colour;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y + stub);
@@ -428,7 +433,6 @@ export class NodeEditor {
       ctx.lineTo(a.x + arrow, a.y + stub - arrow);
       ctx.closePath();
       ctx.fill();
-      // Destination chevron (data arrives here).
       ctx.beginPath();
       ctx.moveTo(b.x, b.y);
       ctx.lineTo(b.x - arrow, b.y - arrow);
@@ -442,17 +446,26 @@ export class NodeEditor {
     ctx.strokeStyle = colour;
     ctx.lineWidth = lineW;
     ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(a.x, midY);
-    ctx.lineTo(b.x, midY);
-    ctx.lineTo(b.x, b.y);
+    ctx.moveTo(path[0][0], path[0][1]);
+    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i][0], path[i][1]);
     ctx.stroke();
 
+    // Arrowhead at destination — orient based on the direction of entry.
     ctx.fillStyle = colour;
     ctx.beginPath();
-    ctx.moveTo(b.x, b.y);
-    ctx.lineTo(b.x - arrow, b.y - arrow);
-    ctx.lineTo(b.x + arrow, b.y - arrow);
+    if (horizontal) {
+      // Skill arrows enter sideways; flip based on which side we entered on.
+      const enteringFromLeft = a.x <= b.x;
+      const tipX = b.x;
+      const baseX = enteringFromLeft ? b.x - arrow : b.x + arrow;
+      ctx.moveTo(tipX, b.y);
+      ctx.lineTo(baseX, b.y - arrow);
+      ctx.lineTo(baseX, b.y + arrow);
+    } else {
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - arrow, b.y - arrow);
+      ctx.lineTo(b.x + arrow, b.y - arrow);
+    }
     ctx.closePath();
     ctx.fill();
   }
@@ -525,14 +538,70 @@ export class NodeEditor {
 
   // ── geometry helpers ──────────────────────────────────────────────────────
   _node(id) { return this.graph.nodes.find(n => n.id === id) || null; }
-  _hasInSlot(n) { return n.type !== "input"; }
-  _hasOutSlot(n) { return n.type !== "output"; }
   _nodeH(n) { return n.type === "agent" ? NODE_H : NODE_H_SMALL; }
-  _slotIn(n) {
-    return { x: n.position.x + NODE_W / 2, y: n.position.y };
+
+  // Slot inventory per node type.
+  //   - Agent: top + bottom for delegate/input/output flow; left + right for
+  //     skill tools (so they enter from the side, not jammed on top with
+  //     delegation).
+  //   - Skill / source: left + right out-slots — picks whichever side is
+  //     closer to the consuming agent at draw time.
+  //   - Input: bottom out-slot only.
+  //   - Output: top in-slot only.
+  _slotsForType(type) {
+    switch (type) {
+      case "agent":  return {
+        ins:  [{ side: "top",    kinds: ["delegate", "input"] },
+               { side: "left",   kinds: ["skill"] },
+               { side: "right",  kinds: ["skill"] }],
+        outs: [{ side: "bottom", kinds: ["delegate", "output"] }],
+      };
+      case "skill":
+      case "source": return {
+        ins:  [],
+        outs: [{ side: "left",  kinds: ["skill"] },
+               { side: "right", kinds: ["skill"] }],
+      };
+      case "input":  return {
+        ins:  [],
+        outs: [{ side: "bottom", kinds: ["input"] }],
+      };
+      case "output": return {
+        ins:  [{ side: "top", kinds: ["output"] }],
+        outs: [],
+      };
+    }
+    return { ins: [], outs: [] };
   }
-  _slotOut(n) {
-    return { x: n.position.x + NODE_W / 2, y: n.position.y + this._nodeH(n) };
+
+  _slotPos(n, side) {
+    const x = n.position.x;
+    const y = n.position.y;
+    const w = NODE_W;
+    const h = this._nodeH(n);
+    if (side === "top")    return { x: x + w / 2, y: y };
+    if (side === "bottom") return { x: x + w / 2, y: y + h };
+    if (side === "left")   return { x: x,         y: y + h / 2 };
+    if (side === "right")  return { x: x + w,     y: y + h / 2 };
+    return null;
+  }
+
+  // Endpoints to use when rendering / sparking a given edge — vertical
+  // (top↔bottom) for input/delegate/output, horizontal (left↔right) for skill,
+  // with the skill source's side chosen by which is closer to the target.
+  _edgeEndpoints(edge) {
+    const from = this._node(edge.from);
+    const to = this._node(edge.to);
+    if (!from || !to) return null;
+    if (edge.kind === "skill") {
+      const fromCx = from.position.x + NODE_W / 2;
+      const toCx   = to.position.x + NODE_W / 2;
+      if (fromCx <= toCx) {
+        return { a: this._slotPos(from, "right"), b: this._slotPos(to, "left") };
+      }
+      return { a: this._slotPos(from, "left"), b: this._slotPos(to, "right") };
+    }
+    return { a: this._slotPos(from, "bottom"), b: this._slotPos(to, "top") };
   }
 
   _hitNode(graphX, graphY) {
@@ -548,18 +617,24 @@ export class NodeEditor {
 
   _hitOutSlot(graphX, graphY) {
     for (const n of this.graph.nodes) {
-      if (!this._hasOutSlot(n)) continue;
-      const s = this._slotOut(n);
-      if (Math.abs(graphX - s.x) < 8 && Math.abs(graphY - s.y) < 8) return n;
+      for (const s of this._slotsForType(n.type).outs) {
+        const p = this._slotPos(n, s.side);
+        if (Math.abs(graphX - p.x) < 8 && Math.abs(graphY - p.y) < 8) {
+          return { node: n, side: s.side };
+        }
+      }
     }
     return null;
   }
 
   _hitInSlot(graphX, graphY) {
     for (const n of this.graph.nodes) {
-      if (!this._hasInSlot(n)) continue;
-      const s = this._slotIn(n);
-      if (Math.abs(graphX - s.x) < 8 && Math.abs(graphY - s.y) < 8) return n;
+      for (const s of this._slotsForType(n.type).ins) {
+        const p = this._slotPos(n, s.side);
+        if (Math.abs(graphX - p.x) < 8 && Math.abs(graphY - p.y) < 8) {
+          return { node: n, side: s.side };
+        }
+      }
     }
     return null;
   }
@@ -623,7 +698,7 @@ export class NodeEditor {
 
     const out = this._hitOutSlot(g.x, g.y);
     if (out) {
-      this._connecting = { fromId: out.id, mx, my };
+      this._connecting = { fromId: out.node.id, fromSide: out.side, mx, my };
       return;
     }
     const node = this._hitNode(g.x, g.y);
@@ -671,8 +746,8 @@ export class NodeEditor {
     const g = this._toGraph(mx, my);
     if (this._connecting) {
       const target = this._hitInSlot(g.x, g.y);
-      if (target && target.id !== this._connecting.fromId) {
-        this._tryConnect(this._connecting.fromId, target.id);
+      if (target && target.node.id !== this._connecting.fromId) {
+        this._tryConnect(this._connecting.fromId, target.node.id);
       }
     }
     this._drag = this._pan = this._connecting = null;
@@ -697,17 +772,25 @@ export class NodeEditor {
   _onDblClick(e) {
     const r = this.canvas.getBoundingClientRect();
     const g = this._toGraph(e.clientX - r.left, e.clientY - r.top);
-    // Double-click an edge midpoint to delete it.
+    // Double-click on the middle segment of an edge to delete it. For vertical
+    // edges this is a horizontal midline at midY; for skill (horizontal)
+    // edges it's a vertical midline at midX.
     for (let i = 0; i < this.graph.edges.length; i++) {
       const ed = this.graph.edges[i];
-      const from = this._node(ed.from);
-      const to = this._node(ed.to);
-      if (!from || !to) continue;
-      const a = this._slotOut(from);
-      const b = this._slotIn(to);
-      const midY = (a.y + b.y) / 2;
-      // Hit-test midline segment.
-      if (Math.abs(g.y - midY) < 8 && g.x > Math.min(a.x, b.x) - 4 && g.x < Math.max(a.x, b.x) + 4) {
+      const endpoints = this._edgeEndpoints(ed);
+      if (!endpoints) continue;
+      const { a, b } = endpoints;
+      let hit;
+      if (ed.kind === "skill") {
+        const midX = (a.x + b.x) / 2;
+        hit = Math.abs(g.x - midX) < 8 &&
+              g.y > Math.min(a.y, b.y) - 4 && g.y < Math.max(a.y, b.y) + 4;
+      } else {
+        const midY = (a.y + b.y) / 2;
+        hit = Math.abs(g.y - midY) < 8 &&
+              g.x > Math.min(a.x, b.x) - 4 && g.x < Math.max(a.x, b.x) + 4;
+      }
+      if (hit) {
         this.graph.edges.splice(i, 1);
         this.onChange(this.graph);
         return;
