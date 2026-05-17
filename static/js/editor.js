@@ -458,41 +458,24 @@ export class NodeEditor {
         })();
 
     // Input/output edges signal where information enters/exits the system.
-    // When they span >200px they'd cross other nodes — render solid chevron
-    // stubs at each endpoint with a faint dashed bridge between, so the
-    // entry/exit reads clearly without the line dominating the middle of the
-    // graph. Active state overrides (full glow during a run).
+    // When they span >200px they'd cross other nodes; draw nothing in the
+    // middle — just a small gold chevron at the source slot and a gold
+    // chevron at the destination, so the entry/exit reads as a marker
+    // rather than a long line dominating the graph. The agent-to-agent and
+    // skill edges carry the visual weight. Active state overrides — during
+    // a run the full solid line draws so data-flow is legible.
     const isThrough = (kind === "input" || kind === "output");
     const longSpan = Math.abs(b.y - a.y) > 200;
     if (isThrough && longSpan && !isActive) {
-      ctx.save();
-      ctx.strokeStyle = colour;
-      ctx.globalAlpha = 0.28;
-      ctx.lineWidth = 1 / this.scale;
-      ctx.setLineDash([3 / this.scale, 4 / this.scale]);
-      ctx.beginPath();
-      ctx.moveTo(path[0][0], path[0][1]);
-      for (let i = 1; i < path.length; i++) ctx.lineTo(path[i][0], path[i][1]);
-      ctx.stroke();
-      ctx.restore();
-
-      const stub = 22 / this.scale;
-      ctx.strokeStyle = colour;
-      ctx.lineWidth = lineW;
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(a.x, a.y + stub);
-      ctx.moveTo(b.x, b.y - stub);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
-
       ctx.fillStyle = colour;
+      // Source chevron — points away from the source slot.
       ctx.beginPath();
-      ctx.moveTo(a.x, a.y + stub);
-      ctx.lineTo(a.x - arrow, a.y + stub - arrow);
-      ctx.lineTo(a.x + arrow, a.y + stub - arrow);
+      ctx.moveTo(a.x, a.y + arrow);
+      ctx.lineTo(a.x - arrow, a.y);
+      ctx.lineTo(a.x + arrow, a.y);
       ctx.closePath();
       ctx.fill();
+      // Destination chevron — points into the destination slot.
       ctx.beginPath();
       ctx.moveTo(b.x, b.y);
       ctx.lineTo(b.x - arrow, b.y - arrow);
