@@ -468,18 +468,26 @@ export class NodeEditor {
     const longSpan = Math.abs(b.y - a.y) > 200;
     if (isThrough && longSpan && !isActive) {
       const stub = 40 / this.scale;
+      // Arrowhead sits *just above* the destination slot's top edge so the
+      // slot rectangle (drawn later, on top of edges) can't bury it. Shaft
+      // ends at the arrowhead's base so the two connect cleanly without the
+      // line poking through the triangle.
+      const slotEdge = SLOT_SIZE / 2;
+      const tipY = b.y - slotEdge;
+      const baseY = tipY - arrow;
+
       ctx.strokeStyle = colour;
       ctx.lineWidth = lineW;
       ctx.beginPath();
       ctx.moveTo(b.x, b.y - stub);
-      ctx.lineTo(b.x, b.y);
+      ctx.lineTo(b.x, baseY);
       ctx.stroke();
 
       ctx.fillStyle = colour;
       ctx.beginPath();
-      ctx.moveTo(b.x, b.y);
-      ctx.lineTo(b.x - arrow, b.y - arrow);
-      ctx.lineTo(b.x + arrow, b.y - arrow);
+      ctx.moveTo(b.x, tipY);
+      ctx.lineTo(b.x - arrow, baseY);
+      ctx.lineTo(b.x + arrow, baseY);
       ctx.closePath();
       ctx.fill();
       return;
