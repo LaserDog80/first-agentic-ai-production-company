@@ -1,0 +1,43 @@
+{
+  "id": "research_assistant",
+  "name": "Research Assistant",
+  "description": "Single agent with web search. The simplest possible playground graph.",
+  "entry_node_id": "n_brief",
+  "nodes": [
+    {
+      "id": "n_brief",
+      "type": "input",
+      "label": "Question",
+      "position": {"x": 400, "y": 40}
+    },
+    {
+      "id": "n_assistant",
+      "type": "agent",
+      "label": "Research Assistant",
+      "model_tier": "research",
+      "max_iterations": 6,
+      "tier": 0,
+      "position": {"x": 400, "y": 220},
+      "system_prompt": "You are a meticulous research assistant. When the user asks a question:\n1. Use web_search one or more times across different angles to find real, current information.\n2. Synthesise a clear, well-cited answer in plain prose. For every factual claim, cite the URL you took it from.\n3. End with a short \"Sources\" list.\n\nNever fabricate sources. If you can't find something, say so."
+    },
+    {
+      "id": "n_search",
+      "type": "skill",
+      "label": "Web Search",
+      "skill_id": "web_search",
+      "position": {"x": 80, "y": 240}
+    },
+    {
+      "id": "n_answer",
+      "type": "output",
+      "label": "Answer",
+      "subtype": "text",
+      "position": {"x": 400, "y": 420}
+    }
+  ],
+  "edges": [
+    {"id": "e1", "from": "n_brief",     "to": "n_assistant", "kind": "input"},
+    {"id": "e2", "from": "n_search",    "to": "n_assistant", "kind": "skill"},
+    {"id": "e3", "from": "n_assistant", "to": "n_answer",    "kind": "output"}
+  ]
+}

@@ -5,7 +5,6 @@ import pytest
 from unittest.mock import patch, MagicMock
 from src.tools import tool, get_openai_tools_schema, execute_tool
 from src.tools.search import web_search
-from src.tools.rework import request_rework, approve, flag_gap
 from src.tools.research import create_reference_research
 from src.tools.rates import lookup_rates
 
@@ -72,29 +71,6 @@ def test_execute_tool_missing_required_kwarg_returns_error():
     assert "error" in result
 
 
-# --- request_rework ---
-
-def test_request_rework():
-    result = request_rework(agent="researcher", notes="Thin competitive landscape")
-    assert result["status"] == "rework_requested"
-    assert result["agent"] == "researcher"
-
-
-# --- approve ---
-
-def test_approve():
-    result = approve()
-    assert result["status"] == "approved"
-
-
-# --- flag_gap ---
-
-def test_flag_gap():
-    result = flag_gap(description="No archive sources identified")
-    assert result["status"] == "gap_flagged"
-    assert "No archive" in result["description"]
-
-
 # --- web_search (mocked) ---
 
 TAVILY_RESULT = {
@@ -110,12 +86,16 @@ LINKUP_RESULT.results = [
 LINKUP_RESULT.results[0].name = "LinkItem"
 
 
-@patch.dict(os.environ, {"LINKUP_API_KEY": "test-key"})
-@patch("src.tools.search.LinkupClient")
-def test_web_search(mock_linkup_class):
+@patch.dict(
+    os.environ, {"SEARCH_PROVIDER": "tavily", "TAVILY_API_KEY": "test-key"}
+)
+@patch("src.tools.search.TavilyClient")
+def test_web_search(mock_tavily_class):
+    # Pin to tavily so this baseline test isn't affected by which provider
+    # is primary in "auto" mode (see test_web_search_provider_auto_fallback).
     mock_client = MagicMock()
-    mock_client.search.return_value = LINKUP_RESULT
-    mock_linkup_class.return_value = mock_client
+    mock_client.search.return_value = TAVILY_RESULT
+    mock_tavily_class.return_value = mock_client
 
     result = web_search("lighthouse documentaries")
     assert "results" in result
@@ -175,17 +155,18 @@ def test_web_search_provider_auto_fallback(
     mock_tavily_client.search.assert_called_once()
 
 
-@patch.dict(os.environ, {"LINKUP_API_KEY": "k"}, clear=False)
+@patch.dict(
+    os.environ, {"LINKUP_API_KEY": "k", "TAVILY_API_KEY": "k"}, clear=False
+)
 @patch("src.tools.search.LinkupClient")
 def test_web_search_provider_unset_defaults_auto(mock_linkup_class):
-    """When SEARCH_PROVIDER is unset it should behave like 'auto' (Linkup first)."""
+    """When SEARCH_PROVIDER is unset it should behave like 'auto' — Linkup first."""
     os.environ.pop("SEARCH_PROVIDER", None)
     mock_client = MagicMock()
     mock_client.search.return_value = LINKUP_RESULT
     mock_linkup_class.return_value = mock_client
 
     result = web_search("query")
-    assert "results" in result
     assert result["results"][0]["url"] == "http://link.com"
 
 

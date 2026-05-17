@@ -1,0 +1,54 @@
+{
+  "id": "trip_planner",
+  "name": "Quick Trip Planner",
+  "description": "Two agents — a planner that synthesises an itinerary from a researcher's findings. Tests the basic delegate-and-skill pattern.",
+  "entry_node_id": "n_brief",
+  "nodes": [
+    {
+      "id": "n_brief",
+      "type": "input",
+      "label": "Trip Brief",
+      "position": {"x": 480, "y": 40}
+    },
+    {
+      "id": "n_planner",
+      "type": "agent",
+      "label": "Trip Planner",
+      "model_tier": "strong",
+      "max_iterations": 5,
+      "tier": 0,
+      "position": {"x": 480, "y": 200},
+      "system_prompt": "You are a thoughtful travel planner. You receive a brief about a trip the user is taking — destination, duration, dates, traveller details, budget, interests.\n\nWORKFLOW\n1. Read the brief carefully. Identify what you actually need to know to plan well (e.g. best neighbourhoods for their interests, current weather norms, must-see vs skippable spots, food picks for their budget).\n2. Call delegate_to_travel_researcher with a focused research request — be specific about what you need them to find. Do NOT ask for an \"itinerary\" from the researcher; they only research, you plan.\n3. Use their findings to write a 2-day itinerary structured as Day 1 / Day 2, each with Morning / Afternoon / Evening blocks. Be opinionated: recommend ONE thing per slot, not a list.\n4. End with a short \"Notes\" section covering anything practical (transit, reservations to book ahead, weather caveats).\n\nSTYLE\n- Plain prose. No JSON. No code fences.\n- Confident but honest — if you're recommending something the researcher only partially confirmed, say so.\n- Around 400-700 words total."
+    },
+    {
+      "id": "n_researcher",
+      "type": "agent",
+      "label": "Travel Researcher",
+      "model_tier": "research",
+      "max_iterations": 6,
+      "tier": 1,
+      "position": {"x": 480, "y": 420},
+      "system_prompt": "You are a travel researcher. You return raw, useful facts and recommendations — not an itinerary.\n\nWORKFLOW\n1. Read the research request from the Trip Planner.\n2. Call web_search across several angles — neighbourhoods, weather/seasonal conditions, top experiences for the interests named, well-reviewed places to eat across price points, anything practical worth flagging (transit, reservations, scams, weather).\n3. Return a clear, well-organised brief in plain prose. Use short bullet points where it helps. Cite URLs inline for every concrete claim (place names, prices, opening times).\n\nRULES\n- Never invent sources. If you can't find something, say so.\n- Don't write the itinerary — that's the planner's job.\n- Keep it focused on what the planner asked for, not everything you could find."
+    },
+    {
+      "id": "n_search",
+      "type": "skill",
+      "label": "Web Search",
+      "skill_id": "web_search",
+      "position": {"x": 160, "y": 440}
+    },
+    {
+      "id": "n_itinerary",
+      "type": "output",
+      "label": "Itinerary",
+      "subtype": "text",
+      "position": {"x": 480, "y": 640}
+    }
+  ],
+  "edges": [
+    {"id": "e_in_plan",   "from": "n_brief",      "to": "n_planner",    "kind": "input"},
+    {"id": "e_plan_res",  "from": "n_planner",    "to": "n_researcher", "kind": "delegate"},
+    {"id": "e_search_res","from": "n_search",     "to": "n_researcher", "kind": "skill"},
+    {"id": "e_res_out",   "from": "n_researcher", "to": "n_itinerary",  "kind": "output"}
+  ]
+}

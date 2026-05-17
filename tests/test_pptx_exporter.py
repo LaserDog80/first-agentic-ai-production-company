@@ -10,9 +10,67 @@ from src.pptx_exporter import export_pitch_deck
 
 @pytest.fixture
 def sample_pitch_deck() -> dict:
-    """Load the test fixture pitch deck."""
-    fixture = Path("output/test1/pitch_deck.json")
-    return json.loads(fixture.read_text())
+    """A self-contained pitch deck fixture exercising every slide."""
+    return {
+        "title_page": {
+            "working_title": "Lighthouse Keepers",
+            "genre": "observational documentary",
+            "format": "3x60",
+            "target_broadcaster": "BBC Two",
+        },
+        "logline": "On a remote Atlantic rock, the last keeper learns the tide is coming for everything he knows.",
+        "format_and_tone": {
+            "series_length": "3x60",
+            "genre": "observational documentary",
+            "tone": "intimate, weather-beaten, hopeful",
+        },
+        "target_audience": "Adults 35+ who watch slow-form factual on BBC Two and Channel 4 — viewers of The Detectorists, Coast, and Earth at Night.",
+        "competitive_landscape": [
+            {"title": "Coast", "broadcaster": "BBC Two", "year": "2005",
+             "relevance": "Defined the British coastal documentary."},
+            {"title": "The Detectorists", "broadcaster": "BBC Four", "year": "2014",
+             "relevance": "Demonstrated appetite for slow, place-rooted storytelling."},
+        ],
+        "key_characters": [
+            {"name": "Donald MacLeod", "role": "Last keeper of Hyskeir",
+             "access_notes": "Confirmed verbal access via Northern Lighthouse Board.",
+             "story_angle": "His final season before automation."},
+            {"name": "Aileen Ross", "role": "Marine archaeologist",
+             "access_notes": "Strong existing relationship through prior research.",
+             "story_angle": "The history beneath the waves."},
+        ],
+        "episode_breakdown": {
+            "episode_title": "The Keeper",
+            "narrative_arc": {
+                "opening": "Dawn on Hyskeir — Donald climbs the spiral stairs for what he knows is one of the last times.",
+                "development": "We follow his daily rituals and the rising tide of automation.",
+                "climax": "A storm forces him to choose between protocol and instinct.",
+                "resolution": "Helicopter lifts him off; the light keeps turning.",
+            },
+            "key_sequences": [
+                {"name": "Lighting the lamp", "description": "Donald's morning routine",
+                 "visual_style": "long lenses, soft natural light", "duration_mins": 6},
+                {"name": "Storm", "description": "Force 9 hits the rock",
+                 "visual_style": "handheld, restless cuts", "duration_mins": 12},
+            ],
+            "overall_tone": "Intimate, weather-beaten",
+            "visual_approach": "Patient, painterly, with archive interludes.",
+            "contributor_usage": [
+                {"character_name": "Donald MacLeod", "role_in_episode": "Anchor and emotional spine"},
+            ],
+            "special_requirements": ["Helicopter access", "Marine insurance"],
+        },
+        "feasibility_summary": {
+            "feasibility_rating": "amber",
+            "budget_bracket": {"low": 850000, "high": 1200000, "currency": "GBP",
+                                "notes": "Includes 28 shoot days, archive licensing, post."},
+            "shooting_days": 28,
+            "key_risks": ["Weather-dependent access", "Single-character reliance"],
+        },
+        "why_now": "Automation reaches the last manned light in 2026 — this is the final chance to film it.",
+        "sp_review_notes": "Strong subject; treatment is bold; budget needs scrutiny.",
+        "unresolved_concerns": ["Need a B-strand if Donald falls ill mid-shoot."],
+    }
 
 
 def test_export_creates_file(sample_pitch_deck, tmp_path):

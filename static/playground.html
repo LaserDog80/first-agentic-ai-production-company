@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agentic Playground</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-dark: #1a1a2e;
+    --bg-mid:  #16213e;
+    --bg-light:#0f3460;
+    --accent:  #e94560;
+    --gold:    #f5c542;
+    --green:   #4ecca3;
+    --text:    #eaeaea;
+    --text-dim:#8892b0;
+    --red:     #ff6b6b;
+  }
+
+  html, body {
+    height: 100%; width: 100%;
+    background: var(--bg-dark);
+    color: var(--text);
+    font-family: 'Press Start 2P', monospace;
+    overflow: hidden;
+  }
+
+  .app {
+    display: grid;
+    grid-template-rows: 56px 1fr 200px;
+    grid-template-columns: 220px 1fr;
+    grid-template-areas:
+      "top top"
+      "lib canvas"
+      "log log";
+    width: 100vw; height: 100vh;
+  }
+
+  /* ── TOP BAR ────────────────────────────────────────────────────────── */
+  .top {
+    grid-area: top;
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 16px;
+    background: linear-gradient(180deg, var(--bg-mid), var(--bg-dark));
+    border-bottom: 4px solid var(--accent);
+  }
+  .top h1 {
+    font-size: 12px; color: var(--gold);
+    letter-spacing: 1px; text-shadow: 2px 2px 0 #000;
+    margin-right: 12px;
+  }
+  .top .grow { flex: 1; }
+  .top select, .top input, .top button {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; padding: 8px 12px;
+    background: var(--bg-mid);
+    border: 3px solid var(--bg-light);
+    color: var(--text);
+    outline: none; cursor: pointer;
+    image-rendering: pixelated;
+  }
+  .top input { cursor: text; min-width: 280px; }
+  .top button:hover { background: var(--bg-light); }
+  .top button.primary {
+    background: var(--accent); color: #000;
+    border-color: var(--accent);
+  }
+  .top button.primary:hover { background: var(--gold); border-color: var(--gold); }
+  .top button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── PANELS ─────────────────────────────────────────────────────────── */
+  .panel {
+    background: var(--bg-mid);
+    border-right: 3px solid var(--bg-light);
+    overflow-y: auto;
+    padding: 12px;
+  }
+  .panel.left { grid-area: lib; }
+  .panel h2 {
+    font-size: 9px; color: var(--gold);
+    margin-bottom: 12px;
+    border-bottom: 2px solid var(--bg-light);
+    padding-bottom: 8px;
+  }
+
+  .lib-item {
+    background: var(--bg-dark);
+    border: 2px solid var(--bg-light);
+    color: var(--text);
+    padding: 10px 8px; margin-bottom: 8px;
+    font-size: 8px; cursor: grab;
+    image-rendering: pixelated;
+    user-select: none;
+  }
+  .lib-item:active { cursor: grabbing; }
+  .lib-item:hover {
+    border-color: var(--accent);
+    color: var(--gold);
+  }
+  .lib-item.dragging { opacity: 0.5; border-color: var(--gold); }
+  .lib-item .desc { color: var(--text-dim); margin-top: 6px; line-height: 1.4; pointer-events: none; }
+
+  /* Drop-target hint while dragging from the library. */
+  .canvas-wrap.drop-target::before {
+    content: ""; position: absolute; inset: 8px;
+    border: 3px dashed var(--gold);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* ── CANVAS ─────────────────────────────────────────────────────────── */
+  .canvas-wrap {
+    grid-area: canvas;
+    position: relative;
+    background: var(--bg-dark);
+  }
+  canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+  .canvas-help {
+    position: absolute; bottom: 12px; left: 12px;
+    font-size: 7px; color: var(--text-dim);
+    background: rgba(22, 33, 62, 0.7);
+    padding: 6px 10px; border: 2px solid var(--bg-light);
+    pointer-events: none;
+  }
+
+  /* ── SIDEBAR (node detail inspector) ────────────────────────────────── */
+  .sidebar {
+    position: absolute;
+    top: 0; bottom: 0; right: 0;
+    width: 360px;
+    background: var(--bg-mid);
+    border-left: 4px solid var(--gold);
+    transform: translateX(100%);
+    transition: transform 180ms ease-out;
+    display: flex; flex-direction: column;
+    z-index: 10;
+    box-shadow: -6px 0 0 rgba(0, 0, 0, 0.3);
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px;
+    background: var(--bg-dark);
+    border-bottom: 3px solid var(--bg-light);
+  }
+  .sb-kind {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    color: var(--bg-dark);
+    background: var(--gold);
+    padding: 4px 6px;
+    border: 2px solid var(--bg-dark);
+    letter-spacing: 1px;
+  }
+  .sb-kind-agent  { background: var(--accent); color: #000; }
+  .sb-kind-skill,
+  .sb-kind-source { background: var(--green); color: #000; }
+  .sb-kind-input,
+  .sb-kind-output { background: var(--gold); color: #000; }
+  .sb-title {
+    flex: 1; min-width: 0;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; color: var(--text);
+    background: var(--bg-mid);
+    border: 2px solid var(--bg-light);
+    padding: 7px 8px;
+    outline: none;
+    image-rendering: pixelated;
+  }
+  .sb-title:focus { border-color: var(--gold); }
+  .sb-close {
+    width: 28px; height: 28px;
+    flex: none;
+    background: var(--bg-mid);
+    border: 2px solid var(--bg-light);
+    color: var(--text);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px; line-height: 1;
+    cursor: pointer;
+    padding: 0;
+  }
+  .sb-close:hover { border-color: var(--accent); color: var(--accent); }
+  .sidebar-body {
+    flex: 1; overflow-y: auto;
+    padding: 14px;
+  }
+  .sb-section { margin-bottom: 18px; }
+  .sb-section h3 {
+    font-size: 8px; color: var(--gold);
+    margin-bottom: 8px;
+    border-bottom: 2px solid var(--bg-light);
+    padding-bottom: 6px;
+    letter-spacing: 1px;
+  }
+  .sb-row { margin-bottom: 10px; }
+  .sb-row label {
+    display: block;
+    font-size: 7px; color: var(--text-dim);
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+  }
+  .sb-row input,
+  .sb-row select {
+    width: 100%;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 8px;
+    background: var(--bg-dark);
+    border: 2px solid var(--bg-light);
+    color: var(--text);
+    outline: none;
+    image-rendering: pixelated;
+  }
+  .sb-row input:focus, .sb-row select:focus { border-color: var(--accent); }
+  .sb-prompt {
+    width: 100%;
+    font-family: monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    padding: 10px;
+    background: var(--bg-dark);
+    border: 2px solid var(--bg-light);
+    color: var(--text);
+    resize: vertical;
+    min-height: 200px;
+    max-height: 420px;
+    white-space: pre-wrap;
+    outline: none;
+  }
+  .sb-prompt:focus { border-color: var(--gold); }
+
+  .conn-group { margin-bottom: 10px; }
+  .conn-head {
+    font-size: 7px; color: var(--text-dim);
+    margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .conn-list {
+    list-style: none;
+    font-family: monospace;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+  .conn-list li {
+    padding: 4px 0;
+    color: var(--text);
+    border-bottom: 1px dashed var(--bg-light);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .conn-list li:last-child { border-bottom: none; }
+  .conn-list .kind {
+    flex: none;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 6px;
+    padding: 3px 5px;
+    border: 1px solid var(--bg-light);
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+  .conn-list .kind-delegate { color: var(--accent); border-color: var(--accent); }
+  .conn-list .kind-skill    { color: var(--green); border-color: var(--green); }
+  .conn-list .kind-input,
+  .conn-list .kind-output   { color: var(--gold); border-color: var(--gold); }
+  .conn-empty {
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 4px 0;
+  }
+
+  .sb-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .sb-actions button {
+    flex: 1;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 8px;
+    background: var(--bg-dark);
+    border: 2px solid var(--bg-light);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .sb-actions button.danger { border-color: var(--red); color: var(--red); }
+  .sb-actions button:hover  { border-color: var(--accent); color: var(--gold); }
+
+  /* Bottom sheet on narrow viewports. */
+  @media (max-width: 720px) {
+    .sidebar {
+      top: auto; left: 0; right: 0;
+      width: 100%; height: 60vh;
+      border-left: none;
+      border-top: 4px solid var(--gold);
+      transform: translateY(100%);
+      box-shadow: 0 -6px 0 rgba(0, 0, 0, 0.3);
+    }
+    .sidebar.open { transform: translateY(0); }
+  }
+
+  /* ── LOG ─────────────────────────────────────────────────────────── */
+  .log {
+    grid-area: log;
+    background: var(--bg-mid);
+    border-top: 3px solid var(--bg-light);
+    display: flex; flex-direction: column;
+  }
+  .log-tabs {
+    display: flex; gap: 0;
+    background: var(--bg-dark);
+    border-bottom: 2px solid var(--bg-light);
+  }
+  .log-tabs button {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; padding: 8px 16px;
+    background: transparent; border: none;
+    color: var(--text-dim); cursor: pointer;
+    border-right: 2px solid var(--bg-light);
+  }
+  .log-tabs button.active { color: var(--gold); background: var(--bg-mid); }
+  .log-tabs .grow { flex: 1; }
+  .log-tabs .download {
+    color: var(--green); border-left: 2px solid var(--bg-light);
+  }
+  .log-tabs .download:hover { color: var(--gold); }
+  .log-body {
+    flex: 1; overflow-y: auto;
+    padding: 10px;
+    font-family: monospace; font-size: 11px;
+    line-height: 1.5;
+  }
+  .log-line { color: var(--text-dim); margin-bottom: 2px; }
+  .log-line .t { color: var(--gold); }
+  .log-line.ok    .t { color: var(--green); }
+  .log-line.err   .t { color: var(--red); }
+  .log-line.tool  .t { color: var(--accent); }
+
+  .output-pre {
+    white-space: pre-wrap; word-break: break-word;
+    color: var(--text); font-family: monospace; font-size: 11px;
+  }
+
+  /* ── DRAG INDICATOR ─────────────────────────────────────────────────── */
+  .running-indicator {
+    position: absolute; top: 12px; right: 12px;
+    background: var(--gold); color: var(--bg-dark);
+    padding: 6px 10px; font-size: 8px;
+    border: 2px solid #000;
+    display: none;
+  }
+  .running-indicator.on { display: block; animation: pulse 1s infinite; }
+  @keyframes pulse {
+    50% { background: var(--accent); }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <h1>AGENTIC PLAYGROUND</h1>
+    <select id="preset-select" title="Load preset"><option value="">— Preset —</option></select>
+    <button id="load-preset">LOAD</button>
+    <button id="reset">CLEAR</button>
+    <span style="color:var(--text-dim);font-size:8px">|</span>
+    <button id="save-local">SAVE</button>
+    <button id="load-local">RESTORE</button>
+    <span class="grow"></span>
+    <input id="brief" type="text" placeholder="Type a brief and hit RUN">
+    <button id="run" class="primary">▶ RUN</button>
+  </header>
+
+  <aside class="panel left">
+    <h2>LIBRARY</h2>
+    <div class="lib-item" draggable="true" data-add="agent">
+      AGENT
+      <div class="desc">A reasoning agent driven by a system prompt. Add one per role in your workflow.</div>
+    </div>
+    <div class="lib-item" draggable="true" data-add="skill" data-skill="web_search">
+      WEB SEARCH
+      <div class="desc">Live web search. Give to any agent that needs current facts.</div>
+    </div>
+    <div class="lib-item" draggable="true" data-add="skill" data-skill="lookup_rates">
+      RATE LOOKUP
+      <div class="desc">Look up a day rate for a role in a region. Ships with a sample dataset — swap in your own.</div>
+    </div>
+    <div class="lib-item" draggable="true" data-add="source">
+      TEXT SOURCE
+      <div class="desc">A block of reference text exposed as a readable tool.</div>
+    </div>
+    <div class="lib-item" draggable="true" data-add="input">
+      INPUT
+      <div class="desc">The brief or prompt that starts the run.</div>
+    </div>
+    <div class="lib-item" draggable="true" data-add="output">
+      OUTPUT
+      <div class="desc">Where the final result lands.</div>
+    </div>
+    <h2 style="margin-top:18px">CONTROLS</h2>
+    <div style="font-size:7px;color:var(--text-dim);line-height:1.7;">
+      • DRAG a library item onto the canvas to add (or click)<br>
+      • DRAG nodes to reposition<br>
+      • DRAG bottom slot → top slot to delegate<br>
+      • DRAG skill side slot → agent side slot for tools<br>
+      • DOUBLE-CLICK an edge to delete it<br>
+      • SHIFT+CLICK adds a node to the selection<br>
+      • SHIFT+DRAG empty canvas to lasso-select<br>
+      • DRAG canvas to pan · SCROLL to zoom · F to fit<br>
+      • DEL removes everything selected
+    </div>
+  </aside>
+
+  <div class="canvas-wrap">
+    <canvas id="canvas"></canvas>
+    <div class="canvas-help">DRAG canvas to pan · SHIFT+DRAG lasso · SCROLL zoom · F fit · SHIFT+CLICK adds to selection · DEL removes</div>
+    <div id="running" class="running-indicator">RUNNING…</div>
+
+    <aside id="sidebar" class="sidebar" aria-hidden="true">
+      <header class="sidebar-head" data-sb-head></header>
+      <div class="sidebar-body" data-sb-body></div>
+    </aside>
+  </div>
+
+  <section class="log">
+    <div class="log-tabs">
+      <button class="active" data-tab="log">LOG</button>
+      <button data-tab="output">OUTPUT</button>
+      <span class="grow"></span>
+      <button id="dl-pptx" class="download" style="display:none">↓ PPTX</button>
+    </div>
+    <div class="log-body" id="log-body"></div>
+  </section>
+</div>
+
+<script type="module">
+import { NodeEditor } from "/static/js/editor.js";
+import { Sidebar } from "/static/js/sidebar.js";
+
+const $ = (id) => document.getElementById(id);
+const canvas = $("canvas");
+
+const editor = new NodeEditor(canvas, {
+  onSelect: (node) => sidebar.open(node),
+  onChange: () => sidebar.refresh(),
+});
+const sidebar = new Sidebar($("sidebar"), editor);
+
+// ── WS ────────────────────────────────────────────────────────────────────
+let ws = null;
+let currentRun = null;
+
+function connectWs() {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  ws = new WebSocket(proto + "//" + location.host + "/ws");
+  ws.addEventListener("open", () => {
+    ws.send(JSON.stringify({ type: "list_presets" }));
+  });
+  ws.addEventListener("message", (e) => {
+    const msg = JSON.parse(e.data);
+    handleMessage(msg);
+  });
+  ws.addEventListener("close", () => {
+    log("ws disconnected. reconnecting in 3s…", "err");
+    setTimeout(connectWs, 3000);
+  });
+}
+connectWs();
+
+function send(msg) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+}
+
+// ── Output state ──────────────────────────────────────────────────────────
+let lastFinalOutput = "";
+let lastPitchDeck = null;
+let activeTab = "log";
+
+// ── messages ──────────────────────────────────────────────────────────────
+function handleMessage(msg) {
+  switch (msg.type) {
+    case "presets": {
+      const sel = $("preset-select");
+      sel.innerHTML = '<option value="">— Preset —</option>';
+      for (const p of msg.presets) {
+        const o = document.createElement("option");
+        o.value = p.id; o.textContent = p.name;
+        sel.appendChild(o);
+      }
+      // Auto-load the first preset on first connect.
+      if (!editor.graph.nodes.length && msg.presets.length) {
+        sel.value = msg.presets[0].id;
+        send({ type: "load_preset", id: msg.presets[0].id });
+      }
+      break;
+    }
+    case "graph":
+      editor.loadGraph(msg.graph);
+      log(`loaded graph: ${msg.graph.name || msg.graph.id}`, "ok");
+      break;
+    case "graph_run_start":
+      editor.resetRunState();
+      log(`▶ run started: ${msg.graph_name || msg.graph_id}`, "ok");
+      $("running").classList.add("on");
+      lastFinalOutput = ""; lastPitchDeck = null;
+      $("dl-pptx").style.display = "none";
+      break;
+    case "node_started":
+      editor.setNodeRunState(msg.node_id, "running");
+      log(`◇ ${msg.label} (${msg.model_tier}) started`);
+      break;
+    case "tool_call":
+      log(`  ↳ ${msg.agent}: ${msg.tool}`, "tool");
+      break;
+    case "edge_fired":
+      editor.fireEdge(msg.from, msg.to);
+      break;
+    case "node_finished":
+      editor.setNodeRunState(msg.node_id, "finished");
+      log(`✓ node done · ${msg.iterations} iter · ${msg.tokens?.prompt}/${msg.tokens?.completion} tok`);
+      break;
+    case "graph_run_complete":
+      log(`✓ run complete`, "ok");
+      lastFinalOutput = msg.output || "";
+      $("running").classList.remove("on");
+      // Auto-switch to output tab.
+      switchTab("output");
+      break;
+    case "run_summary":
+      if (msg.pitch_deck) {
+        lastPitchDeck = msg.pitch_deck;
+      }
+      if (msg.download_url) {
+        $("dl-pptx").style.display = "inline-block";
+        $("dl-pptx").onclick = () => window.location = msg.download_url;
+      }
+      break;
+    case "graph_run_error":
+      $("running").classList.remove("on");
+      log(`✗ ${msg.error}`, "err");
+      // Mark whatever's running as errored.
+      for (const n of editor.graph.nodes) {
+        if (editor.runStates[n.id] === "running") editor.setNodeRunState(n.id, "error");
+      }
+      break;
+    case "validation":
+      if (!msg.ok) {
+        log(`graph invalid:`, "err");
+        for (const e of msg.errors) log(`  · ${e}`, "err");
+      }
+      break;
+    case "error":
+      log(`! ${msg.message}`, "err");
+      $("running").classList.remove("on");
+      break;
+  }
+}
+
+// ── log ───────────────────────────────────────────────────────────────────
+function log(text, kind = "") {
+  if (activeTab !== "log") {
+    // log buffer still accumulates; just show on switch.
+  }
+  const div = document.createElement("div");
+  div.className = "log-line " + kind;
+  const t = new Date().toTimeString().slice(0, 8);
+  div.innerHTML = `<span class="t">[${t}]</span> ${escapeHtml(text)}`;
+  const body = $("log-body");
+  if (activeTab === "log") {
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+  }
+  // Persistent buffer.
+  logBuffer.push({ text, kind, t });
+  if (logBuffer.length > 500) logBuffer.shift();
+}
+const logBuffer = [];
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  for (const b of document.querySelectorAll(".log-tabs button[data-tab]")) {
+    b.classList.toggle("active", b.dataset.tab === tab);
+  }
+  const body = $("log-body");
+  body.innerHTML = "";
+  if (tab === "log") {
+    for (const l of logBuffer) {
+      const div = document.createElement("div");
+      div.className = "log-line " + l.kind;
+      div.innerHTML = `<span class="t">[${l.t}]</span> ${escapeHtml(l.text)}`;
+      body.appendChild(div);
+    }
+    body.scrollTop = body.scrollHeight;
+  } else if (tab === "output") {
+    const pre = document.createElement("pre");
+    pre.className = "output-pre";
+    if (lastPitchDeck) {
+      pre.textContent = JSON.stringify(lastPitchDeck, null, 2);
+    } else {
+      pre.textContent = lastFinalOutput || "(no output yet)";
+    }
+    body.appendChild(pre);
+  }
+}
+for (const b of document.querySelectorAll(".log-tabs button[data-tab]")) {
+  b.addEventListener("click", () => switchTab(b.dataset.tab));
+}
+
+// ── library spawn ─────────────────────────────────────────────────────────
+// Spawning auto-selects the new node; the sidebar opens and the user fills in
+// name / system prompt / etc. in place. Library items support both click
+// (spawns at viewport centre) and drag-and-drop (spawns at the drop point).
+const NODE_W_HALF = 100; // matches NODE_W/2 in editor.js
+const NODE_H_HALF = 28;  // half of NODE_H_SMALL — close enough for centering
+
+function buildNodeFromKind(kind, skillId) {
+  if (kind === "agent") {
+    return {
+      type: "agent", label: "New Agent",
+      system_prompt: "", model_tier: "strong",
+      max_iterations: 5, tier: 0,
+    };
+  }
+  if (kind === "skill") {
+    return {
+      type: "skill",
+      label: skillId === "web_search" ? "Web Search" : "Rate Lookup",
+      skill_id: skillId,
+    };
+  }
+  if (kind === "source") {
+    return { type: "source", label: "Text Source", source_kind: "text", source_value: "" };
+  }
+  if (kind === "input") return { type: "input", label: "Brief" };
+  if (kind === "output") return { type: "output", label: "Output" };
+  return null;
+}
+
+function spawnFromLibrary(kind, skillId, position) {
+  const node = buildNodeFromKind(kind, skillId);
+  if (!node) return;
+  if (position) node.position = position;
+  // Input is singleton — replace any existing.
+  if (kind === "input") {
+    editor.graph.nodes = editor.graph.nodes.filter(n => n.type !== "input");
+    editor.graph.edges = editor.graph.edges.filter(e => e.kind !== "input");
+  }
+  editor.addNode(node);
+}
+
+for (const item of document.querySelectorAll(".lib-item")) {
+  item.addEventListener("click", () => {
+    spawnFromLibrary(item.dataset.add, item.dataset.skill, null);
+  });
+  item.addEventListener("dragstart", (e) => {
+    item.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "copy";
+    // Stash spawn info on the dataTransfer so cross-page drops would also work.
+    e.dataTransfer.setData("application/x-lib-item", JSON.stringify({
+      kind: item.dataset.add,
+      skill: item.dataset.skill || "",
+    }));
+  });
+  item.addEventListener("dragend", () => item.classList.remove("dragging"));
+}
+
+const canvasWrap = canvas.parentElement;
+canvasWrap.addEventListener("dragover", (e) => {
+  // Only react to our own library drag.
+  if (!Array.from(e.dataTransfer.types).includes("application/x-lib-item")) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "copy";
+  canvasWrap.classList.add("drop-target");
+});
+canvasWrap.addEventListener("dragleave", (e) => {
+  // Only clear when we actually leave the wrap (not when we enter a child).
+  if (e.target === canvasWrap) canvasWrap.classList.remove("drop-target");
+});
+canvasWrap.addEventListener("drop", (e) => {
+  const raw = e.dataTransfer.getData("application/x-lib-item");
+  if (!raw) return;
+  e.preventDefault();
+  canvasWrap.classList.remove("drop-target");
+  let payload;
+  try { payload = JSON.parse(raw); } catch { return; }
+  const g = editor.screenToGraph(e.clientX, e.clientY);
+  // Centre the node on the cursor (rough; node heights vary by type).
+  spawnFromLibrary(payload.kind, payload.skill, {
+    x: Math.round((g.x - NODE_W_HALF) / 8) * 8,
+    y: Math.round((g.y - NODE_H_HALF) / 8) * 8,
+  });
+});
+
+// ── top bar buttons ───────────────────────────────────────────────────────
+$("load-preset").addEventListener("click", () => {
+  const id = $("preset-select").value;
+  if (!id) return;
+  send({ type: "load_preset", id });
+});
+
+$("reset").addEventListener("click", () => {
+  if (!confirm("Clear the canvas?")) return;
+  editor.loadGraph({ id: "scratch", name: "Scratch", entry_node_id: "", nodes: [], edges: [] });
+  log("canvas cleared");
+});
+
+$("save-local").addEventListener("click", () => {
+  const g = editor.exportGraph();
+  localStorage.setItem("playground:graph", JSON.stringify(g));
+  log("saved to localStorage", "ok");
+});
+
+$("load-local").addEventListener("click", () => {
+  const raw = localStorage.getItem("playground:graph");
+  if (!raw) { log("nothing in localStorage", "err"); return; }
+  try {
+    editor.loadGraph(JSON.parse(raw));
+    log("restored from localStorage", "ok");
+  } catch (e) { log("restore failed: " + e.message, "err"); }
+});
+
+$("run").addEventListener("click", () => {
+  const brief = $("brief").value.trim();
+  if (!brief) { log("type a brief first", "err"); $("brief").focus(); return; }
+  const graph = editor.exportGraph();
+  send({ type: "run_graph", graph, brief });
+});
+$("brief").addEventListener("keydown", (e) => { if (e.key === "Enter") $("run").click(); });
+
+// keyboard help
+window.addEventListener("keydown", (e) => {
+  if (e.key === "?" && !(e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) {
+    alert(
+      "AGENTIC PLAYGROUND\n\n" +
+      "• DRAG a LIBRARY item onto the canvas to add (or click)\n" +
+      "• DRAG bottom slot → top slot to delegate / connect input/output\n" +
+      "• DRAG skill side slot → agent side slot for tools\n" +
+      "• DOUBLE-CLICK an edge to delete it\n" +
+      "• SHIFT+CLICK to multi-select · SHIFT+DRAG empty canvas to lasso\n" +
+      "• DRAG canvas to pan · SCROLL zoom · F fit\n" +
+      "• DEL removes everything selected · ESC clears selection\n"
+    );
+  }
+});
+
+</script>
+</body>
+</html>

@@ -1,4 +1,9 @@
-"""FastAPI web server with WebSocket for real-time pipeline updates."""
+"""FastAPI server for the Agentic Playground.
+
+Serves the node-based playground UI and runs user-built graphs over a
+WebSocket. The legacy linear pitch-deck pipeline is kept available as
+the `pitch_deck` preset graph; the graph executor is the only runtime.
+"""
 import asyncio
 import json
 import logging
@@ -13,20 +18,19 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from src.commentary import CommentaryEngine
-from src.demo_runner import run_demo_pipeline
-from src.orchestrator import Orchestrator
-from src.provider import create_client, get_model_name, load_config
+from src.graph.executor import GraphExecutor, try_parse_pitch_deck
+from src.graph.presets import list_presets, load_preset
+from src.graph.schema import Graph, validate_graph
+from src.graph.skills import list_available_skills
 from src.pptx_exporter import export_pitch_deck
+from src.provider import create_client, get_model_name, load_config
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-DEMO_ENABLED = os.environ.get("ENABLE_DEMO", "").lower() in ("true", "1", "yes")
-
 
 class RateLimiter:
-    """Global in-memory rate limiter tracking pipeline runs per hour and day."""
+    """Global in-memory rate limiter tracking graph runs per hour and day."""
 
     def __init__(self, hourly_limit: int = 10, daily_limit: int = 50) -> None:
         self.hourly_limit = hourly_limit
@@ -34,37 +38,24 @@ class RateLimiter:
         self._timestamps: list[float] = []
 
     def _prune(self, now: float) -> None:
-        """Remove timestamps older than 24 hours."""
         cutoff = now - 86_400
         self._timestamps = [t for t in self._timestamps if t > cutoff]
 
     def check(self) -> str | None:
-        """Return an error message if rate limited, or None if allowed."""
         now = time.monotonic()
         self._prune(now)
-
         one_hour_ago = now - 3_600
-        hourly_count = sum(1 for t in self._timestamps if t > one_hour_ago)
-        if hourly_count >= self.hourly_limit:
-            return (
-                f"Rate limit reached: {self.hourly_limit} runs per hour. "
-                "Please try again later."
-            )
-
+        hourly = sum(1 for t in self._timestamps if t > one_hour_ago)
+        if hourly >= self.hourly_limit:
+            return f"Rate limit reached: {self.hourly_limit} runs per hour."
         if len(self._timestamps) >= self.daily_limit:
-            return (
-                f"Daily limit reached: {self.daily_limit} runs per day. "
-                "Please try again tomorrow."
-            )
-
+            return f"Daily limit reached: {self.daily_limit} runs per day."
         return None
 
     def record(self) -> None:
-        """Record a pipeline run."""
         self._timestamps.append(time.monotonic())
 
 
-# Initialise rate limiter from config
 _config = load_config("config.yaml")
 _rl_cfg = _config.get("rate_limiting", {})
 rate_limiter = RateLimiter(
@@ -72,25 +63,43 @@ rate_limiter = RateLimiter(
     daily_limit=_rl_cfg.get("daily_limit", 50),
 )
 
-app = FastAPI(title="The Agentic Production Company")
+app = FastAPI(title="Agentic Playground")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Track generated PPTX files by run ID
 _generated_files: dict[str, Path] = {}
+_RUN_ID_PATTERN = re.compile(r"^[a-f0-9]{12}$")
 
 
-_RUN_ID_PATTERN = re.compile(r"^(demo-)?[a-f0-9]{12}$")
+_NO_STORE = {"Cache-Control": "no-store, must-revalidate"}
+
+
+@app.get("/")
+async def index():
+    return FileResponse("static/chooser.html", headers=_NO_STORE)
+
+
+@app.get("/playground")
+async def playground():
+    return FileResponse("static/playground.html", headers=_NO_STORE)
+
+
+@app.get("/present")
+async def present():
+    return FileResponse("static/presentation.html", headers=_NO_STORE)
+
+
+@app.get("/health")
+async def health():
+    return JSONResponse({"status": "ok"})
 
 
 @app.get("/download/{run_id}")
 async def download_pptx(run_id: str):
-    """Download a generated PPTX file."""
     if not _RUN_ID_PATTERN.match(run_id):
         return JSONResponse(status_code=400, content={"error": "Invalid run ID"})
     path = _generated_files.get(run_id)
     if not path or not path.exists():
         return JSONResponse(status_code=404, content={"error": "File not found"})
-    # Verify path is under the expected output directory
     if not path.resolve().is_relative_to(Path("output/web").resolve()):
         return JSONResponse(status_code=400, content={"error": "Invalid path"})
     return FileResponse(
@@ -100,97 +109,88 @@ async def download_pptx(run_id: str):
     )
 
 
-@app.get("/")
-async def index():
-    """Serve the main frontend page.
-
-    `no-store` keeps users on the freshly-deployed HTML — without it,
-    browser/CDN caching had been masking JS fixes between deploys
-    (e.g. the ticker coalesce regression in issue #28).
-    """
-    return FileResponse(
-        "static/index.html",
-        headers={"Cache-Control": "no-store, must-revalidate"},
-    )
-
-
-@app.get("/config")
-async def get_config():
-    """Return frontend configuration flags."""
-    return JSONResponse({"demo_enabled": DEMO_ENABLED})
-
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for container orchestration."""
-    return JSONResponse({"status": "ok"})
-
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for running the pipeline with live updates."""
     await websocket.accept()
-    _MAX_MESSAGE_BYTES = 16_384  # 16 KB max WebSocket message
-    _MAX_BRIEF_LENGTH = 2_000   # 2000 chars max brief
+    _MAX_BYTES = 65_536
+    _MAX_BRIEF = 4_000
 
     try:
         while True:
             data = await websocket.receive_text()
-            if len(data) > _MAX_MESSAGE_BYTES:
-                await websocket.send_json(
-                    {"type": "error", "message": "Message too large"}
-                )
+            if len(data) > _MAX_BYTES:
+                await websocket.send_json({"type": "error", "message": "Message too large"})
                 continue
-
             try:
-                message = json.loads(data)
+                msg = json.loads(data)
             except json.JSONDecodeError:
-                await websocket.send_json(
-                    {"type": "error", "message": "Invalid JSON"}
-                )
+                await websocket.send_json({"type": "error", "message": "Invalid JSON"})
                 continue
 
-            msg_type = message.get("type")
-            brief = str(message.get("brief", ""))[:_MAX_BRIEF_LENGTH]
+            mtype = msg.get("type")
 
-            if msg_type == "demo":
-                if not DEMO_ENABLED:
+            if mtype == "list_presets":
+                await websocket.send_json({
+                    "type": "presets",
+                    "presets": list_presets(),
+                    "skills": list_available_skills(),
+                })
+
+            elif mtype == "load_preset":
+                preset_id = str(msg.get("id", ""))
+                data = load_preset(preset_id)
+                if not data:
                     await websocket.send_json({
-                        "type": "error",
-                        "message": "Demo mode is disabled. Set ENABLE_DEMO=true to enable.",
+                        "type": "error", "message": f"Unknown preset '{preset_id}'."
                     })
                     continue
-                await _run_demo(websocket, brief)
+                await websocket.send_json({"type": "graph", "graph": data})
 
-            elif msg_type == "run":
+            elif mtype == "validate_graph":
+                graph_dict = msg.get("graph") or {}
+                ok, errors = _validate(graph_dict)
+                await websocket.send_json({
+                    "type": "validation", "ok": ok, "errors": errors,
+                })
+
+            elif mtype == "run_graph":
+                graph_dict = msg.get("graph") or {}
+                brief = str(msg.get("brief", ""))[:_MAX_BRIEF]
                 if not brief:
-                    await websocket.send_json(
-                        {"type": "error", "message": "No brief provided"}
-                    )
+                    await websocket.send_json({"type": "error", "message": "No brief provided"})
                     continue
-
-                # Check global rate limit before running
+                ok, errors = _validate(graph_dict)
+                if not ok:
+                    await websocket.send_json({
+                        "type": "error", "message": "Invalid graph: " + "; ".join(errors),
+                    })
+                    continue
                 limit_msg = rate_limiter.check()
                 if limit_msg:
-                    await websocket.send_json(
-                        {"type": "error", "message": limit_msg}
-                    )
+                    await websocket.send_json({"type": "error", "message": limit_msg})
                     continue
-
                 rate_limiter.record()
-                await _run_pipeline(websocket, brief)
+                await _run_graph(websocket, graph_dict, brief)
 
             else:
-                await websocket.send_json(
-                    {"type": "error", "message": "Unknown message type"}
-                )
+                await websocket.send_json({
+                    "type": "error", "message": f"Unknown message type: {mtype}"
+                })
 
     except WebSocketDisconnect:
         logger.info("Client disconnected")
 
 
-async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
-    """Run the pipeline in a thread, emitting events over WebSocket."""
+def _validate(graph_dict: dict) -> tuple[bool, list[str]]:
+    try:
+        graph = Graph.model_validate(graph_dict)
+    except Exception as exc:
+        return False, [f"Schema parse error: {exc}"]
+    errors = validate_graph(graph)
+    return (not errors), errors
+
+
+async def _run_graph(websocket: WebSocket, graph_dict: dict, brief: str) -> None:
     loop = asyncio.get_event_loop()
 
     async def emit(event: dict) -> None:
@@ -202,109 +202,47 @@ async def _run_pipeline(websocket: WebSocket, brief: str) -> None:
     def sync_emit(event: dict) -> None:
         asyncio.run_coroutine_threadsafe(emit(event), loop)
 
-    # Set up live commentary engine (utility-tier LLM)
     config = load_config("config.yaml")
-    commentary = CommentaryEngine(
-        client=create_client(config),
-        model=get_model_name(config, "utility"),
-        emit_callback=sync_emit,
-    )
-
-    def sync_emit_with_commentary(event: dict) -> None:
-        """Emit event to client AND feed it to the commentary engine."""
-        sync_emit(event)
-        commentary.ingest(event)
-
-    await emit({"type": "pipeline_start", "brief": brief})
 
     def run_blocking():
-        orchestrator = Orchestrator(config_path="config.yaml")
-        orchestrator.set_event_callback(sync_emit_with_commentary)
-        return orchestrator.run(brief)
+        client = create_client(config)
+        graph = Graph.model_validate(graph_dict)
+        executor = GraphExecutor(graph, client, config, emit=sync_emit)
+        return executor.run(brief), graph
 
     try:
-        result = await loop.run_in_executor(None, run_blocking)
+        result, graph = await loop.run_in_executor(None, run_blocking)
+    except Exception as exc:
+        logger.exception("Graph run error: %s", exc)
+        await emit({"type": "graph_run_error",
+                    "error": "An error occurred. Please try again."})
+        return
 
-        if result.success:
-            # Generate PPTX first (needs rendered_imagery bytes)
+    # Pitch-deck post-run hook: if any output node is a pitch_deck and the
+    # final output parses as a pitch deck, generate a PPTX.
+    download_url = None
+    pitch_deck_obj = None
+    if result.get("ok") and result.get("output_subtype") == "pitch_deck":
+        pitch_deck_obj = try_parse_pitch_deck(result.get("output", ""))
+        if pitch_deck_obj:
             run_id = secrets.token_hex(6)
             pptx_dir = Path("output/web")
             pptx_dir.mkdir(parents=True, exist_ok=True)
             pptx_path = pptx_dir / f"{run_id}.pptx"
-            if result.pitch_deck:
-                export_pitch_deck(result.pitch_deck, str(pptx_path))
+            try:
+                export_pitch_deck(pitch_deck_obj, str(pptx_path))
                 _generated_files[run_id] = pptx_path
+                download_url = f"/download/{run_id}"
+            except Exception as exc:
+                logger.warning("PPTX export failed: %s", exc)
 
-            # Strip binary rendered_imagery before JSON serialization
-            deck_for_json = {
-                k: v for k, v in (result.pitch_deck or {}).items()
-                if k != "rendered_imagery"
-            } if result.pitch_deck else None
-
-            # Generate outro commentary
-            if deck_for_json:
-                outro_text = await loop.run_in_executor(
-                    None, commentary.generate_outro, deck_for_json
-                )
-                await emit({"type": "outro", "text": outro_text})
-
-            await emit({
-                "type": "pipeline_complete",
-                "pitch_deck": deck_for_json,
-                "evidence": result.evidence,
-                "download_url": f"/download/{run_id}" if result.pitch_deck else None,
-            })
-        else:
-            await emit({
-                "type": "pipeline_error",
-                "error": result.error,
-            })
-    except Exception as exc:
-        logger.exception("Pipeline error: %s", exc)
-        await emit({
-            "type": "pipeline_error",
-            "error": "An error occurred processing your brief. Please try again.",
-        })
-    finally:
-        commentary.shutdown()
-
-
-async def _run_demo(websocket: WebSocket, brief: str) -> None:
-    """Run the demo pipeline, emitting events over WebSocket."""
-
-    async def emit(event: dict) -> None:
-        try:
-            await websocket.send_json(event)
-        except Exception:
-            pass
-
-    try:
-        result = await run_demo_pipeline(emit, brief)
-        pitch_deck = result.get("pitch_deck")
-
-        # Generate PPTX from demo data, same as the real pipeline
-        run_id = "demo-" + secrets.token_hex(6)
-        pptx_dir = Path("output/web")
-        pptx_dir.mkdir(parents=True, exist_ok=True)
-        pptx_path = pptx_dir / f"{run_id}.pptx"
-        download_url = None
-        if pitch_deck:
-            export_pitch_deck(pitch_deck, str(pptx_path))
-            _generated_files[run_id] = pptx_path
-            download_url = f"/download/{run_id}"
-
-        await emit({
-            "type": "pipeline_complete",
-            "pitch_deck": pitch_deck,
-            "evidence": result.get("evidence"),
-            "download_url": download_url,
-        })
-    except Exception as exc:
-        logger.exception("Demo pipeline error: %s", exc)
-        await emit({
-            "type": "pipeline_error",
-            "error": "An error occurred running the demo. Please try again.",
-        })
+    await emit({
+        "type": "run_summary",
+        "ok": result.get("ok", False),
+        "output_subtype": result.get("output_subtype", ""),
+        "pitch_deck": pitch_deck_obj,
+        "download_url": download_url,
+    })
 
 
 if __name__ == "__main__":

@@ -153,8 +153,8 @@ class AgentRuntime:
         # max_iterations reached without a final text response. The model
         # may have been chaining tool_calls forever with no text. Make one
         # last call WITHOUT tools to force a synthesis from accumulated
-        # tool results — otherwise the loop returns "" and downstream parse
-        # blows up (issue #23).
+        # tool results — otherwise the loop returns "" and any downstream
+        # parse blows up.
         synthesis_output = self._force_synthesis(messages, token_usage)
         final_output = synthesis_output or last_content
         logger.warning(
@@ -185,9 +185,9 @@ class AgentRuntime:
             "content": (
                 "You have reached the maximum number of tool calls. "
                 "Stop searching and synthesise everything you have learned "
-                "into the final required JSON now. Do not call any tools. "
-                "Return ONLY the JSON object — no prose, no code fences, "
-                "no <tool_call> tags."
+                "into the final required output now. Do not call any tools. "
+                "Return ONLY the final content — no prose preamble, no code "
+                "fences, no <tool_call> tags."
             ),
         }]
         kwargs: dict[str, Any] = {
