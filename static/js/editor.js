@@ -45,7 +45,7 @@ export class NodeEditor {
     this.ctx.imageSmoothingEnabled = false;
 
     this.graph = { id: "untitled", name: "Untitled", entry_node_id: "", nodes: [], edges: [] };
-    this.selectedId = null;
+    this.selectedIds = new Set();
     this.runStates = {}; // node_id -> 'running' | 'finished' | 'error'
     this.activeEdges = new Set(); // "from->to" strings briefly highlighted
 
@@ -53,11 +53,12 @@ export class NodeEditor {
     this.offsetX = 0;
     this.offsetY = 0;
 
-    this._drag = null;       // dragging a node
+    this._drag = null;        // dragging one or more nodes
     this._pan = null;         // panning the canvas
-    this._connecting = null;  // creating an edge {fromId, mx, my}
+    this._connecting = null;  // creating an edge {fromId, fromSide, mx, my}
     this._sparks = [];        // animated dots travelling along edges
     this._snapGuides = null;  // { x: number|null, y: number|null } while dragging
+    this._lasso = null;       // box-select rect in graph coords
 
     this.onSelect = opts.onSelect || (() => {});
     this.onChange = opts.onChange || (() => {});
@@ -68,6 +69,40 @@ export class NodeEditor {
     requestAnimationFrame(() => this._loop());
   }
 
+  // Backwards-compat shim: callers (e.g. the sidebar) read/write a singular
+  // selectedId. Treat assignment as "set selection to this one id, or clear".
+  get selectedId() {
+    return this.selectedIds.size === 1 ? [...this.selectedIds][0] : null;
+  }
+  set selectedId(id) {
+    if (id) this.selectedIds = new Set([id]);
+    else this.selectedIds.clear();
+  }
+
+  // Set the entire selection at once. Fires onSelect with the single node
+  // when the resulting selection has size 1, else null (so the sidebar
+  // closes during multi-select — there's no multi-edit UI).
+  _setSelection(ids) {
+    this.selectedIds = new Set(ids);
+    this._notifySelection();
+  }
+
+  _toggleSelection(id) {
+    if (this.selectedIds.has(id)) this.selectedIds.delete(id);
+    else this.selectedIds.add(id);
+    this._notifySelection();
+  }
+
+  _notifySelection() {
+    if (this.selectedIds.size === 1) {
+      const id = [...this.selectedIds][0];
+      const node = this._node(id);
+      this.onSelect(node);
+    } else {
+      this.onSelect(null);
+    }
+  }
+
   // ── public API ────────────────────────────────────────────────────────────
   loadGraph(graph) {
     // Defensive defaults; ensure positions exist.
@@ -75,7 +110,7 @@ export class NodeEditor {
     for (const n of this.graph.nodes) {
       n.position = n.position || { x: 100, y: 100 };
     }
-    this.selectedId = null;
+    this.selectedIds.clear();
     this.runStates = {};
     this.activeEdges.clear();
     this._sparks = [];
@@ -99,24 +134,28 @@ export class NodeEditor {
     if (node.type === "agent" && !node.model_tier) node.model_tier = "strong";
     if (node.type === "agent" && !node.max_iterations) node.max_iterations = 5;
     this.graph.nodes.push(node);
-    this.selectedId = node.id;
-    this.onSelect(node);
+    this._setSelection([node.id]);
     this.onChange(this.graph);
   }
 
+  // Deletes every node in the current selection (and any edges that touched
+  // them). No-op when the selection is empty.
   deleteSelected() {
-    if (!this.selectedId) return;
-    const id = this.selectedId;
-    this.graph.nodes = this.graph.nodes.filter(n => n.id !== id);
-    this.graph.edges = this.graph.edges.filter(e => e.from !== id && e.to !== id);
-    this.selectedId = null;
-    this.onSelect(null);
+    if (!this.selectedIds.size) return;
+    const ids = this.selectedIds;
+    this.graph.nodes = this.graph.nodes.filter(n => !ids.has(n.id));
+    this.graph.edges = this.graph.edges.filter(e => !ids.has(e.from) && !ids.has(e.to));
+    this._setSelection([]);
     this.onChange(this.graph);
   }
 
+  // Updates fields on the *singly-selected* node. No-op during multi-select —
+  // the sidebar isn't shown then so this isn't normally reachable, but the
+  // guard keeps the API safe.
   updateSelected(updates) {
-    if (!this.selectedId) return;
-    const n = this.graph.nodes.find(n => n.id === this.selectedId);
+    if (this.selectedIds.size !== 1) return;
+    const id = [...this.selectedIds][0];
+    const n = this._node(id);
     if (!n) return;
     Object.assign(n, updates);
     this.onChange(this.graph);
@@ -209,6 +248,27 @@ export class NodeEditor {
     // Nodes.
     for (const n of this.graph.nodes) this._drawNode(n);
 
+    this._drawLasso();
+
+    ctx.restore();
+  }
+
+  _drawLasso() {
+    if (!this._lasso) return;
+    const ctx = this.ctx;
+    const { x0, y0, x1, y1 } = this._lasso;
+    const x = Math.min(x0, x1);
+    const y = Math.min(y0, y1);
+    const w = Math.abs(x1 - x0);
+    const h = Math.abs(y1 - y0);
+    ctx.save();
+    ctx.fillStyle = "rgba(245, 197, 66, 0.08)";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = PALETTE.gold;
+    ctx.lineWidth = 1 / this.scale;
+    ctx.setLineDash([4 / this.scale, 3 / this.scale]);
+    ctx.strokeRect(x + 0.5 / this.scale, y + 0.5 / this.scale, w, h);
+    ctx.setLineDash([]);
     ctx.restore();
   }
 
@@ -267,7 +327,7 @@ export class NodeEditor {
     const { x, y } = n.position;
     const w = NODE_W;
     const h = (n.type === "agent") ? NODE_H : NODE_H_SMALL;
-    const isSelected = this.selectedId === n.id;
+    const isSelected = this.selectedIds.has(n.id);
     const runState = this.runStates[n.id];
 
     // Border colour.
@@ -678,7 +738,7 @@ export class NodeEditor {
     c.addEventListener("mousedown", (e) => this._onDown(e));
     c.addEventListener("mousemove", (e) => this._onMove(e));
     c.addEventListener("mouseup",   (e) => this._onUp(e));
-    c.addEventListener("mouseleave",() => { this._drag = this._pan = this._connecting = null; this._snapGuides = null; });
+    c.addEventListener("mouseleave",() => { this._drag = this._pan = this._connecting = this._lasso = null; this._snapGuides = null; });
     c.addEventListener("wheel",     (e) => this._onWheel(e), { passive: false });
     c.addEventListener("dblclick",  (e) => this._onDblClick(e));
     c.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -691,26 +751,53 @@ export class NodeEditor {
     const my = e.clientY - r.top;
     const g = this._toGraph(mx, my);
 
-    if (e.button === 1 || e.shiftKey) {
+    // Middle-click anywhere = pan.
+    if (e.button === 1) {
       this._pan = { mx, my, ox: this.offsetX, oy: this.offsetY };
       return;
     }
 
+    // Slot drag for connecting nodes takes priority over selection.
     const out = this._hitOutSlot(g.x, g.y);
     if (out) {
       this._connecting = { fromId: out.node.id, fromSide: out.side, mx, my };
       return;
     }
+
     const node = this._hitNode(g.x, g.y);
-    if (node) {
-      this.selectedId = node.id;
-      this.onSelect(node);
-      this._drag = { id: node.id, dx: g.x - node.position.x, dy: g.y - node.position.y };
+
+    // Shift+click on a node toggles its selection without starting a drag.
+    if (node && e.shiftKey) {
+      this._toggleSelection(node.id);
       return;
     }
-    // empty space click — start panning
-    this.selectedId = null;
-    this.onSelect(null);
+
+    // Shift+drag on empty canvas = lasso box-select.
+    if (!node && e.shiftKey) {
+      this._lasso = { x0: g.x, y0: g.y, x1: g.x, y1: g.y };
+      return;
+    }
+
+    if (node) {
+      // Click on a node that's already part of a multi-selection keeps the
+      // whole selection (so the drag moves the group). Otherwise replace
+      // selection with just this node.
+      if (!this.selectedIds.has(node.id)) {
+        this._setSelection([node.id]);
+      }
+      // Build per-node drag offsets relative to the cursor.
+      const offsets = {};
+      for (const id of this.selectedIds) {
+        const n = this._node(id);
+        if (!n) continue;
+        offsets[id] = { dx: g.x - n.position.x, dy: g.y - n.position.y };
+      }
+      this._drag = { ids: [...this.selectedIds], offsets };
+      return;
+    }
+
+    // Empty canvas, no shift: clear selection and start panning.
+    this._setSelection([]);
     this._pan = { mx, my, ox: this.offsetX, oy: this.offsetY };
   }
 
@@ -720,16 +807,35 @@ export class NodeEditor {
     const my = e.clientY - r.top;
     if (this._drag) {
       const g = this._toGraph(mx, my);
-      const n = this._node(this._drag.id);
-      if (n) {
-        const snapped = this._snapDraggedPosition(
-          n.id, g.x - this._drag.dx, g.y - this._drag.dy
-        );
-        n.position.x = snapped.x;
-        n.position.y = snapped.y;
-        this._snapGuides = snapped.guides;
+      // Single-node drag: apply snap-to-hierarchy. Multi-node drag: move all
+      // in lockstep with grid-aligned positions, no hierarchy snap (snapping
+      // each independently produces overlaps and is rarely what you want).
+      if (this._drag.ids.length === 1) {
+        const id = this._drag.ids[0];
+        const off = this._drag.offsets[id];
+        const n = this._node(id);
+        if (n) {
+          const snapped = this._snapDraggedPosition(id, g.x - off.dx, g.y - off.dy);
+          n.position.x = snapped.x;
+          n.position.y = snapped.y;
+          this._snapGuides = snapped.guides;
+          this.onChange(this.graph);
+        }
+      } else {
+        for (const id of this._drag.ids) {
+          const n = this._node(id);
+          const off = this._drag.offsets[id];
+          if (!n || !off) continue;
+          n.position.x = Math.round((g.x - off.dx) / 8) * 8;
+          n.position.y = Math.round((g.y - off.dy) / 8) * 8;
+        }
+        this._snapGuides = null;
         this.onChange(this.graph);
       }
+    } else if (this._lasso) {
+      const g = this._toGraph(mx, my);
+      this._lasso.x1 = g.x;
+      this._lasso.y1 = g.y;
     } else if (this._pan) {
       this.offsetX = this._pan.ox + (mx - this._pan.mx);
       this.offsetY = this._pan.oy + (my - this._pan.my);
@@ -750,7 +856,28 @@ export class NodeEditor {
         this._tryConnect(this._connecting.fromId, target.node.id);
       }
     }
-    this._drag = this._pan = this._connecting = null;
+    if (this._lasso) {
+      const { x0, y0, x1, y1 } = this._lasso;
+      const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
+      const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
+      // Only treat as a lasso if the user actually dragged a meaningful area;
+      // a near-zero rect is just a stray shift+click on empty canvas.
+      if (Math.abs(maxX - minX) > 4 || Math.abs(maxY - minY) > 4) {
+        const picked = [];
+        for (const n of this.graph.nodes) {
+          const nx = n.position.x;
+          const ny = n.position.y;
+          const nw = NODE_W;
+          const nh = this._nodeH(n);
+          // Rect-vs-rect intersection (any overlap = selected).
+          if (nx < maxX && nx + nw > minX && ny < maxY && ny + nh > minY) {
+            picked.push(n.id);
+          }
+        }
+        this._setSelection(picked);
+      }
+    }
+    this._drag = this._pan = this._connecting = this._lasso = null;
     this._snapGuides = null;
   }
 
@@ -800,9 +927,11 @@ export class NodeEditor {
 
   _onKey(e) {
     if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
-    if ((e.key === "Delete" || e.key === "Backspace") && this.selectedId) {
+    if ((e.key === "Delete" || e.key === "Backspace") && this.selectedIds.size) {
       this.deleteSelected();
       e.preventDefault();
+    } else if (e.key === "Escape" && this.selectedIds.size) {
+      this._setSelection([]);
     } else if (e.key === "f" || e.key === "F") {
       this._fitToView();
     }

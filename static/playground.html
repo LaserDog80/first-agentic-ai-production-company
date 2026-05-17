@@ -403,14 +403,16 @@
       • DRAG bottom slot → top slot to delegate<br>
       • DRAG skill side slot → agent side slot for tools<br>
       • DOUBLE-CLICK an edge to delete it<br>
-      • SHIFT+DRAG canvas to pan<br>
-      • SCROLL to zoom · F to fit
+      • SHIFT+CLICK adds a node to the selection<br>
+      • SHIFT+DRAG empty canvas to lasso-select<br>
+      • DRAG canvas to pan · SCROLL to zoom · F to fit<br>
+      • DEL removes everything selected
     </div>
   </aside>
 
   <div class="canvas-wrap">
     <canvas id="canvas"></canvas>
-    <div class="canvas-help">SHIFT+DRAG pan · SCROLL zoom · F fit · DEL remove · CLICK node to inspect</div>
+    <div class="canvas-help">DRAG canvas to pan · SHIFT+DRAG lasso · SCROLL zoom · F fit · SHIFT+CLICK adds to selection · DEL removes</div>
     <div id="running" class="running-indicator">RUNNING…</div>
 
     <aside id="sidebar" class="sidebar" aria-hidden="true">
@@ -732,11 +734,13 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "?" && !(e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) {
     alert(
       "AGENTIC PLAYGROUND\n\n" +
-      "• Click a LIBRARY item to add a node\n" +
-      "• DRAG node bottom slot → another node's top slot to connect\n" +
+      "• DRAG a LIBRARY item onto the canvas to add (or click)\n" +
+      "• DRAG bottom slot → top slot to delegate / connect input/output\n" +
+      "• DRAG skill side slot → agent side slot for tools\n" +
       "• DOUBLE-CLICK an edge to delete it\n" +
-      "• SHIFT+DRAG to pan · SCROLL to zoom · F to fit\n" +
-      "• DEL removes selected node\n"
+      "• SHIFT+CLICK to multi-select · SHIFT+DRAG empty canvas to lasso\n" +
+      "• DRAG canvas to pan · SCROLL zoom · F fit\n" +
+      "• DEL removes everything selected · ESC clears selection\n"
     );
   }
 });
