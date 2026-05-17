@@ -384,12 +384,63 @@ export class NodeEditor {
     if (!a || !b) return;
     const colour = KIND_COLOR[kind] || PALETTE.textDim;
     const isActive = this.activeEdges.has(`${from.id}->${to.id}`);
-
-    ctx.strokeStyle = colour;
-    ctx.lineWidth = isActive ? 5 / this.scale : (kind === "skill" ? 2 : 3) / this.scale;
-
-    // Stepped path: a -> midY -> b.
+    const lineW = isActive ? 5 / this.scale : (kind === "skill" ? 2 : 3) / this.scale;
+    const arrow = 6 / this.scale;
     const midY = (a.y + b.y) / 2;
+
+    // Input/output edges signal where information enters and exits the system.
+    // When they're long enough to visually cross other nodes, render them as
+    // solid chevron stubs at each endpoint with only a faint dashed bridge
+    // between — so the entry/exit points read clearly without the line
+    // dominating the middle of the graph. Active state overrides (full glow
+    // during a run so the user sees data flow).
+    const isThrough = (kind === "input" || kind === "output");
+    const longSpan = Math.abs(b.y - a.y) > 200;
+    if (isThrough && longSpan && !isActive) {
+      ctx.save();
+      ctx.strokeStyle = colour;
+      ctx.globalAlpha = 0.28;
+      ctx.lineWidth = 1 / this.scale;
+      ctx.setLineDash([3 / this.scale, 4 / this.scale]);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(a.x, midY);
+      ctx.lineTo(b.x, midY);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      ctx.restore();
+
+      const stub = 22 / this.scale;
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = lineW;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(a.x, a.y + stub);
+      ctx.moveTo(b.x, b.y - stub);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+
+      // Source chevron (data leaves here, pointing away from source).
+      ctx.fillStyle = colour;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y + stub);
+      ctx.lineTo(a.x - arrow, a.y + stub - arrow);
+      ctx.lineTo(a.x + arrow, a.y + stub - arrow);
+      ctx.closePath();
+      ctx.fill();
+      // Destination chevron (data arrives here).
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - arrow, b.y - arrow);
+      ctx.lineTo(b.x + arrow, b.y - arrow);
+      ctx.closePath();
+      ctx.fill();
+      return;
+    }
+
+    // Default: solid stepped path with one arrowhead at the destination.
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = lineW;
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(a.x, midY);
@@ -397,8 +448,6 @@ export class NodeEditor {
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
 
-    // Arrow head at b.
-    const arrow = 6 / this.scale;
     ctx.fillStyle = colour;
     ctx.beginPath();
     ctx.moveTo(b.x, b.y);
