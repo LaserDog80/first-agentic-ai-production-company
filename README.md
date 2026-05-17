@@ -75,7 +75,7 @@ The pitch deck preset has an output node with `subtype: "pitch_deck"` — when i
 pytest -q
 ```
 
-73 tests cover the graph schema and validator, the executor with stubbed LLM clients, preset integrity, the FastAPI/WebSocket protocol (including the chooser, playground, and present routes plus the sprites module), the agent runtime, the tool registry, the PPTX exporter, and rate limiting.
+76 tests cover the graph schema and validator, the executor with stubbed LLM clients, preset integrity, the FastAPI/WebSocket protocol (including the chooser, playground, and present routes plus the sprites module), the agent runtime, the tool registry, the PPTX exporter, and rate limiting.
 
 ## Deployment (Hugging Face Spaces)
 

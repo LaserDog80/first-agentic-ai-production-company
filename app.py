@@ -70,19 +70,22 @@ _generated_files: dict[str, Path] = {}
 _RUN_ID_PATTERN = re.compile(r"^[a-f0-9]{12}$")
 
 
+_NO_STORE = {"Cache-Control": "no-store, must-revalidate"}
+
+
 @app.get("/")
 async def index():
-    return FileResponse("static/chooser.html")
+    return FileResponse("static/chooser.html", headers=_NO_STORE)
 
 
 @app.get("/playground")
 async def playground():
-    return FileResponse("static/playground.html")
+    return FileResponse("static/playground.html", headers=_NO_STORE)
 
 
 @app.get("/present")
 async def present():
-    return FileResponse("static/presentation.html")
+    return FileResponse("static/presentation.html", headers=_NO_STORE)
 
 
 @app.get("/health")

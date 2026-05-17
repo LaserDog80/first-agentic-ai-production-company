@@ -21,7 +21,7 @@ agents:
     max_iterations: 5
   researcher:
     model_tier: "research"
-    max_iterations: 5
+    max_iterations: 8
   director:
     model_tier: "strong"
     max_iterations: 5
@@ -46,10 +46,11 @@ rate_limiting:
   daily_limit: 50     # Max pipeline runs per day (global, all users)
 
 tools:
-  search_provider: "auto"  # auto | tavily | linkup
-  tavily:
-    api_key_env: "TAVILY_API_KEY"
-    search_depth: "advanced"
+  # auto: try Linkup first, fall back to Tavily. Or force one: tavily | linkup
+  search_provider: "auto"
   linkup:
     api_key_env: "LINKUP_API_KEY"
     search_depth: "standard"
+  tavily:
+    api_key_env: "TAVILY_API_KEY"
+    search_depth: "advanced"

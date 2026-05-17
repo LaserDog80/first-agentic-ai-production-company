@@ -131,6 +131,12 @@ class PMBrief(BaseModel):
     quality_bar: str
 
 
+class SpecialistBriefs(BaseModel):
+    research_brief: ResearchBrief
+    director_brief: DirectorBrief
+    pm_brief: PMBrief
+
+
 class ResearchPack(BaseModel):
     competitive_landscape: list[CompetitorEntry]
     characters: list[CharacterEntry]
@@ -158,6 +164,16 @@ class FeasibilityAssessment(BaseModel):
     logistics: list[LogisticsEntry]
     feasibility_rating: Literal["green", "amber", "red"]
     cost_saving_opportunities: list[str]
+
+
+class EditorialContribution(BaseModel):
+    """The Producer's actual contribution to the EpisodePackage.
+
+    Kept separate from EpisodePackage so the Producer LLM is only asked to
+    generate its own additions, not echo back the (large) specialist outputs.
+    """
+    editorial_narrative: str
+    gaps_and_conflicts: list[str]
 
 
 class EpisodePackage(BaseModel):
