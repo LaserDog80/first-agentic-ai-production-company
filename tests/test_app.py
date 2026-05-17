@@ -11,12 +11,37 @@ def client():
     return TestClient(app)
 
 
-def test_index_serves_playground(client):
-    """GET / returns the playground HTML."""
+def test_index_serves_chooser(client):
+    """GET / returns the mode-chooser HTML linking to /playground and /present."""
     r = client.get("/")
     assert r.status_code == 200
     assert "text/html" in r.headers["content-type"]
-    assert "AGENTIC PLAYGROUND" in r.text
+    assert 'href="/playground"' in r.text
+    assert 'href="/present"' in r.text
+
+
+def test_playground_route(client):
+    r = client.get("/playground")
+    assert r.status_code == 200
+    assert "text/html" in r.headers["content-type"]
+    assert "editor.js" in r.text
+
+
+def test_present_route(client):
+    r = client.get("/present")
+    assert r.status_code == 200
+    assert "text/html" in r.headers["content-type"]
+    assert "/static/js/sprites.js" in r.text
+
+
+def test_sprites_module(client):
+    r = client.get("/static/js/sprites.js")
+    assert r.status_code == 200
+    for cid in (
+        "series_producer", "producer", "researcher",
+        "director", "production_manager",
+    ):
+        assert f"id: '{cid}'" in r.text
 
 
 def test_health(client):

@@ -72,7 +72,17 @@ _RUN_ID_PATTERN = re.compile(r"^[a-f0-9]{12}$")
 
 @app.get("/")
 async def index():
+    return FileResponse("static/chooser.html")
+
+
+@app.get("/playground")
+async def playground():
     return FileResponse("static/playground.html")
+
+
+@app.get("/present")
+async def present():
+    return FileResponse("static/presentation.html")
 
 
 @app.get("/health")

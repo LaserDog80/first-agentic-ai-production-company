@@ -53,7 +53,10 @@ python app.py
 # Open http://localhost:8000
 ```
 
-The first thing you see is the canvas with the **Pitch Deck Pipeline** preset already loaded. Type a brief into the top input (e.g. *"A 3x60 doc about the last lighthouse keepers in Britain"*) and click **RUN**.
+The root URL is a mode chooser:
+
+- **`/playground`** — node-based canvas editor (the default working surface). Loads the **Pitch Deck Pipeline** preset by default. Type a brief into the top input and click **RUN**.
+- **`/present`** — cinematic view of the pipeline running. Pixel-art characters animate as each agent works. Currently wired to the legacy pitch-deck event vocabulary; full unification with the graph executor is tracked in `docs/PRESENTATION_MODE_PLAN.md` (Phase 2+).
 
 Building your own graph:
 
@@ -72,7 +75,7 @@ The pitch deck preset has an output node with `subtype: "pitch_deck"` — when i
 pytest -q
 ```
 
-70+ tests cover the graph schema and validator, the executor with stubbed LLM clients, preset integrity, the FastAPI/WebSocket protocol, the agent runtime, the tool registry, the PPTX exporter, and rate limiting.
+73 tests cover the graph schema and validator, the executor with stubbed LLM clients, preset integrity, the FastAPI/WebSocket protocol (including the chooser, playground, and present routes plus the sprites module), the agent runtime, the tool registry, the PPTX exporter, and rate limiting.
 
 ## Deployment (Hugging Face Spaces)
 
