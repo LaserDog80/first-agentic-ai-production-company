@@ -459,36 +459,23 @@ export class NodeEditor {
 
     // Input/output edges signal where information enters/exits the system.
     // When they span >200px they'd cross other nodes; draw nothing in the
-    // middle — just a short solid gold stub at each endpoint capped with an
-    // arrowhead. So you see a clear gold arrow leaving the source and a
-    // clear gold arrow entering the destination, but no line strung between
-    // them. Red delegation and green tool edges keep the visual weight.
-    // Active state overrides — during a run the full solid line draws so
-    // data-flow is legible.
+    // middle and nothing at the source — the source slot often also emits a
+    // delegate edge (the gold stub competed with the red delegate visually).
+    // Just render a clear, complete gold arrow entering the destination —
+    // that's the semantic marker the user needs. Active state overrides:
+    // during a run the full solid line draws so data-flow is legible.
     const isThrough = (kind === "input" || kind === "output");
     const longSpan = Math.abs(b.y - a.y) > 200;
     if (isThrough && longSpan && !isActive) {
-      const stub = 28 / this.scale;
+      const stub = 40 / this.scale;
       ctx.strokeStyle = colour;
       ctx.lineWidth = lineW;
-      // Source stub — leaves source slot heading down toward the destination.
       ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(a.x, a.y + stub);
-      // Destination stub — arrives at the destination slot from above.
       ctx.moveTo(b.x, b.y - stub);
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
 
       ctx.fillStyle = colour;
-      // Arrowhead at end of source stub — data leaves here, pointing away.
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y + stub);
-      ctx.lineTo(a.x - arrow, a.y + stub - arrow);
-      ctx.lineTo(a.x + arrow, a.y + stub - arrow);
-      ctx.closePath();
-      ctx.fill();
-      // Arrowhead entering destination slot.
       ctx.beginPath();
       ctx.moveTo(b.x, b.y);
       ctx.lineTo(b.x - arrow, b.y - arrow);
