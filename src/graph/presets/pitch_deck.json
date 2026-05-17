@@ -90,6 +90,6 @@
     {"id": "e_prod_pm",      "from": "n_producer","to": "n_pm",         "kind": "delegate"},
     {"id": "e_search_res",   "from": "n_search",  "to": "n_researcher", "kind": "skill"},
     {"id": "e_rates_pm",     "from": "n_rates",   "to": "n_pm",         "kind": "skill"},
-    {"id": "e_sp_out",       "from": "n_sp",      "to": "n_deck",       "kind": "output"}
+    {"id": "e_dir_out",      "from": "n_director","to": "n_deck",       "kind": "output"}
   ]
 }
