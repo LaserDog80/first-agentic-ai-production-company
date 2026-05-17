@@ -122,6 +122,13 @@ export class NodeEditor {
     this.onChange(this.graph);
   }
 
+  // Convert page coords (e.g. from a drop event) into graph coords so the
+  // caller can position a spawned node at the cursor.
+  screenToGraph(clientX, clientY) {
+    const r = this.canvas.getBoundingClientRect();
+    return this._toGraph(clientX - r.left, clientY - r.top);
+  }
+
   setNodeRunState(nodeId, state) {
     if (state == null) delete this.runStates[nodeId];
     else this.runStates[nodeId] = state;

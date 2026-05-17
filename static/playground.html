@@ -92,14 +92,25 @@
     border: 2px solid var(--bg-light);
     color: var(--text);
     padding: 10px 8px; margin-bottom: 8px;
-    font-size: 8px; cursor: pointer;
+    font-size: 8px; cursor: grab;
     image-rendering: pixelated;
+    user-select: none;
   }
+  .lib-item:active { cursor: grabbing; }
   .lib-item:hover {
     border-color: var(--accent);
     color: var(--gold);
   }
-  .lib-item .desc { color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
+  .lib-item.dragging { opacity: 0.5; border-color: var(--gold); }
+  .lib-item .desc { color: var(--text-dim); margin-top: 6px; line-height: 1.4; pointer-events: none; }
+
+  /* Drop-target hint while dragging from the library. */
+  .canvas-wrap.drop-target::before {
+    content: ""; position: absolute; inset: 8px;
+    border: 3px dashed var(--gold);
+    pointer-events: none;
+    z-index: 5;
+  }
 
   /* ── CANVAS ─────────────────────────────────────────────────────────── */
   .canvas-wrap {
@@ -361,33 +372,33 @@
 
   <aside class="panel left">
     <h2>LIBRARY</h2>
-    <div class="lib-item" data-add="agent">
+    <div class="lib-item" draggable="true" data-add="agent">
       AGENT
       <div class="desc">A reasoning agent driven by a system prompt. Add one per role in your workflow.</div>
     </div>
-    <div class="lib-item" data-add="skill" data-skill="web_search">
+    <div class="lib-item" draggable="true" data-add="skill" data-skill="web_search">
       WEB SEARCH
       <div class="desc">Live web search. Give to any agent that needs current facts.</div>
     </div>
-    <div class="lib-item" data-add="skill" data-skill="lookup_rates">
+    <div class="lib-item" draggable="true" data-add="skill" data-skill="lookup_rates">
       RATE LOOKUP
       <div class="desc">Look up a day rate for a role in a region. Ships with a sample dataset — swap in your own.</div>
     </div>
-    <div class="lib-item" data-add="source">
+    <div class="lib-item" draggable="true" data-add="source">
       TEXT SOURCE
       <div class="desc">A block of reference text exposed as a readable tool.</div>
     </div>
-    <div class="lib-item" data-add="input">
+    <div class="lib-item" draggable="true" data-add="input">
       INPUT
       <div class="desc">The brief or prompt that starts the run.</div>
     </div>
-    <div class="lib-item" data-add="output">
+    <div class="lib-item" draggable="true" data-add="output">
       OUTPUT
       <div class="desc">Where the final result lands.</div>
     </div>
     <h2 style="margin-top:18px">CONTROLS</h2>
     <div style="font-size:7px;color:var(--text-dim);line-height:1.7;">
-      • CLICK a library item to add to canvas<br>
+      • DRAG a library item onto the canvas to add (or click)<br>
       • DRAG nodes to reposition<br>
       • DRAG from BOTTOM slot to TOP slot to connect<br>
       • DOUBLE-CLICK an edge to delete it<br>
@@ -594,39 +605,90 @@ for (const b of document.querySelectorAll(".log-tabs button[data-tab]")) {
   b.addEventListener("click", () => switchTab(b.dataset.tab));
 }
 
-// ── library buttons ───────────────────────────────────────────────────────
-// Spawning a node from the library auto-selects it; the sidebar opens and the
-// user fills in name / system prompt / etc. in place. No more prompt() wizard.
+// ── library spawn ─────────────────────────────────────────────────────────
+// Spawning auto-selects the new node; the sidebar opens and the user fills in
+// name / system prompt / etc. in place. Library items support both click
+// (spawns at viewport centre) and drag-and-drop (spawns at the drop point).
+const NODE_W_HALF = 100; // matches NODE_W/2 in editor.js
+const NODE_H_HALF = 28;  // half of NODE_H_SMALL — close enough for centering
+
+function buildNodeFromKind(kind, skillId) {
+  if (kind === "agent") {
+    return {
+      type: "agent", label: "New Agent",
+      system_prompt: "", model_tier: "strong",
+      max_iterations: 5, tier: 0,
+    };
+  }
+  if (kind === "skill") {
+    return {
+      type: "skill",
+      label: skillId === "web_search" ? "Web Search" : "Rate Lookup",
+      skill_id: skillId,
+    };
+  }
+  if (kind === "source") {
+    return { type: "source", label: "Text Source", source_kind: "text", source_value: "" };
+  }
+  if (kind === "input") return { type: "input", label: "Brief" };
+  if (kind === "output") return { type: "output", label: "Output" };
+  return null;
+}
+
+function spawnFromLibrary(kind, skillId, position) {
+  const node = buildNodeFromKind(kind, skillId);
+  if (!node) return;
+  if (position) node.position = position;
+  // Input is singleton — replace any existing.
+  if (kind === "input") {
+    editor.graph.nodes = editor.graph.nodes.filter(n => n.type !== "input");
+    editor.graph.edges = editor.graph.edges.filter(e => e.kind !== "input");
+  }
+  editor.addNode(node);
+}
+
 for (const item of document.querySelectorAll(".lib-item")) {
   item.addEventListener("click", () => {
-    const kind = item.dataset.add;
-    if (kind === "agent") {
-      editor.addNode({
-        type: "agent", label: "New Agent",
-        system_prompt: "", model_tier: "strong",
-        max_iterations: 5, tier: 0,
-      });
-    } else if (kind === "skill") {
-      const skillId = item.dataset.skill;
-      editor.addNode({
-        type: "skill", label: skillId === "web_search" ? "Web Search" : "Rate Lookup",
-        skill_id: skillId,
-      });
-    } else if (kind === "source") {
-      editor.addNode({
-        type: "source", label: "Text Source",
-        source_kind: "text", source_value: "",
-      });
-    } else if (kind === "input") {
-      // Only one input allowed; remove existing.
-      editor.graph.nodes = editor.graph.nodes.filter(n => n.type !== "input");
-      editor.graph.edges = editor.graph.edges.filter(e => e.kind !== "input");
-      editor.addNode({ type: "input", label: "Brief" });
-    } else if (kind === "output") {
-      editor.addNode({ type: "output", label: "Output" });
-    }
+    spawnFromLibrary(item.dataset.add, item.dataset.skill, null);
   });
+  item.addEventListener("dragstart", (e) => {
+    item.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "copy";
+    // Stash spawn info on the dataTransfer so cross-page drops would also work.
+    e.dataTransfer.setData("application/x-lib-item", JSON.stringify({
+      kind: item.dataset.add,
+      skill: item.dataset.skill || "",
+    }));
+  });
+  item.addEventListener("dragend", () => item.classList.remove("dragging"));
 }
+
+const canvasWrap = canvas.parentElement;
+canvasWrap.addEventListener("dragover", (e) => {
+  // Only react to our own library drag.
+  if (!Array.from(e.dataTransfer.types).includes("application/x-lib-item")) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "copy";
+  canvasWrap.classList.add("drop-target");
+});
+canvasWrap.addEventListener("dragleave", (e) => {
+  // Only clear when we actually leave the wrap (not when we enter a child).
+  if (e.target === canvasWrap) canvasWrap.classList.remove("drop-target");
+});
+canvasWrap.addEventListener("drop", (e) => {
+  const raw = e.dataTransfer.getData("application/x-lib-item");
+  if (!raw) return;
+  e.preventDefault();
+  canvasWrap.classList.remove("drop-target");
+  let payload;
+  try { payload = JSON.parse(raw); } catch { return; }
+  const g = editor.screenToGraph(e.clientX, e.clientY);
+  // Centre the node on the cursor (rough; node heights vary by type).
+  spawnFromLibrary(payload.kind, payload.skill, {
+    x: Math.round((g.x - NODE_W_HALF) / 8) * 8,
+    y: Math.round((g.y - NODE_H_HALF) / 8) * 8,
+  });
+});
 
 // ── top bar buttons ───────────────────────────────────────────────────────
 $("load-preset").addEventListener("click", () => {
