@@ -61,6 +61,6 @@
     {"id": "e_coach_buy",  "from": "n_coach",  "to": "n_buy",     "kind": "delegate"},
     {"id": "e_search_lease","from": "n_search","to": "n_lease",   "kind": "skill"},
     {"id": "e_search_buy", "from": "n_search", "to": "n_buy",     "kind": "skill"},
-    {"id": "e_coach_out",  "from": "n_coach",  "to": "n_verdict", "kind": "output"}
+    {"id": "e_buy_out",    "from": "n_buy",    "to": "n_verdict", "kind": "output"}
   ]
 }

@@ -60,6 +60,6 @@
     {"id": "e_edit_cur",   "from": "n_editor",     "to": "n_curator",    "kind": "delegate"},
     {"id": "e_cur_res",    "from": "n_curator",    "to": "n_researcher", "kind": "delegate"},
     {"id": "e_search_res", "from": "n_search",     "to": "n_researcher", "kind": "skill"},
-    {"id": "e_edit_out",   "from": "n_editor",     "to": "n_newsletter", "kind": "output"}
+    {"id": "e_res_out",    "from": "n_researcher", "to": "n_newsletter", "kind": "output"}
   ]
 }

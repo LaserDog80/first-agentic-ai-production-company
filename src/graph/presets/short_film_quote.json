@@ -68,6 +68,6 @@
     {"id": "e_est_kit",   "from": "n_estimator", "to": "n_kit",       "kind": "delegate"},
     {"id": "e_rates_crew","from": "n_rates",     "to": "n_crew",      "kind": "skill"},
     {"id": "e_search_kit","from": "n_search",    "to": "n_kit",       "kind": "skill"},
-    {"id": "e_est_out",   "from": "n_estimator", "to": "n_quote",     "kind": "output"}
+    {"id": "e_kit_out",   "from": "n_kit",       "to": "n_quote",     "kind": "output"}
   ]
 }

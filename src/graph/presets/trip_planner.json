@@ -49,6 +49,6 @@
     {"id": "e_in_plan",   "from": "n_brief",      "to": "n_planner",    "kind": "input"},
     {"id": "e_plan_res",  "from": "n_planner",    "to": "n_researcher", "kind": "delegate"},
     {"id": "e_search_res","from": "n_search",     "to": "n_researcher", "kind": "skill"},
-    {"id": "e_plan_out",  "from": "n_planner",    "to": "n_itinerary",  "kind": "output"}
+    {"id": "e_res_out",   "from": "n_researcher", "to": "n_itinerary",  "kind": "output"}
   ]
 }
