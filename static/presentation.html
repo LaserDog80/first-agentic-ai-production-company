@@ -755,6 +755,39 @@
             border-color: var(--gold);
         }
 
+        /* ── MODE SWITCH ── */
+        .mode-switch {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            gap: 8px;
+            z-index: 201;
+        }
+
+        .mode-switch a {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            padding: 10px 14px;
+            background: var(--bg-mid);
+            border: 2px solid var(--gold);
+            color: var(--gold);
+            text-decoration: none;
+            letter-spacing: 1px;
+            image-rendering: pixelated;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .mode-switch a:hover {
+            background: var(--gold);
+            color: var(--bg-dark);
+        }
+
+        .mode-switch a.home {
+            padding: 10px 12px;
+            font-size: 10px;
+        }
+
         /* Highlight glow on characters during intro */
         .character-slot.intro-highlight .pixel-character {
             filter: drop-shadow(0 0 12px var(--gold));
@@ -951,6 +984,9 @@
             .intro-overlay { padding: 24px 14px 14px; }
             .intro-line { font-size: 8px; line-height: 1.8; margin-bottom: 6px; }
             .intro-skip { top: 12px; right: 12px; font-size: 7px; padding: 8px 14px; }
+            .mode-switch { top: 12px; left: 12px; gap: 6px; }
+            .mode-switch a { font-size: 6px; padding: 7px 10px; }
+            .mode-switch a.home { font-size: 8px; padding: 7px 9px; }
 
             .result-content { padding: 16px; }
             .result-content h2 { font-size: 10px; }
@@ -963,6 +999,11 @@
     </style>
 </head>
 <body>
+
+    <nav class="mode-switch" aria-label="Switch mode">
+        <a href="/playground" title="Switch to graph editor playground">▣ PLAYGROUND</a>
+        <a class="home" href="/" title="Back to mode chooser">⌂</a>
+    </nav>
 
     <div class="intro-overlay" id="introOverlay">
         <div class="intro-text-area" id="introTextArea"></div>
