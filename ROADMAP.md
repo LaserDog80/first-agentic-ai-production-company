@@ -6,21 +6,6 @@ Living document. Items move up when we decide to do them; new ideas land at the 
 
 ## Sooner (this session or next)
 
-### 0a. Mode switch from presentation back to playground (and vice versa)
-
-**What.** When `/present` loads it commits the user to the production-company preset with no in-app exit — the only way back to the chooser or the playground is the browser Back button. Add a persistent "Switch mode" affordance on `/present` (and a matching one on `/playground`) that returns to `/` or jumps directly to the other mode.
-
-**Why.** Right now presentation mode is a trap. For demos that's fine, but for iterating (the common case) it forces a browser-level escape, which feels broken. Two-way mode switching also makes the chooser less of a one-shot gate and more of a hub.
-
-**Design intent.**
-- Small pixel-art button in the header/corner of both pages: on `/present` it reads "← Playground" (or "Chooser"), on `/playground` it reads "▶ Present".
-- Just an `<a>` to the other route — no state to preserve across modes for v1.
-- Keep the chooser as the canonical entry point (`/`) but allow direct mode-to-mode jumps so users don't bounce through it every time.
-
-**Where it lives.** `static/presentation.html` and `static/playground.html` headers.
-
----
-
 ### 0b. Creative Director → Artist workflow with image generation and feedback loop
 
 **What.** A new preset / workflow: a Creative Director agent receives a brief, interprets it, and delegates to an Artist node. The Artist turns the interpretation into an image-generation prompt and calls an image API (placeholder/mock for v1). The CD then examines the returned image, decides whether it matches the brief, and either approves or returns feedback to the Artist for another attempt. Capped at **5 iterations**.

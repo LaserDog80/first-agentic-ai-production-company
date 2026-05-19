@@ -58,6 +58,8 @@ The root URL is a mode chooser:
 - **`/playground`** — node-based canvas editor (the default working surface). Loads the **Pitch Deck Pipeline** preset by default. Type a brief into the top input and click **RUN**.
 - **`/present`** — cinematic view of the pipeline running. Pixel-art characters animate as each agent works. Currently wired to the legacy pitch-deck event vocabulary; full unification with the graph executor is tracked in `docs/PRESENTATION_MODE_PLAN.md` (Phase 2+).
 
+Both modes have a persistent **mode switch** affordance — a "▶ PRESENT" button on `/playground` and a "▣ PLAYGROUND" button on `/present`, plus a small "⌂" link back to the chooser. Iterate on a graph in the playground, then jump to presentation mode for a demo without bouncing through the chooser.
+
 Building your own graph:
 
 1. Drop an **INPUT** and an **OUTPUT** node from the left library panel.

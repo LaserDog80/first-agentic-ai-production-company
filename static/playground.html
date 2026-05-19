@@ -72,6 +72,20 @@
   .top button.primary:hover { background: var(--gold); border-color: var(--gold); }
   .top button:disabled { opacity: 0.4; cursor: not-allowed; }
 
+  .top a.mode-switch {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; padding: 8px 12px;
+    background: var(--bg-mid);
+    border: 3px solid var(--gold);
+    color: var(--gold);
+    text-decoration: none;
+    image-rendering: pixelated;
+    letter-spacing: 1px;
+  }
+  .top a.mode-switch:hover {
+    background: var(--gold); color: var(--bg-dark);
+  }
+
   /* ── PANELS ─────────────────────────────────────────────────────────── */
   .panel {
     background: var(--bg-mid);
@@ -365,6 +379,9 @@
     <span style="color:var(--text-dim);font-size:8px">|</span>
     <button id="save-local">SAVE</button>
     <button id="load-local">RESTORE</button>
+    <span style="color:var(--text-dim);font-size:8px">|</span>
+    <a class="mode-switch" href="/present" title="Switch to cinematic presentation mode">▶ PRESENT</a>
+    <a class="mode-switch" href="/" title="Back to mode chooser" style="font-size:8px;padding:8px 10px;">⌂</a>
     <span class="grow"></span>
     <input id="brief" type="text" placeholder="Type a brief and hit RUN">
     <button id="run" class="primary">▶ RUN</button>
