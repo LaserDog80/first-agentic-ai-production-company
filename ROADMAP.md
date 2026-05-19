@@ -6,6 +6,47 @@ Living document. Items move up when we decide to do them; new ideas land at the 
 
 ## Sooner (this session or next)
 
+### 0a. Mode switch from presentation back to playground (and vice versa)
+
+**What.** When `/present` loads it commits the user to the production-company preset with no in-app exit — the only way back to the chooser or the playground is the browser Back button. Add a persistent "Switch mode" affordance on `/present` (and a matching one on `/playground`) that returns to `/` or jumps directly to the other mode.
+
+**Why.** Right now presentation mode is a trap. For demos that's fine, but for iterating (the common case) it forces a browser-level escape, which feels broken. Two-way mode switching also makes the chooser less of a one-shot gate and more of a hub.
+
+**Design intent.**
+- Small pixel-art button in the header/corner of both pages: on `/present` it reads "← Playground" (or "Chooser"), on `/playground` it reads "▶ Present".
+- Just an `<a>` to the other route — no state to preserve across modes for v1.
+- Keep the chooser as the canonical entry point (`/`) but allow direct mode-to-mode jumps so users don't bounce through it every time.
+
+**Where it lives.** `static/presentation.html` and `static/playground.html` headers.
+
+---
+
+### 0b. Creative Director → Artist workflow with image generation and feedback loop
+
+**What.** A new preset / workflow: a Creative Director agent receives a brief, interprets it, and delegates to an Artist node. The Artist turns the interpretation into an image-generation prompt and calls an image API (placeholder/mock for v1). The CD then examines the returned image, decides whether it matches the brief, and either approves or returns feedback to the Artist for another attempt. Capped at **5 iterations**.
+
+**Why.** First non-text-only workflow in the app. Exercises the rework-loop pattern on a multimodal output and forces us to build image display into the runtime — a prerequisite for any visual production workflow (storyboards, mood boards, character design).
+
+**Design intent.**
+- **Nodes.** New `artist` agent type. CD is a regular agent with a `delegate` edge to Artist plus a feedback/rework edge back from Artist's output.
+- **Image API.** Start with a placeholder skill (`generate_image`) that returns a stub image URL or a locally-generated placeholder PNG. Wire the real provider (Nebius image endpoint? OpenAI Images? decide later) behind the same skill interface.
+- **CD review step.** The CD needs to "see" the image. For v1 the CD reads the image's prompt + any returned metadata/caption and decides text-only; v2 uses a vision model to actually look at it. Mark this clearly — the v1 review is a stand-in.
+- **Loop control.** Reuse the existing rework-loop machinery (Series Producer pattern) with `max_iterations: 5` on the CD→Artist edge. On exhaustion, emit the best-so-far with a "max iterations reached" flag.
+- **Image display in the UI.** Biggest piece. The playground/presentation UI currently only renders text outputs. Need:
+  - A new output subtype `image` (or `image_set` for multi-attempt).
+  - Node output panel renders `<img>` thumbnails with click-to-enlarge.
+  - Run summary panel shows the iteration history as a row of thumbnails with the CD's feedback under each.
+  - Presentation mode renders the final image full-bleed.
+- **Persistence.** Images saved under `output/web/<run_id>/` and served via the existing download route pattern; same `_RUN_ID_PATTERN` validation.
+
+**Risk / open questions.**
+- Real image generation is slow and costs more than text. Hard cap the 5 iterations and surface estimated cost in the run summary.
+- Vision-based CD review is the right long-term answer; flag the text-only v1 review as a known limitation.
+
+**Where it lives.** New preset under `src/graph/presets/`, new skill under `src/graph/skills/`, schema additions in `src/graph/schema.py` for the `image` output subtype, UI changes across `static/playground.html`, `static/presentation.html`, and the JS run-output renderers.
+
+---
+
 ### 1. Snap-to-hierarchy on node placement and drag
 
 **What.** When a node is dropped or dragged, snap it to a column/row in an implicit hierarchy: the same x-coordinate as nodes at the same depth from the input, the same y-coordinate as its siblings. A first pass can be axis-snap (just lock to the nearest existing column/row within N pixels); a second pass can auto-layout the whole graph on demand (`L` key, maybe).
