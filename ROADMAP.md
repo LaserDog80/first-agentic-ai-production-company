@@ -21,32 +21,6 @@ Living document. Items move up when we decide to do them; new ideas land at the 
 
 ---
 
-### 0b. Creative Director → Artist workflow with image generation and feedback loop
-
-**What.** A new preset / workflow: a Creative Director agent receives a brief, interprets it, and delegates to an Artist node. The Artist turns the interpretation into an image-generation prompt and calls an image API (placeholder/mock for v1). The CD then examines the returned image, decides whether it matches the brief, and either approves or returns feedback to the Artist for another attempt. Capped at **5 iterations**.
-
-**Why.** First non-text-only workflow in the app. Exercises the rework-loop pattern on a multimodal output and forces us to build image display into the runtime — a prerequisite for any visual production workflow (storyboards, mood boards, character design).
-
-**Design intent.**
-- **Nodes.** New `artist` agent type. CD is a regular agent with a `delegate` edge to Artist plus a feedback/rework edge back from Artist's output.
-- **Image API.** Start with a placeholder skill (`generate_image`) that returns a stub image URL or a locally-generated placeholder PNG. Wire the real provider (Nebius image endpoint? OpenAI Images? decide later) behind the same skill interface.
-- **CD review step.** The CD needs to "see" the image. For v1 the CD reads the image's prompt + any returned metadata/caption and decides text-only; v2 uses a vision model to actually look at it. Mark this clearly — the v1 review is a stand-in.
-- **Loop control.** Reuse the existing rework-loop machinery (Series Producer pattern) with `max_iterations: 5` on the CD→Artist edge. On exhaustion, emit the best-so-far with a "max iterations reached" flag.
-- **Image display in the UI.** Biggest piece. The playground/presentation UI currently only renders text outputs. Need:
-  - A new output subtype `image` (or `image_set` for multi-attempt).
-  - Node output panel renders `<img>` thumbnails with click-to-enlarge.
-  - Run summary panel shows the iteration history as a row of thumbnails with the CD's feedback under each.
-  - Presentation mode renders the final image full-bleed.
-- **Persistence.** Images saved under `output/web/<run_id>/` and served via the existing download route pattern; same `_RUN_ID_PATTERN` validation.
-
-**Risk / open questions.**
-- Real image generation is slow and costs more than text. Hard cap the 5 iterations and surface estimated cost in the run summary.
-- Vision-based CD review is the right long-term answer; flag the text-only v1 review as a known limitation.
-
-**Where it lives.** New preset under `src/graph/presets/`, new skill under `src/graph/skills/`, schema additions in `src/graph/schema.py` for the `image` output subtype, UI changes across `static/playground.html`, `static/presentation.html`, and the JS run-output renderers.
-
----
-
 ### 1. Snap-to-hierarchy on node placement and drag
 
 **What.** When a node is dropped or dragged, snap it to a column/row in an implicit hierarchy: the same x-coordinate as nodes at the same depth from the input, the same y-coordinate as its siblings. A first pass can be axis-snap (just lock to the nearest existing column/row within N pixels); a second pass can auto-layout the whole graph on demand (`L` key, maybe).
@@ -83,6 +57,19 @@ Living document. Items move up when we decide to do them; new ideas land at the 
 ---
 
 ## Later (on the list, not next)
+
+### 2a. CD → Artist v1.1: vision review and presentation-mode rendering
+
+**What.** Follow-ups to the v1 `cd_artist` preset that just shipped.
+- **Vision-based review.** Today the CD reads the Artist's text description of the generated image — it never "sees" the image. Switch the CD to a vision-capable model (or add a separate "Critic" vision-agent node) so review feedback is grounded in pixels, not adjectives.
+- **Presentation-mode wiring.** Right now the final image only renders in `/playground`'s OUTPUT tab. `/present` still assumes the legacy pitch-deck event vocabulary. Teach the presentation runtime to render arbitrary `output_subtype: "image"` runs full-bleed, with the iteration history as a filmstrip below.
+- **Cost meter.** Surface estimated fal.ai cost per run in the run summary (≈$0.003/image × N attempts).
+
+**Why.** v1 ships the loop and the playground experience. These two changes are what makes it demo-grade: real visual judgement from the CD, and a cinematic surface for showing it off.
+
+**Where it lives.** `src/prompts/` (CD prompt change), `src/agent.py` or a new vision-call helper, `static/presentation.html` + `static/js/`, `app.py` run summary.
+
+---
 
 ### 3. Edge directionality controls
 

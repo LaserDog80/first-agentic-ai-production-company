@@ -340,6 +340,25 @@
     color: var(--text); font-family: monospace; font-size: 11px;
   }
 
+  .output-images { display: flex; flex-direction: column; gap: 12px; }
+  .output-image-card {
+    border: 2px solid var(--bg-light);
+    background: var(--bg-dark);
+    padding: 8px;
+  }
+  .output-image-card.final { border-color: var(--gold); }
+  .output-image-card img {
+    display: block; max-width: 100%; height: auto;
+    image-rendering: auto;
+  }
+  .output-image-card .caption {
+    font-family: monospace; font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    display: flex; justify-content: space-between;
+  }
+  .output-image-card.final .caption { color: var(--gold); }
+
   /* ── DRAG INDICATOR ─────────────────────────────────────────────────── */
   .running-indicator {
     position: absolute; top: 12px; right: 12px;
@@ -473,6 +492,7 @@ function send(msg) {
 // ── Output state ──────────────────────────────────────────────────────────
 let lastFinalOutput = "";
 let lastPitchDeck = null;
+let lastImages = [];
 let activeTab = "log";
 
 // ── messages ──────────────────────────────────────────────────────────────
@@ -501,7 +521,7 @@ function handleMessage(msg) {
       editor.resetRunState();
       log(`▶ run started: ${msg.graph_name || msg.graph_id}`, "ok");
       $("running").classList.add("on");
-      lastFinalOutput = ""; lastPitchDeck = null;
+      lastFinalOutput = ""; lastPitchDeck = null; lastImages = [];
       $("dl-pptx").style.display = "none";
       break;
     case "node_started":
@@ -532,6 +552,10 @@ function handleMessage(msg) {
       if (msg.download_url) {
         $("dl-pptx").style.display = "inline-block";
         $("dl-pptx").onclick = () => window.location = msg.download_url;
+      }
+      if (Array.isArray(msg.images) && msg.images.length) {
+        lastImages = msg.images;
+        if (activeTab === "output") switchTab("output");
       }
       break;
     case "graph_run_error":
@@ -594,14 +618,42 @@ function switchTab(tab) {
     }
     body.scrollTop = body.scrollHeight;
   } else if (tab === "output") {
-    const pre = document.createElement("pre");
-    pre.className = "output-pre";
-    if (lastPitchDeck) {
-      pre.textContent = JSON.stringify(lastPitchDeck, null, 2);
+    if (lastImages.length) {
+      const wrap = document.createElement("div");
+      wrap.className = "output-images";
+      // Final attempt first, history below.
+      const ordered = lastImages.slice().sort((a, b) => b.attempt - a.attempt);
+      ordered.forEach((img, idx) => {
+        const card = document.createElement("div");
+        card.className = "output-image-card" + (idx === 0 ? " final" : "");
+        const el = document.createElement("img");
+        el.src = img.url;
+        el.alt = `Attempt ${img.attempt}`;
+        card.appendChild(el);
+        const cap = document.createElement("div");
+        cap.className = "caption";
+        cap.innerHTML = `<span>${idx === 0 ? "FINAL · " : ""}Attempt ${img.attempt}</span><a href="${img.url}" target="_blank" style="color:inherit">open ↗</a>`;
+        card.appendChild(cap);
+        wrap.appendChild(card);
+      });
+      body.appendChild(wrap);
+      if (lastFinalOutput) {
+        const pre = document.createElement("pre");
+        pre.className = "output-pre";
+        pre.style.marginTop = "12px";
+        pre.textContent = lastFinalOutput;
+        body.appendChild(pre);
+      }
     } else {
-      pre.textContent = lastFinalOutput || "(no output yet)";
+      const pre = document.createElement("pre");
+      pre.className = "output-pre";
+      if (lastPitchDeck) {
+        pre.textContent = JSON.stringify(lastPitchDeck, null, 2);
+      } else {
+        pre.textContent = lastFinalOutput || "(no output yet)";
+      }
+      body.appendChild(pre);
     }
-    body.appendChild(pre);
   }
 }
 for (const b of document.querySelectorAll(".log-tabs button[data-tab]")) {
