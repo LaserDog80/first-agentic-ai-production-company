@@ -39,7 +39,12 @@ def _text_source_factory(node: Node, run_id: str) -> Callable:
 
 
 def _generate_image_factory(node: Node, run_id: str) -> Callable:
-    return build_generate_image_tool(run_id)
+    params = node.params or {}
+    return build_generate_image_tool(
+        run_id,
+        model=params.get("model") or "",
+        image_size=params.get("image_size") or "",
+    )
 
 
 def _slug(s: str) -> str:

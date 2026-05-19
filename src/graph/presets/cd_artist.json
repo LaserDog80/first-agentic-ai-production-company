@@ -35,6 +35,7 @@
       "type": "skill",
       "label": "Generate Image",
       "skill_id": "generate_image",
+      "params": {"model": "fal-ai/flux/schnell", "image_size": "landscape_16_9"},
       "position": {"x": 80, "y": 460}
     },
     {

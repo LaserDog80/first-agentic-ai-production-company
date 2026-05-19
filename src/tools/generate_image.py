@@ -1,9 +1,10 @@
-"""Text-to-image skill backed by fal.ai's flux-schnell endpoint.
+"""Text-to-image skill backed by fal.ai.
 
 The skill is factory-built per agent because each generated image is
 persisted under `output/web/<run_id>/<seq>.png` and the run_id is only
-known at graph-execution time. The factory closes over run_id and a
-per-call counter so successive invocations land on distinct filenames.
+known at graph-execution time. The factory closes over run_id, model,
+image_size, and a per-call counter so successive invocations land on
+distinct filenames.
 """
 from __future__ import annotations
 
@@ -18,7 +19,8 @@ from src.tools import tool
 
 logger = logging.getLogger(__name__)
 
-FAL_MODEL = "fal-ai/flux/schnell"
+DEFAULT_MODEL = "fal-ai/flux/schnell"
+DEFAULT_IMAGE_SIZE = "landscape_16_9"
 _OUTPUT_DIR = Path("output/web")
 
 
@@ -35,8 +37,8 @@ def _save_image(image_url: str, run_id: str, seq: int) -> Path:
     return out
 
 
-def _call_fal(prompt: str) -> dict:
-    """Invoke fal.ai flux/schnell and return the first image dict."""
+def _call_fal(prompt: str, model: str, image_size: str) -> dict:
+    """Invoke fal.ai and return the first image dict."""
     import fal_client  # local import so test envs without the package still load
 
     if not os.environ.get("FAL_KEY"):
@@ -45,10 +47,10 @@ def _call_fal(prompt: str) -> dict:
             "needs a fal.ai API key — see https://fal.ai/dashboard/keys."
         )
     result = fal_client.subscribe(
-        FAL_MODEL,
+        model,
         arguments={
             "prompt": prompt,
-            "image_size": "landscape_16_9",
+            "image_size": image_size,
         },
     )
     images = result.get("images") or []
@@ -57,18 +59,24 @@ def _call_fal(prompt: str) -> dict:
     return images[0]
 
 
-def build_generate_image_tool(run_id: str) -> Callable:
-    """Return a `generate_image` tool bound to `run_id`.
+def build_generate_image_tool(
+    run_id: str,
+    model: str = DEFAULT_MODEL,
+    image_size: str = DEFAULT_IMAGE_SIZE,
+) -> Callable:
+    """Return a `generate_image` tool bound to `run_id` and the configured model.
 
     The tool downloads each image and exposes it at /output-image/<run_id>/<n>.png.
     Successive calls within the same run increment a counter so each attempt
     has a distinct URL the UI can render.
     """
     counter = {"n": 0}
+    cfg_model = model or DEFAULT_MODEL
+    cfg_size = image_size or DEFAULT_IMAGE_SIZE
 
     @tool
     def generate_image(prompt: str) -> dict:
-        """Generate an image from a text prompt using fal.ai (flux-schnell).
+        """Generate an image from a text prompt using fal.ai.
 
         Use this when you need to produce a visual. Pass a vivid, specific
         description — composition, subject, lighting, mood, medium. The tool
@@ -78,7 +86,7 @@ def build_generate_image_tool(run_id: str) -> Callable:
         counter["n"] += 1
         seq = counter["n"]
         try:
-            image = _call_fal(prompt)
+            image = _call_fal(prompt, cfg_model, cfg_size)
         except Exception as exc:
             logger.warning("generate_image failed for run %s seq %d: %s",
                            run_id, seq, exc)
@@ -95,11 +103,13 @@ def build_generate_image_tool(run_id: str) -> Callable:
                 "image_url": image["url"],
                 "attempt": seq,
                 "warning": f"Could not cache locally: {exc}",
+                "model": cfg_model,
             }
         return {
             "image_url": f"/output-image/{run_id}/{seq}.png",
             "attempt": seq,
             "prompt": prompt,
+            "model": cfg_model,
         }
 
     return generate_image

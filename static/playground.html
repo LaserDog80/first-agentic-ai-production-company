@@ -420,6 +420,10 @@
       RATE LOOKUP
       <div class="desc">Look up a day rate for a role in a region. Ships with a sample dataset — swap in your own.</div>
     </div>
+    <div class="lib-item" draggable="true" data-add="skill" data-skill="generate_image">
+      GENERATE IMAGE
+      <div class="desc">Text-to-image via fal.ai. Configure model + image size in the node sidebar. Requires FAL_KEY.</div>
+    </div>
     <div class="lib-item" draggable="true" data-add="source">
       TEXT SOURCE
       <div class="desc">A block of reference text exposed as a readable tool.</div>
@@ -693,11 +697,20 @@ function buildNodeFromKind(kind, skillId) {
     };
   }
   if (kind === "skill") {
-    return {
+    const labels = {
+      web_search: "Web Search",
+      lookup_rates: "Rate Lookup",
+      generate_image: "Generate Image",
+    };
+    const node = {
       type: "skill",
-      label: skillId === "web_search" ? "Web Search" : "Rate Lookup",
+      label: labels[skillId] || skillId,
       skill_id: skillId,
     };
+    if (skillId === "generate_image") {
+      node.params = { model: "fal-ai/flux/schnell", image_size: "landscape_16_9" };
+    }
+    return node;
   }
   if (kind === "source") {
     return { type: "source", label: "Text Source", source_kind: "text", source_value: "" };

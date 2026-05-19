@@ -6,6 +6,25 @@ Living document. Items move up when we decide to do them; new ideas land at the 
 
 ## Sooner (this session or next)
 
+### 0c. Run-output tray UX upgrades (thumbnails, resizable, image-strip view)
+
+**What.** Three related improvements to the bottom run-output panel that became obvious as soon as the `cd_artist` preset shipped real images into it.
+
+1. **Thumbnails, not full-bleed.** Right now the OUTPUT tab renders each image at intrinsic size — a single 1024×576 fal image fills the whole tray and pushes everything else off-screen. Render each attempt as a small thumbnail (~180px wide) in a flex-wrap row. Click a thumbnail to enlarge it (modal lightbox / inline expand — either is fine).
+2. **Resizable tray.** The bottom region is currently a fixed `200px` row in the grid. Add a drag-handle on the top edge so the user can pull it up to see more of the output (or shove it down to give the canvas more room). Persist the height in localStorage.
+3. **Image-strip view of all attempts.** Today the OUTPUT tab stacks attempts vertically with the final on top. After (1), put the *whole* iteration history into a horizontal strip — first attempt on the left, last on the right, latest framed in gold. Optionally promote this into its own tab next to LOG and OUTPUT (e.g. "IMAGES (3)"), so the user can flick to it during a run and watch attempts land one at a time without losing the LOG view.
+
+**Why.** During the first live demo the final image dominated the tray; the user never saw the earlier attempts (they were below the fold, hidden behind the FINAL frame) and couldn't resize to reveal them. The whole point of the rework loop is showing the *evolution* — that needs to be visible by default, not after a scroll.
+
+**Design intent.**
+- Thumbnails: existing `.output-image-card` already has a `.final` modifier; switch the wrap from `flex-direction: column` to `flex-direction: row; flex-wrap: wrap;` and constrain card width. Lightbox can be a single `<div>` overlay that copies the `src`, no library.
+- Resizable: a 6px-tall absolutely-positioned handle inside the grid track's top border; `mousedown` → capture, `mousemove` → write a CSS variable for the row height, `mouseup` → save to localStorage. Re-apply on page load.
+- Image-strip tab: cheap option is just to keep it in OUTPUT but lay them horizontally. The dedicated IMAGES tab is nicer — gate it on `run_summary.images.length > 0` so it doesn't show up for text-only runs.
+
+**Where it lives.** `static/playground.html` (markup + CSS for the new tab/handle, switchTab() to render the strip, the lightbox overlay). No backend changes — `run_summary.images` already carries everything needed.
+
+---
+
 ### 1. Snap-to-hierarchy on node placement and drag
 
 **What.** When a node is dropped or dragged, snap it to a column/row in an implicit hierarchy: the same x-coordinate as nodes at the same depth from the input, the same y-coordinate as its siblings. A first pass can be axis-snap (just lock to the nearest existing column/row within N pixels); a second pass can auto-layout the whole graph on demand (`L` key, maybe).

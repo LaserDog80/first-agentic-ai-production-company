@@ -62,7 +62,7 @@ def test_generate_image_uses_run_id_for_persistence(monkeypatch, tmp_path):
     monkeypatch.setattr(gi, "_OUTPUT_DIR", tmp_path / "web")
     monkeypatch.setattr(
         gi, "_call_fal",
-        lambda prompt: {"url": f"https://stub.example/{prompt[:10]}.png"},
+        lambda prompt, model, image_size: {"url": f"https://stub.example/{prompt[:10]}.png"},
     )
     # Bypass the network download; just write a tiny file.
     def fake_save(image_url, run_id, seq):
@@ -84,12 +84,65 @@ def test_generate_image_uses_run_id_for_persistence(monkeypatch, tmp_path):
     assert (tmp_path / "web" / "abc123def456" / "2.png").exists()
 
 
+def test_generate_image_passes_model_and_size_through(monkeypatch, tmp_path):
+    """node.params.model and node.params.image_size should reach fal_client.subscribe."""
+    from src.tools import generate_image as gi
+
+    monkeypatch.setattr(gi, "_OUTPUT_DIR", tmp_path / "web")
+    monkeypatch.setattr(gi, "_save_image", lambda url, rid, seq: tmp_path / "x.png")
+    monkeypatch.setenv("FAL_KEY", "stub")
+
+    calls = []
+    class FakeClient:
+        @staticmethod
+        def subscribe(model, *, arguments):
+            calls.append({"model": model, "arguments": arguments})
+            return {"images": [{"url": "https://stub.example/x.png"}]}
+    monkeypatch.setitem(__import__("sys").modules, "fal_client", FakeClient)
+
+    node = Node(
+        id="s", type="skill", skill_id="generate_image",
+        params={"model": "fal-ai/flux/dev", "image_size": "square_hd"},
+    )
+    fn = build_skill_tool(node, run_id="abc123def456")
+    fn("a moody portrait")
+
+    assert len(calls) == 1
+    assert calls[0]["model"] == "fal-ai/flux/dev"
+    assert calls[0]["arguments"]["image_size"] == "square_hd"
+    assert calls[0]["arguments"]["prompt"] == "a moody portrait"
+
+
+def test_generate_image_falls_back_to_defaults_when_params_missing(monkeypatch, tmp_path):
+    """A skill node with no params should still use fal-ai/flux/schnell + landscape_16_9."""
+    from src.tools import generate_image as gi
+
+    monkeypatch.setattr(gi, "_OUTPUT_DIR", tmp_path / "web")
+    monkeypatch.setattr(gi, "_save_image", lambda url, rid, seq: tmp_path / "x.png")
+    monkeypatch.setenv("FAL_KEY", "stub")
+
+    calls = []
+    class FakeClient:
+        @staticmethod
+        def subscribe(model, *, arguments):
+            calls.append({"model": model, "arguments": arguments})
+            return {"images": [{"url": "https://stub.example/x.png"}]}
+    monkeypatch.setitem(__import__("sys").modules, "fal_client", FakeClient)
+
+    node = Node(id="s", type="skill", skill_id="generate_image")
+    fn = build_skill_tool(node, run_id="abc123def456")
+    fn("a quiet beach")
+
+    assert calls[0]["model"] == gi.DEFAULT_MODEL
+    assert calls[0]["arguments"]["image_size"] == gi.DEFAULT_IMAGE_SIZE
+
+
 def test_generate_image_surfaces_fal_errors(monkeypatch, tmp_path):
     """If fal.ai raises, the tool should return a structured error dict rather than crash."""
     from src.tools import generate_image as gi
 
     monkeypatch.setattr(gi, "_OUTPUT_DIR", tmp_path / "web")
-    def boom(prompt):
+    def boom(prompt, model, image_size):
         raise RuntimeError("fal exploded")
     monkeypatch.setattr(gi, "_call_fal", boom)
 
@@ -131,7 +184,7 @@ def test_cd_artist_loop_runs_end_to_end(monkeypatch, tmp_path):
     monkeypatch.setattr(gi, "_OUTPUT_DIR", tmp_path / "web")
     monkeypatch.setattr(
         gi, "_call_fal",
-        lambda prompt: {"url": f"https://stub.example/{prompt[:6]}.png"},
+        lambda prompt, model, image_size: {"url": f"https://stub.example/{prompt[:6]}.png"},
     )
     def fake_save(image_url, run_id, seq):
         run_dir = tmp_path / "web" / run_id
