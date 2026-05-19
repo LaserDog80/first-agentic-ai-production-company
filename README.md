@@ -15,10 +15,11 @@ pinned: false
 
 You compose AI agents on a canvas. Each agent is a node with its own system prompt and model tier. You connect agents to each other to set up delegation (who can ask whom to do work), and you connect skill nodes (web search, lookup tools, static text sources) to grant agents abilities. Then you type a brief into the input, click **RUN**, and watch the graph execute live — nodes light up gold while running, gold sparks travel along edges as one agent delegates to another.
 
-Two presets ship with the app:
+Presets that ship with the app:
 
 - **Pitch Deck Pipeline** — five agents (Series Producer → Producer → Researcher / Director / Production Manager) collaborating to turn a one-line TV idea into a broadcast-ready pitch deck. Originally the proof-of-concept for this engine; now just one preset among many.
 - **Research Assistant** — a single agent with web search. The simplest possible playground graph; useful as a starting template.
+- **Creative Director → Artist** — a Creative Director delegates a brief to a Visual Artist, who generates an image via fal.ai (`fal-ai/flux/schnell`) and replies with the URL and a description. The CD reviews the description (text-only in v1 — no vision model yet) and either approves or sends feedback for another attempt, up to **5 attempts**. The final image renders in the OUTPUT tab; earlier attempts are kept below as history. Requires `FAL_KEY` in `.env`.
 
 You can save your own graphs to localStorage, swap presets in and out, and build new agents from the library panel.
 
@@ -44,6 +45,7 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with NEBIUS_API_KEY (LLM provider)
 # and TAVILY_API_KEY or LINKUP_API_KEY (web search)
+# and FAL_KEY (image generation — only needed for the Creative Director → Artist preset)
 ```
 
 ## Usage
@@ -77,7 +79,7 @@ The pitch deck preset has an output node with `subtype: "pitch_deck"` — when i
 pytest -q
 ```
 
-76 tests cover the graph schema and validator, the executor with stubbed LLM clients, preset integrity, the FastAPI/WebSocket protocol (including the chooser, playground, and present routes plus the sprites module), the agent runtime, the tool registry, the PPTX exporter, and rate limiting.
+83 tests cover the graph schema and validator, the executor with stubbed LLM clients, preset integrity (including the new `cd_artist` preset with a mocked fal.ai client), the FastAPI/WebSocket protocol (including the chooser, playground, and present routes plus the sprites module), the agent runtime, the tool registry, the PPTX exporter, and rate limiting.
 
 ## Deployment (Hugging Face Spaces)
 

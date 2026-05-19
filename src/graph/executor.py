@@ -38,11 +38,13 @@ class GraphExecutor:
         client: Any,
         config: dict,
         emit: Callable[[dict], None] | None = None,
+        run_id: str = "",
     ) -> None:
         self.graph = graph
         self.client = client
         self.config = config
         self.emit = emit or (lambda _ev: None)
+        self.run_id = run_id
         self.nodes_by_id: dict[str, Node] = {n.id: n for n in graph.nodes}
 
     # ── edge index helpers ──────────────────────────────────────────────────
@@ -149,7 +151,7 @@ class GraphExecutor:
         tools: list[Callable] = []
         for src_id in self._skill_sources_for(node_id):
             src = self.nodes_by_id[src_id]
-            tools.append(build_skill_tool(src))
+            tools.append(build_skill_tool(src, run_id=self.run_id))
         for child_id in self._delegate_children(node_id):
             tools.append(self._delegate_tool(node_id, child_id, parents))
 

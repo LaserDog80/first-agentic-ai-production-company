@@ -3,25 +3,27 @@
 A skill node connected to an agent is materialised as a callable @tool
 function during graph execution. Some skills (e.g. text_source) are
 parameterised by node config; the factory takes the node so the closure
-can capture those params.
+can capture those params. A second optional parameter exposes the run_id
+so skills that persist artefacts can write to a per-run directory.
 """
 from typing import Callable
 
 from src.graph.schema import Node
 from src.tools import tool
+from src.tools.generate_image import build_generate_image_tool
 from src.tools.rates import lookup_rates
 from src.tools.search import web_search
 
 
-def _web_search_factory(node: Node) -> Callable:
+def _web_search_factory(node: Node, run_id: str) -> Callable:
     return web_search
 
 
-def _lookup_rates_factory(node: Node) -> Callable:
+def _lookup_rates_factory(node: Node, run_id: str) -> Callable:
     return lookup_rates
 
 
-def _text_source_factory(node: Node) -> Callable:
+def _text_source_factory(node: Node, run_id: str) -> Callable:
     """Expose this source node's text as a tool the agent can read."""
     label = node.label or node.id
     text = node.source_value or ""
@@ -36,6 +38,15 @@ def _text_source_factory(node: Node) -> Callable:
     return _read_source
 
 
+def _generate_image_factory(node: Node, run_id: str) -> Callable:
+    params = node.params or {}
+    return build_generate_image_tool(
+        run_id,
+        model=params.get("model") or "",
+        image_size=params.get("image_size") or "",
+    )
+
+
 def _slug(s: str) -> str:
     out = []
     for ch in s.lower():
@@ -46,21 +57,22 @@ def _slug(s: str) -> str:
     return "".join(out).strip("_") or "x"
 
 
-SKILL_REGISTRY: dict[str, Callable[[Node], Callable]] = {
+SKILL_REGISTRY: dict[str, Callable[[Node, str], Callable]] = {
     "web_search": _web_search_factory,
     "lookup_rates": _lookup_rates_factory,
     "text_source": _text_source_factory,
+    "generate_image": _generate_image_factory,
 }
 
 
-def build_skill_tool(node: Node) -> Callable:
+def build_skill_tool(node: Node, run_id: str = "") -> Callable:
     """Build the @tool callable for a skill or source node."""
     if node.type == "source":
         # Sources currently always become a text-read tool.
-        return _text_source_factory(node)
+        return _text_source_factory(node, run_id)
     if node.skill_id not in SKILL_REGISTRY:
         raise KeyError(f"Unknown skill_id: {node.skill_id}")
-    return SKILL_REGISTRY[node.skill_id](node)
+    return SKILL_REGISTRY[node.skill_id](node, run_id)
 
 
 def list_available_skills() -> list[dict]:
@@ -75,5 +87,10 @@ def list_available_skills() -> list[dict]:
             "skill_id": "lookup_rates",
             "label": "Rate Lookup",
             "description": "Look up a day rate for a role in a region. Ships with a sample dataset — swap in your own.",
+        },
+        {
+            "skill_id": "generate_image",
+            "label": "Generate Image",
+            "description": "Text-to-image generation via fal.ai (flux-schnell). Requires FAL_KEY.",
         },
     ]

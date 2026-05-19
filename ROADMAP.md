@@ -6,29 +6,22 @@ Living document. Items move up when we decide to do them; new ideas land at the 
 
 ## Sooner (this session or next)
 
-### 0b. Creative Director → Artist workflow with image generation and feedback loop
+### 0c. Run-output tray UX upgrades (thumbnails, resizable, image-strip view)
 
-**What.** A new preset / workflow: a Creative Director agent receives a brief, interprets it, and delegates to an Artist node. The Artist turns the interpretation into an image-generation prompt and calls an image API (placeholder/mock for v1). The CD then examines the returned image, decides whether it matches the brief, and either approves or returns feedback to the Artist for another attempt. Capped at **5 iterations**.
+**What.** Three related improvements to the bottom run-output panel that became obvious as soon as the `cd_artist` preset shipped real images into it.
 
-**Why.** First non-text-only workflow in the app. Exercises the rework-loop pattern on a multimodal output and forces us to build image display into the runtime — a prerequisite for any visual production workflow (storyboards, mood boards, character design).
+1. **Thumbnails, not full-bleed.** Right now the OUTPUT tab renders each image at intrinsic size — a single 1024×576 fal image fills the whole tray and pushes everything else off-screen. Render each attempt as a small thumbnail (~180px wide) in a flex-wrap row. Click a thumbnail to enlarge it (modal lightbox / inline expand — either is fine).
+2. **Resizable tray.** The bottom region is currently a fixed `200px` row in the grid. Add a drag-handle on the top edge so the user can pull it up to see more of the output (or shove it down to give the canvas more room). Persist the height in localStorage.
+3. **Image-strip view of all attempts.** Today the OUTPUT tab stacks attempts vertically with the final on top. After (1), put the *whole* iteration history into a horizontal strip — first attempt on the left, last on the right, latest framed in gold. Optionally promote this into its own tab next to LOG and OUTPUT (e.g. "IMAGES (3)"), so the user can flick to it during a run and watch attempts land one at a time without losing the LOG view.
+
+**Why.** During the first live demo the final image dominated the tray; the user never saw the earlier attempts (they were below the fold, hidden behind the FINAL frame) and couldn't resize to reveal them. The whole point of the rework loop is showing the *evolution* — that needs to be visible by default, not after a scroll.
 
 **Design intent.**
-- **Nodes.** New `artist` agent type. CD is a regular agent with a `delegate` edge to Artist plus a feedback/rework edge back from Artist's output.
-- **Image API.** Start with a placeholder skill (`generate_image`) that returns a stub image URL or a locally-generated placeholder PNG. Wire the real provider (Nebius image endpoint? OpenAI Images? decide later) behind the same skill interface.
-- **CD review step.** The CD needs to "see" the image. For v1 the CD reads the image's prompt + any returned metadata/caption and decides text-only; v2 uses a vision model to actually look at it. Mark this clearly — the v1 review is a stand-in.
-- **Loop control.** Reuse the existing rework-loop machinery (Series Producer pattern) with `max_iterations: 5` on the CD→Artist edge. On exhaustion, emit the best-so-far with a "max iterations reached" flag.
-- **Image display in the UI.** Biggest piece. The playground/presentation UI currently only renders text outputs. Need:
-  - A new output subtype `image` (or `image_set` for multi-attempt).
-  - Node output panel renders `<img>` thumbnails with click-to-enlarge.
-  - Run summary panel shows the iteration history as a row of thumbnails with the CD's feedback under each.
-  - Presentation mode renders the final image full-bleed.
-- **Persistence.** Images saved under `output/web/<run_id>/` and served via the existing download route pattern; same `_RUN_ID_PATTERN` validation.
+- Thumbnails: existing `.output-image-card` already has a `.final` modifier; switch the wrap from `flex-direction: column` to `flex-direction: row; flex-wrap: wrap;` and constrain card width. Lightbox can be a single `<div>` overlay that copies the `src`, no library.
+- Resizable: a 6px-tall absolutely-positioned handle inside the grid track's top border; `mousedown` → capture, `mousemove` → write a CSS variable for the row height, `mouseup` → save to localStorage. Re-apply on page load.
+- Image-strip tab: cheap option is just to keep it in OUTPUT but lay them horizontally. The dedicated IMAGES tab is nicer — gate it on `run_summary.images.length > 0` so it doesn't show up for text-only runs.
 
-**Risk / open questions.**
-- Real image generation is slow and costs more than text. Hard cap the 5 iterations and surface estimated cost in the run summary.
-- Vision-based CD review is the right long-term answer; flag the text-only v1 review as a known limitation.
-
-**Where it lives.** New preset under `src/graph/presets/`, new skill under `src/graph/skills/`, schema additions in `src/graph/schema.py` for the `image` output subtype, UI changes across `static/playground.html`, `static/presentation.html`, and the JS run-output renderers.
+**Where it lives.** `static/playground.html` (markup + CSS for the new tab/handle, switchTab() to render the strip, the lightbox overlay). No backend changes — `run_summary.images` already carries everything needed.
 
 ---
 
@@ -68,6 +61,19 @@ Living document. Items move up when we decide to do them; new ideas land at the 
 ---
 
 ## Later (on the list, not next)
+
+### 2a. CD → Artist v1.1: vision review and presentation-mode rendering
+
+**What.** Follow-ups to the v1 `cd_artist` preset that just shipped.
+- **Vision-based review.** Today the CD reads the Artist's text description of the generated image — it never "sees" the image. Switch the CD to a vision-capable model (or add a separate "Critic" vision-agent node) so review feedback is grounded in pixels, not adjectives.
+- **Presentation-mode wiring.** Right now the final image only renders in `/playground`'s OUTPUT tab. `/present` still assumes the legacy pitch-deck event vocabulary. Teach the presentation runtime to render arbitrary `output_subtype: "image"` runs full-bleed, with the iteration history as a filmstrip below.
+- **Cost meter.** Surface estimated fal.ai cost per run in the run summary (≈$0.003/image × N attempts).
+
+**Why.** v1 ships the loop and the playground experience. These two changes are what makes it demo-grade: real visual judgement from the CD, and a cinematic surface for showing it off.
+
+**Where it lives.** `src/prompts/` (CD prompt change), `src/agent.py` or a new vision-call helper, `static/presentation.html` + `static/js/`, `app.py` run summary.
+
+---
 
 ### 3. Edge directionality controls
 

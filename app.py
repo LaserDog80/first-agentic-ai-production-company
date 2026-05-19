@@ -68,6 +68,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 _generated_files: dict[str, Path] = {}
 _RUN_ID_PATTERN = re.compile(r"^[a-f0-9]{12}$")
+_IMAGE_NAME_PATTERN = re.compile(r"^[0-9]+\.png$")
 
 
 _NO_STORE = {"Cache-Control": "no-store, must-revalidate"}
@@ -107,6 +108,20 @@ async def download_pptx(run_id: str):
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         filename="pitch_deck.pptx",
     )
+
+
+@app.get("/output-image/{run_id}/{name}")
+async def output_image(run_id: str, name: str):
+    if not _RUN_ID_PATTERN.match(run_id):
+        return JSONResponse(status_code=400, content={"error": "Invalid run ID"})
+    if not _IMAGE_NAME_PATTERN.match(name):
+        return JSONResponse(status_code=400, content={"error": "Invalid image name"})
+    path = Path("output/web") / run_id / name
+    if not path.exists():
+        return JSONResponse(status_code=404, content={"error": "Image not found"})
+    if not path.resolve().is_relative_to(Path("output/web").resolve()):
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
+    return FileResponse(str(path), media_type="image/png")
 
 
 @app.websocket("/ws")
@@ -203,11 +218,14 @@ async def _run_graph(websocket: WebSocket, graph_dict: dict, brief: str) -> None
         asyncio.run_coroutine_threadsafe(emit(event), loop)
 
     config = load_config("config.yaml")
+    run_id = secrets.token_hex(6)
 
     def run_blocking():
         client = create_client(config)
         graph = Graph.model_validate(graph_dict)
-        executor = GraphExecutor(graph, client, config, emit=sync_emit)
+        executor = GraphExecutor(
+            graph, client, config, emit=sync_emit, run_id=run_id,
+        )
         return executor.run(brief), graph
 
     try:
@@ -225,7 +243,6 @@ async def _run_graph(websocket: WebSocket, graph_dict: dict, brief: str) -> None
     if result.get("ok") and result.get("output_subtype") == "pitch_deck":
         pitch_deck_obj = try_parse_pitch_deck(result.get("output", ""))
         if pitch_deck_obj:
-            run_id = secrets.token_hex(6)
             pptx_dir = Path("output/web")
             pptx_dir.mkdir(parents=True, exist_ok=True)
             pptx_path = pptx_dir / f"{run_id}.pptx"
@@ -236,12 +253,28 @@ async def _run_graph(websocket: WebSocket, graph_dict: dict, brief: str) -> None
             except Exception as exc:
                 logger.warning("PPTX export failed: %s", exc)
 
+    # Image-output post-run hook: surface any images the generate_image
+    # skill persisted under output/web/<run_id>/, in iteration order.
+    images: list[dict] = []
+    if result.get("ok") and result.get("output_subtype") == "image":
+        run_dir = Path("output/web") / run_id
+        if run_dir.is_dir():
+            for path in sorted(
+                run_dir.glob("*.png"),
+                key=lambda p: int(p.stem) if p.stem.isdigit() else 0,
+            ):
+                images.append({
+                    "url": f"/output-image/{run_id}/{path.name}",
+                    "attempt": int(path.stem) if path.stem.isdigit() else 0,
+                })
+
     await emit({
         "type": "run_summary",
         "ok": result.get("ok", False),
         "output_subtype": result.get("output_subtype", ""),
         "pitch_deck": pitch_deck_obj,
         "download_url": download_url,
+        "images": images,
     })
 
 

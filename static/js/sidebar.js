@@ -115,6 +115,35 @@ export class Sidebar {
           </div>
         </div>
       `;
+      if (node.skill_id === "generate_image") {
+        const p = node.params || {};
+        html += `
+          <div class="sb-section">
+            <h3>FAL.AI PARAMS</h3>
+            <div class="sb-row">
+              <label>MODEL</label>
+              <input data-sb-param="model" type="text" value="${escAttr(p.model || "fal-ai/flux/schnell")}" placeholder="fal-ai/flux/schnell" spellcheck="false" />
+            </div>
+            <div class="sb-row">
+              <label>IMAGE SIZE</label>
+              <select data-sb-param="image_size">
+                <option value="square_hd">square_hd</option>
+                <option value="square">square</option>
+                <option value="portrait_4_3">portrait_4_3</option>
+                <option value="portrait_16_9">portrait_16_9</option>
+                <option value="landscape_4_3">landscape_4_3</option>
+                <option value="landscape_16_9">landscape_16_9</option>
+              </select>
+            </div>
+            <div class="sb-row" style="font-size:6px;color:var(--text-dim);line-height:1.7;letter-spacing:0.5px;">
+              Common models: <strong>fal-ai/flux/schnell</strong> (fast, cheap) ·
+              <strong>fal-ai/flux/dev</strong> (higher quality) ·
+              <strong>fal-ai/flux-pro</strong> (best quality, costliest).
+              See <a href="https://fal.ai/models" target="_blank" style="color:var(--gold)">fal.ai/models</a>.
+            </div>
+          </div>
+        `;
+      }
     }
     if (isSource) {
       html += `
@@ -156,8 +185,14 @@ export class Sidebar {
       const sel = this._body.querySelector('[data-sb-field="model_tier"]');
       if (sel) sel.value = node.model_tier || "strong";
     }
+    if (isSkill && node.skill_id === "generate_image") {
+      const sel = this._body.querySelector('[data-sb-param="image_size"]');
+      const p = node.params || {};
+      if (sel) sel.value = p.image_size || "landscape_16_9";
+    }
 
     this._bindFields();
+    this._bindParamFields(node);
     const del = this._body.querySelector('[data-sb-action="delete"]');
     if (del) del.addEventListener("click", () => {
       this.editor.deleteSelected();
@@ -185,6 +220,25 @@ export class Sidebar {
       value = el.value;
     }
     this.editor.updateSelected({ [key]: value });
+  }
+
+  _bindParamFields(node) {
+    const fields = this.root.querySelectorAll("[data-sb-param]");
+    for (const el of fields) {
+      const key = el.dataset.sbParam;
+      const write = () => {
+        const current = (this._currentNode() || {}).params || {};
+        const next = { ...current, [key]: el.value };
+        this.editor.updateSelected({ params: next });
+      };
+      el.addEventListener("input", write);
+      el.addEventListener("change", write);
+    }
+  }
+
+  _currentNode() {
+    if (!this.currentNodeId) return null;
+    return this.editor.graph.nodes.find(n => n.id === this.currentNodeId) || null;
   }
 
   _renderConnectionsHtml(node) {
