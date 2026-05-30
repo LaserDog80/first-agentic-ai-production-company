@@ -1,0 +1,12 @@
+{
+  "name": "first-agentic-ai-production-company",
+  "detected_type": "docker-single",
+  "auto_generated": true,
+  "steps": [
+    {
+      "run": "docker build -t project . && docker run project",
+      "background": true,
+      "wait": 2
+    }
+  ]
+}

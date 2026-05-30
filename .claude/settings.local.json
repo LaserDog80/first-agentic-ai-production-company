@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(source .venv/bin/activate)",
+      "Bash(pytest tests/test_agent.py -v)",
+      "Bash(pytest -v)",
+      "Bash(pytest -v --tb=short)",
+      "Bash(pytest -q --tb=short)",
+      "Bash(python -c \":*)",
+      "Bash(pytest tests/test_integration.py::TestFullPipelineWithRework -v --tb=long)",
+      "Bash(xargs kill:*)"
+    ]
+  }
+}
