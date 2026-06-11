@@ -466,6 +466,9 @@
       <button class="active" data-tab="log">LOG</button>
       <button data-tab="output">OUTPUT</button>
       <span class="grow"></span>
+      <span id="meter" title="Tokens used this run (cost is a config-driven estimate)"
+            style="font-family:monospace;font-size:10px;color:var(--text-dim);padding:8px 10px;align-self:center;"></span>
+      <button id="replay" class="download" style="display:none" title="Replay the last run's events">↻ REPLAY</button>
       <button id="dl-pptx" class="download" style="display:none">↓ PPTX</button>
     </div>
     <div class="log-body" id="log-body"></div>
@@ -501,6 +504,7 @@ function connectWs() {
   });
   ws.addEventListener("close", () => {
     log("ws disconnected. reconnecting in 3s…", "err");
+    if (running) setRunning(false); // server cancels the run on disconnect
     setTimeout(connectWs, 3000);
   });
 }
@@ -516,8 +520,34 @@ let lastPitchDeck = null;
 let lastImages = [];
 let activeTab = "log";
 
+// ── Run state: stop button, token/cost meter, replay buffer ───────────────
+let running = false;
+let replaying = false;
+let runTokens = 0;
+let runCost = 0;
+let runEvents = [];
+const REPLAYABLE = new Set([
+  "graph_run_start", "node_started", "tool_call", "edge_fired",
+  "node_finished", "graph_run_complete", "graph_run_error", "run_summary",
+]);
+
+function setRunning(on) {
+  running = on;
+  $("run").textContent = on ? "■ STOP" : "▶ RUN";
+  $("running").classList.toggle("on", on);
+}
+
+function updateMeter() {
+  const el = $("meter");
+  if (!runTokens) { el.textContent = ""; return; }
+  let s = "Σ " + runTokens.toLocaleString() + " tok";
+  if (runCost > 0) s += " · ~$" + runCost.toFixed(4);
+  el.textContent = s;
+}
+
 // ── messages ──────────────────────────────────────────────────────────────
 function handleMessage(msg) {
+  if (!replaying && REPLAYABLE.has(msg.type)) runEvents.push(msg);
   switch (msg.type) {
     case "presets": {
       const sel = $("preset-select");
@@ -541,9 +571,11 @@ function handleMessage(msg) {
     case "graph_run_start":
       editor.resetRunState();
       log(`▶ run started: ${msg.graph_name || msg.graph_id}`, "ok");
-      $("running").classList.add("on");
+      setRunning(true);
+      runTokens = 0; runCost = 0; updateMeter();
       lastFinalOutput = ""; lastPitchDeck = null; lastImages = [];
       $("dl-pptx").style.display = "none";
+      if (!replaying) $("replay").style.display = "none";
       break;
     case "node_started":
       editor.setNodeRunState(msg.node_id, "running");
@@ -557,15 +589,29 @@ function handleMessage(msg) {
       break;
     case "node_finished":
       editor.setNodeRunState(msg.node_id, "finished");
+      runTokens += (msg.tokens?.prompt || 0) + (msg.tokens?.completion || 0);
+      if (typeof msg.cost_usd === "number") runCost += msg.cost_usd;
+      updateMeter();
       log(`✓ node done · ${msg.iterations} iter · ${msg.tokens?.prompt}/${msg.tokens?.completion} tok`);
       break;
-    case "graph_run_complete":
-      log(`✓ run complete`, "ok");
+    case "graph_run_complete": {
+      let summary = "✓ run complete";
+      const tok = msg.tokens ? (msg.tokens.prompt || 0) + (msg.tokens.completion || 0) : 0;
+      if (tok) {
+        runTokens = tok;
+        if (typeof msg.cost_usd === "number") runCost = msg.cost_usd;
+        updateMeter();
+        summary += ` · ${tok.toLocaleString()} tok`;
+        if (typeof msg.cost_usd === "number") summary += ` · ~$${msg.cost_usd.toFixed(4)}`;
+      }
+      log(summary, "ok");
       lastFinalOutput = msg.output || "";
-      $("running").classList.remove("on");
+      setRunning(false);
+      if (runEvents.length) $("replay").style.display = "inline-block";
       // Auto-switch to output tab.
       switchTab("output");
       break;
+    }
     case "run_summary":
       if (msg.pitch_deck) {
         lastPitchDeck = msg.pitch_deck;
@@ -580,8 +626,8 @@ function handleMessage(msg) {
       }
       break;
     case "graph_run_error":
-      $("running").classList.remove("on");
-      log(`✗ ${msg.error}`, "err");
+      setRunning(false);
+      log(msg.cancelled ? `■ ${msg.error}` : `✗ ${msg.error}`, msg.cancelled ? "" : "err");
       // Mark whatever's running as errored.
       for (const n of editor.graph.nodes) {
         if (editor.runStates[n.id] === "running") editor.setNodeRunState(n.id, "error");
@@ -595,7 +641,6 @@ function handleMessage(msg) {
       break;
     case "error":
       log(`! ${msg.message}`, "err");
-      $("running").classList.remove("on");
       break;
   }
 }
@@ -804,10 +849,41 @@ $("load-local").addEventListener("click", () => {
 });
 
 $("run").addEventListener("click", () => {
+  if (replaying) return;
+  if (running) { send({ type: "stop_run" }); log("stopping run…"); return; }
   const brief = $("brief").value.trim();
   if (!brief) { log("type a brief first", "err"); $("brief").focus(); return; }
   const graph = editor.exportGraph();
+  runEvents = [];
   send({ type: "run_graph", graph, brief });
+});
+
+// ── replay ────────────────────────────────────────────────────────────────
+// Re-fires the buffered events of the last run client-side, so the node
+// activations and edge sparks can be watched again (or shown to someone)
+// without spending a single token.
+$("replay").addEventListener("click", () => {
+  if (replaying || running || !runEvents.length) return;
+  replaying = true;
+  $("run").disabled = true;
+  $("replay").disabled = true;
+  log("↻ replaying last run…", "ok");
+  const events = runEvents.slice();
+  let i = 0;
+  const step = () => {
+    if (i >= events.length) {
+      replaying = false;
+      $("run").disabled = false;
+      $("replay").disabled = false;
+      setRunning(false);
+      return;
+    }
+    const ev = events[i++];
+    handleMessage(ev);
+    const quick = ev.type === "tool_call" || ev.type === "edge_fired";
+    setTimeout(step, quick ? 250 : 700);
+  };
+  step();
 });
 $("brief").addEventListener("keydown", (e) => { if (e.key === "Enter") $("run").click(); });
 
