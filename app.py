@@ -1,8 +1,9 @@
 """FastAPI server for the Agentic Playground.
 
 Serves the node-based playground UI and runs user-built graphs over a
-WebSocket. The legacy linear pitch-deck pipeline is kept available as
-the `pitch_deck` preset graph; the graph executor is the only runtime.
+WebSocket. Runs execute as background tasks so the socket stays
+responsive — a `stop_run` message (or the client disconnecting) sets a
+cancel event that the executor checks between LLM iterations.
 """
 import asyncio
 import json
@@ -10,6 +11,8 @@ import logging
 import os
 import re
 import secrets
+import shutil
+import threading
 import time
 from pathlib import Path
 
@@ -23,7 +26,7 @@ from src.graph.presets import list_presets, load_preset
 from src.graph.schema import Graph, validate_graph
 from src.graph.skills import list_available_skills
 from src.pptx_exporter import export_pitch_deck
-from src.provider import create_client, get_model_name, load_config
+from src.provider import create_client, load_config
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -69,6 +72,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 _generated_files: dict[str, Path] = {}
 _RUN_ID_PATTERN = re.compile(r"^[a-f0-9]{12}$")
 _IMAGE_NAME_PATTERN = re.compile(r"^[0-9]+\.png$")
+_OUTPUT_ROOT = Path("output/web")
+_KEEP_RUN_ARTEFACTS = 40
 
 
 _NO_STORE = {"Cache-Control": "no-store, must-revalidate"}
@@ -101,7 +106,7 @@ async def download_pptx(run_id: str):
     path = _generated_files.get(run_id)
     if not path or not path.exists():
         return JSONResponse(status_code=404, content={"error": "File not found"})
-    if not path.resolve().is_relative_to(Path("output/web").resolve()):
+    if not path.resolve().is_relative_to(_OUTPUT_ROOT.resolve()):
         return JSONResponse(status_code=400, content={"error": "Invalid path"})
     return FileResponse(
         str(path),
@@ -116,12 +121,37 @@ async def output_image(run_id: str, name: str):
         return JSONResponse(status_code=400, content={"error": "Invalid run ID"})
     if not _IMAGE_NAME_PATTERN.match(name):
         return JSONResponse(status_code=400, content={"error": "Invalid image name"})
-    path = Path("output/web") / run_id / name
+    path = _OUTPUT_ROOT / run_id / name
     if not path.exists():
         return JSONResponse(status_code=404, content={"error": "Image not found"})
-    if not path.resolve().is_relative_to(Path("output/web").resolve()):
+    if not path.resolve().is_relative_to(_OUTPUT_ROOT.resolve()):
         return JSONResponse(status_code=400, content={"error": "Invalid path"})
     return FileResponse(str(path), media_type="image/png")
+
+
+def _prune_run_artefacts(keep: int = _KEEP_RUN_ARTEFACTS) -> None:
+    """Delete the oldest run artefacts so output/web doesn't grow forever."""
+    if not _OUTPUT_ROOT.is_dir():
+        return
+    try:
+        entries = sorted(
+            _OUTPUT_ROOT.iterdir(),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+    except OSError:
+        return
+    for stale in entries[keep:]:
+        try:
+            if stale.is_dir():
+                shutil.rmtree(stale, ignore_errors=True)
+            else:
+                stale.unlink(missing_ok=True)
+        except OSError:
+            pass
+    for rid, path in list(_generated_files.items()):
+        if not path.exists():
+            _generated_files.pop(rid, None)
 
 
 @app.websocket("/ws")
@@ -129,6 +159,9 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     _MAX_BYTES = 65_536
     _MAX_BRIEF = 4_000
+
+    run_task: asyncio.Task | None = None
+    cancel_event: threading.Event | None = None
 
     try:
         while True:
@@ -169,6 +202,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
 
             elif mtype == "run_graph":
+                if run_task is not None and not run_task.done():
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "A run is already in progress — stop it first.",
+                    })
+                    continue
                 graph_dict = msg.get("graph") or {}
                 brief = str(msg.get("brief", ""))[:_MAX_BRIEF]
                 if not brief:
@@ -185,7 +224,18 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_json({"type": "error", "message": limit_msg})
                     continue
                 rate_limiter.record()
-                await _run_graph(websocket, graph_dict, brief)
+                cancel_event = threading.Event()
+                run_task = asyncio.create_task(
+                    _run_graph(websocket, graph_dict, brief, cancel_event)
+                )
+
+            elif mtype == "stop_run":
+                if run_task is not None and not run_task.done() and cancel_event:
+                    cancel_event.set()
+                else:
+                    await websocket.send_json({
+                        "type": "error", "message": "No run in progress.",
+                    })
 
             else:
                 await websocket.send_json({
@@ -194,6 +244,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logger.info("Client disconnected")
+    finally:
+        # Don't keep burning tokens for a client that is gone.
+        if cancel_event is not None:
+            cancel_event.set()
 
 
 def _validate(graph_dict: dict) -> tuple[bool, list[str]]:
@@ -201,11 +255,16 @@ def _validate(graph_dict: dict) -> tuple[bool, list[str]]:
         graph = Graph.model_validate(graph_dict)
     except Exception as exc:
         return False, [f"Schema parse error: {exc}"]
-    errors = validate_graph(graph)
+    errors = validate_graph(graph, limits=_config.get("limits"))
     return (not errors), errors
 
 
-async def _run_graph(websocket: WebSocket, graph_dict: dict, brief: str) -> None:
+async def _run_graph(
+    websocket: WebSocket,
+    graph_dict: dict,
+    brief: str,
+    cancel_event: threading.Event,
+) -> None:
     loop = asyncio.get_event_loop()
 
     async def emit(event: dict) -> None:
@@ -217,19 +276,20 @@ async def _run_graph(websocket: WebSocket, graph_dict: dict, brief: str) -> None
     def sync_emit(event: dict) -> None:
         asyncio.run_coroutine_threadsafe(emit(event), loop)
 
-    config = load_config("config.yaml")
     run_id = secrets.token_hex(6)
+    _prune_run_artefacts()
 
     def run_blocking():
-        client = create_client(config)
+        client = create_client(_config)
         graph = Graph.model_validate(graph_dict)
         executor = GraphExecutor(
-            graph, client, config, emit=sync_emit, run_id=run_id,
+            graph, client, _config, emit=sync_emit, run_id=run_id,
+            cancel_event=cancel_event,
         )
-        return executor.run(brief), graph
+        return executor.run(brief)
 
     try:
-        result, graph = await loop.run_in_executor(None, run_blocking)
+        result = await loop.run_in_executor(None, run_blocking)
     except Exception as exc:
         logger.exception("Graph run error: %s", exc)
         await emit({"type": "graph_run_error",
@@ -243,9 +303,8 @@ async def _run_graph(websocket: WebSocket, graph_dict: dict, brief: str) -> None
     if result.get("ok") and result.get("output_subtype") == "pitch_deck":
         pitch_deck_obj = try_parse_pitch_deck(result.get("output", ""))
         if pitch_deck_obj:
-            pptx_dir = Path("output/web")
-            pptx_dir.mkdir(parents=True, exist_ok=True)
-            pptx_path = pptx_dir / f"{run_id}.pptx"
+            _OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+            pptx_path = _OUTPUT_ROOT / f"{run_id}.pptx"
             try:
                 export_pitch_deck(pitch_deck_obj, str(pptx_path))
                 _generated_files[run_id] = pptx_path
@@ -257,7 +316,7 @@ async def _run_graph(websocket: WebSocket, graph_dict: dict, brief: str) -> None
     # skill persisted under output/web/<run_id>/, in iteration order.
     images: list[dict] = []
     if result.get("ok") and result.get("output_subtype") == "image":
-        run_dir = Path("output/web") / run_id
+        run_dir = _OUTPUT_ROOT / run_id
         if run_dir.is_dir():
             for path in sorted(
                 run_dir.glob("*.png"),
@@ -275,6 +334,8 @@ async def _run_graph(websocket: WebSocket, graph_dict: dict, brief: str) -> None
         "pitch_deck": pitch_deck_obj,
         "download_url": download_url,
         "images": images,
+        "tokens": result.get("tokens"),
+        "cost_usd": result.get("cost_usd"),
     })
 
 

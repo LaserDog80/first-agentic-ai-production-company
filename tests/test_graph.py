@@ -186,3 +186,155 @@ def test_try_parse_pitch_deck_accepts_minimal():
     assert try_parse_pitch_deck(json.dumps(obj)) == obj
     fenced = "```json\n" + json.dumps(obj) + "\n```"
     assert try_parse_pitch_deck(fenced) == obj
+
+
+def test_executor_output_edge_selects_feeding_node():
+    """The graph result must be the output of the agent wired to OUTPUT,
+    not whatever the entry agent happened to return (v3 fix)."""
+    g = Graph.model_validate({
+        "id": "t", "name": "t", "entry_node_id": "in",
+        "nodes": [
+            {"id": "in",  "type": "input"},
+            {"id": "a",   "type": "agent", "label": "A", "system_prompt": "."},
+            {"id": "b",   "type": "agent", "label": "B", "system_prompt": "."},
+            {"id": "out", "type": "output", "subtype": "pitch_deck"},
+        ],
+        "edges": [
+            {"id": "e1", "from": "in", "to": "a",   "kind": "input"},
+            {"id": "e2", "from": "a",  "to": "b",   "kind": "delegate"},
+            {"id": "e3", "from": "b",  "to": "out", "kind": "output"},
+        ],
+    })
+    client = _stub_client([
+        (None, [_tool_call("delegate_to_b", {"message": "hi"})]),
+        ("B response", None),
+        ("A final", None),
+    ])
+    cfg = {"providers": {"primary": {"models": {"strong": "m", "research": "m", "utility": "m"}}}}
+    res = GraphExecutor(g, client, cfg, emit=lambda e: None).run("brief")
+    assert res["ok"] is True
+    assert res["output"] == "B response"
+    assert res["output_subtype"] == "pitch_deck"
+
+
+def test_executor_output_subtype_from_connected_node():
+    """output_subtype comes from the node the output edge actually targets,
+    not from whichever output node happens to be first in the list."""
+    g = Graph.model_validate({
+        "id": "t", "name": "t", "entry_node_id": "in",
+        "nodes": [
+            {"id": "in",  "type": "input"},
+            {"id": "a",   "type": "agent", "label": "A", "system_prompt": "."},
+            {"id": "out_decoy", "type": "output", "subtype": "pitch_deck"},
+            {"id": "out_real",  "type": "output", "subtype": "image"},
+        ],
+        "edges": [
+            {"id": "e1", "from": "in", "to": "a",        "kind": "input"},
+            {"id": "e2", "from": "a",  "to": "out_real", "kind": "output"},
+        ],
+    })
+    client = _stub_client([("done", None)])
+    cfg = {"providers": {"primary": {"models": {"strong": "m", "research": "m", "utility": "m"}}}}
+    res = GraphExecutor(g, client, cfg, emit=lambda e: None).run("brief")
+    assert res["output_subtype"] == "image"
+
+
+def test_executor_clamps_max_iterations():
+    g = Graph.model_validate(_minimal())
+    cfg = {
+        "providers": {"primary": {"models": {"strong": "m"}}},
+        "limits": {"max_iterations_per_node": 3},
+    }
+    ex = GraphExecutor(g, _stub_client([]), cfg)
+    node = ex.nodes_by_id["n_a"]
+    node.max_iterations = 99
+    assert ex._max_iterations_for(node) == 3
+    node.max_iterations = 2
+    assert ex._max_iterations_for(node) == 2
+    node.max_iterations = 0  # unset -> default, still within limit
+    assert ex._max_iterations_for(node) == 3
+
+
+def test_executor_passes_timeout_from_config():
+    g = Graph.model_validate(_minimal())
+    seen = {}
+
+    def create(**kwargs):
+        seen.update(kwargs)
+        from types import SimpleNamespace as NS
+        return NS(
+            choices=[NS(message=NS(content="ok", tool_calls=None))],
+            usage=NS(prompt_tokens=1, completion_tokens=1),
+        )
+
+    from types import SimpleNamespace as NS
+    client = NS(chat=NS(completions=NS(create=create)))
+    cfg = {
+        "providers": {"primary": {"models": {"strong": "m"}}},
+        "pipeline": {"agent_timeout_seconds": 123},
+    }
+    GraphExecutor(g, client, cfg).run("brief")
+    assert seen.get("timeout") == 123
+
+
+def test_executor_cancellation():
+    import threading
+    g = Graph.model_validate(_minimal())
+    cfg = {"providers": {"primary": {"models": {"strong": "m"}}}}
+    cancel = threading.Event()
+    cancel.set()
+    events = []
+    res = GraphExecutor(
+        g, _stub_client([("never", None)]), cfg,
+        emit=events.append, cancel_event=cancel,
+    ).run("brief")
+    assert res["ok"] is False
+    assert res.get("cancelled") is True
+    assert any(
+        e["type"] == "graph_run_error" and e.get("cancelled") for e in events
+    )
+
+
+def test_executor_reports_token_totals_and_cost():
+    g = Graph.model_validate(_minimal())
+    cfg = {
+        "providers": {"primary": {"models": {"strong": "m"}}},
+        "pricing": {"strong": {"prompt": 1.0, "completion": 2.0}},
+    }
+    events = []
+    res = GraphExecutor(
+        g, _stub_client([("ok", None)]), cfg, emit=events.append,
+    ).run("brief")
+    assert res["tokens"] == {"prompt": 1, "completion": 1}
+    # 1 prompt tok @ $1/1M + 1 completion tok @ $2/1M
+    assert res["cost_usd"] == pytest.approx(3e-6)
+    finished = [e for e in events if e["type"] == "node_finished"][0]
+    assert finished["model_tier"] == "strong"
+    assert finished["cost_usd"] == pytest.approx(3e-6)
+
+
+# ── validator limits ──────────────────────────────────────────────────────
+def test_validator_rejects_excessive_max_iterations():
+    d = _minimal()
+    d["nodes"][1]["max_iterations"] = 999
+    g = Graph.model_validate(d)
+    errs = validate_graph(g, limits={"max_iterations_per_node": 15})
+    assert any("max_iterations" in e for e in errs)
+
+
+def test_validator_rejects_too_many_agents():
+    d = _minimal()
+    for i in range(20):
+        d["nodes"].append({"id": f"extra_{i}", "type": "agent", "system_prompt": "."})
+    g = Graph.model_validate(d)
+    errs = validate_graph(g, limits={"max_agent_nodes": 12})
+    assert any("Too many agent nodes" in e for e in errs)
+
+
+def test_validator_rejects_multiple_input_edges():
+    d = _minimal()
+    d["nodes"].append({"id": "n_b", "type": "agent", "system_prompt": "."})
+    d["edges"].append({"id": "e9", "from": "n_in", "to": "n_b", "kind": "input"})
+    g = Graph.model_validate(d)
+    errs = validate_graph(g)
+    assert any("input edge" in e for e in errs)

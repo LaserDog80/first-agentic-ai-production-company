@@ -8,6 +8,7 @@ distinct filenames.
 """
 from __future__ import annotations
 
+import itertools
 import logging
 import os
 from pathlib import Path
@@ -70,7 +71,9 @@ def build_generate_image_tool(
     Successive calls within the same run increment a counter so each attempt
     has a distinct URL the UI can render.
     """
-    counter = {"n": 0}
+    # itertools.count is safe to share across the worker threads used for
+    # parallel tool calls, unlike a bare dict increment.
+    counter = itertools.count(1)
     cfg_model = model or DEFAULT_MODEL
     cfg_size = image_size or DEFAULT_IMAGE_SIZE
 
@@ -78,13 +81,15 @@ def build_generate_image_tool(
     def generate_image(prompt: str) -> dict:
         """Generate an image from a text prompt using fal.ai.
 
-        Use this when you need to produce a visual. Pass a vivid, specific
-        description — composition, subject, lighting, mood, medium. The tool
-        returns a URL the user can view; pass it back to whoever asked you
-        for the image along with a one-line description of what you made.
+        Use this when you need to produce a visual. The tool returns a URL
+        the user can view; pass it back to whoever asked you for the image
+        along with a one-line description of what you made.
+
+        Args:
+            prompt: A vivid, specific description of the image —
+                composition, subject, lighting, mood, medium.
         """
-        counter["n"] += 1
-        seq = counter["n"]
+        seq = next(counter)
         try:
             image = _call_fal(prompt, cfg_model, cfg_size)
         except Exception as exc:

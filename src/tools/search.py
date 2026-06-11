@@ -19,6 +19,29 @@ except ImportError:
     LinkupClient = None  # type: ignore
 
 
+_TOOLS_CONFIG: dict | None = None
+
+
+def _tools_config() -> dict:
+    """Read (and cache) the `tools:` section of config.yaml.
+
+    Cached because every web_search call needs it and the file does not
+    change while the server is running.
+    """
+    global _TOOLS_CONFIG
+    if _TOOLS_CONFIG is None:
+        try:
+            config_path = os.path.join(
+                os.path.dirname(__file__), "..", "..", "config.yaml"
+            )
+            with open(config_path, "r") as fh:
+                cfg = yaml.safe_load(fh) or {}
+            _TOOLS_CONFIG = cfg.get("tools", {}) or {}
+        except Exception:
+            _TOOLS_CONFIG = {}
+    return _TOOLS_CONFIG
+
+
 def _get_search_provider() -> str:
     """Return the active search provider setting.
 
@@ -28,23 +51,9 @@ def _get_search_provider() -> str:
     if env_val in ("tavily", "linkup", "auto"):
         return env_val
 
-    # Fall back to config.yaml
-    try:
-        config_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "config.yaml"
-        )
-        with open(config_path, "r") as fh:
-            cfg = yaml.safe_load(fh) or {}
-        cfg_val = (
-            cfg.get("tools", {})
-            .get("search_provider", "")
-            .strip()
-            .lower()
-        )
-        if cfg_val in ("tavily", "linkup", "auto"):
-            return cfg_val
-    except Exception:
-        pass
+    cfg_val = str(_tools_config().get("search_provider", "")).strip().lower()
+    if cfg_val in ("tavily", "linkup", "auto"):
+        return cfg_val
 
     return "auto"
 
@@ -57,7 +66,8 @@ def _search_tavily(query: str) -> dict:
     if not api_key:
         raise ValueError("TAVILY_API_KEY not set")
     client = TavilyClient(api_key=api_key)
-    return client.search(query, search_depth="advanced")
+    depth = _tools_config().get("tavily", {}).get("search_depth", "advanced")
+    return client.search(query, search_depth=depth)
 
 
 def _search_linkup(query: str) -> dict:
@@ -70,7 +80,7 @@ def _search_linkup(query: str) -> dict:
     client = LinkupClient(api_key=api_key)
     response = client.search(
         query=query,
-        depth="standard",
+        depth=_tools_config().get("linkup", {}).get("search_depth", "standard"),
         output_type="searchResults",
     )
     # Normalize to Tavily-compatible format
@@ -86,7 +96,12 @@ def _search_linkup(query: str) -> dict:
 
 @tool
 def web_search(query: str) -> dict:
-    """Search the web for information relevant to the research brief."""
+    """Search the web for information relevant to the research brief.
+
+    Args:
+        query: A focused search query — one topic per call, like you would
+            type into a search engine.
+    """
     provider = _get_search_provider()
     logger.info("Search provider resolved to '%s'", provider)
 

@@ -20,7 +20,12 @@ RATES = {
 
 @tool
 def lookup_rates(role: str, region: str) -> dict:
-    """Look up approximate daily rates for a TV production role in a region."""
+    """Look up approximate daily rates for a TV production role in a region.
+
+    Args:
+        role: The production role, e.g. "camera operator" or "editor".
+        region: Region code — "UK" or "US" (unknown regions fall back to UK).
+    """
     region_key = region.upper() if region.upper() in RATES else RATES["_default_region"]
     region_data = RATES[region_key]
     role_lower = role.lower()

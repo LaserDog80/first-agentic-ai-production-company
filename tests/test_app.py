@@ -164,3 +164,11 @@ def test_ws_run_graph_blocked_by_rate_limit(client):
             assert "limit" in resp["message"].lower()
     finally:
         app_module.rate_limiter.hourly_limit = original
+
+
+def test_ws_stop_run_without_active_run(client):
+    with client.websocket_connect("/ws") as ws:
+        ws.send_json({"type": "stop_run"})
+        resp = ws.receive_json()
+        assert resp["type"] == "error"
+        assert "no run" in resp["message"].lower()

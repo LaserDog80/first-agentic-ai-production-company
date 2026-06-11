@@ -200,3 +200,42 @@ def test_lookup_rates():
 def test_lookup_rates_unknown_role():
     result = lookup_rates(role="underwater basket weaver", region="UK")
     assert "daily_rate" in result  # returns a default/estimate
+
+
+# --- docstring Args -> parameter descriptions (v3) ---
+
+def test_schema_includes_param_descriptions_from_docstring():
+    @tool
+    def documented(query: str, region: str = "UK") -> dict:
+        """Search for something.
+
+        More detail on a second line.
+
+        Args:
+            query: What to search for, one topic per call.
+            region: Region code, e.g. "UK" or "US".
+
+        Returns:
+            A dict.
+        """
+        return {}
+
+    schema = get_openai_tools_schema([documented])[0]["function"]
+    assert schema["description"].startswith("Search for something.")
+    assert "Args:" not in schema["description"]
+    assert "Returns:" not in schema["description"]
+    props = schema["parameters"]["properties"]
+    assert props["query"]["description"] == "What to search for, one topic per call."
+    assert props["region"]["description"].startswith("Region code")
+    assert schema["parameters"]["required"] == ["query"]
+
+
+def test_schema_without_args_section_unchanged():
+    @tool
+    def plain(query: str) -> dict:
+        """Just a description."""
+        return {}
+
+    schema = get_openai_tools_schema([plain])[0]["function"]
+    assert schema["description"] == "Just a description."
+    assert "description" not in schema["parameters"]["properties"]["query"]
