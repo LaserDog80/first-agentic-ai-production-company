@@ -5,7 +5,6 @@ import pytest
 from unittest.mock import patch, MagicMock
 from src.tools import tool, get_openai_tools_schema, execute_tool
 from src.tools.search import web_search
-from src.tools.research import create_reference_research
 from src.tools.rates import lookup_rates
 
 
@@ -168,25 +167,6 @@ def test_web_search_provider_unset_defaults_auto(mock_linkup_class):
 
     result = web_search("query")
     assert result["results"][0]["url"] == "http://link.com"
-
-
-# --- reference_research (closure — model only sees `section` param) ---
-
-def test_reference_research():
-    mock_research = {
-        "competitive_landscape": [{"title": "Test Show"}],
-        "characters": [{"name": "Test Person"}],
-    }
-    ref_tool = create_reference_research(mock_research)
-    result = ref_tool(section="competitive_landscape")
-    assert result["section"] == "competitive_landscape"
-    assert len(result["data"]) == 1
-
-
-def test_reference_research_invalid_section():
-    ref_tool = create_reference_research({})
-    result = ref_tool(section="nonexistent")
-    assert "error" in result
 
 
 # --- lookup_rates ---
