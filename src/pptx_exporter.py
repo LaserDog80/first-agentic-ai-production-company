@@ -8,8 +8,6 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 
 # Pixel art imports kept for potential future use but not rendered in PPTX
-# from src.pixel_art import generate_title_card, generate_mood_art
-# from src.scene_renderer import render_scene_for_slot
 
 
 # Slide dimensions (standard 16:9)

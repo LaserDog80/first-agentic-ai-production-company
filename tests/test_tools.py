@@ -5,7 +5,6 @@ import pytest
 from unittest.mock import patch, MagicMock
 from src.tools import tool, get_openai_tools_schema, execute_tool
 from src.tools.search import web_search
-from src.tools.research import create_reference_research
 from src.tools.rates import lookup_rates
 
 
@@ -170,25 +169,6 @@ def test_web_search_provider_unset_defaults_auto(mock_linkup_class):
     assert result["results"][0]["url"] == "http://link.com"
 
 
-# --- reference_research (closure — model only sees `section` param) ---
-
-def test_reference_research():
-    mock_research = {
-        "competitive_landscape": [{"title": "Test Show"}],
-        "characters": [{"name": "Test Person"}],
-    }
-    ref_tool = create_reference_research(mock_research)
-    result = ref_tool(section="competitive_landscape")
-    assert result["section"] == "competitive_landscape"
-    assert len(result["data"]) == 1
-
-
-def test_reference_research_invalid_section():
-    ref_tool = create_reference_research({})
-    result = ref_tool(section="nonexistent")
-    assert "error" in result
-
-
 # --- lookup_rates ---
 
 def test_lookup_rates():
@@ -200,3 +180,42 @@ def test_lookup_rates():
 def test_lookup_rates_unknown_role():
     result = lookup_rates(role="underwater basket weaver", region="UK")
     assert "daily_rate" in result  # returns a default/estimate
+
+
+# --- docstring Args -> parameter descriptions (v3) ---
+
+def test_schema_includes_param_descriptions_from_docstring():
+    @tool
+    def documented(query: str, region: str = "UK") -> dict:
+        """Search for something.
+
+        More detail on a second line.
+
+        Args:
+            query: What to search for, one topic per call.
+            region: Region code, e.g. "UK" or "US".
+
+        Returns:
+            A dict.
+        """
+        return {}
+
+    schema = get_openai_tools_schema([documented])[0]["function"]
+    assert schema["description"].startswith("Search for something.")
+    assert "Args:" not in schema["description"]
+    assert "Returns:" not in schema["description"]
+    props = schema["parameters"]["properties"]
+    assert props["query"]["description"] == "What to search for, one topic per call."
+    assert props["region"]["description"].startswith("Region code")
+    assert schema["parameters"]["required"] == ["query"]
+
+
+def test_schema_without_args_section_unchanged():
+    @tool
+    def plain(query: str) -> dict:
+        """Just a description."""
+        return {}
+
+    schema = get_openai_tools_schema([plain])[0]["function"]
+    assert schema["description"] == "Just a description."
+    assert "description" not in schema["parameters"]["properties"]["query"]

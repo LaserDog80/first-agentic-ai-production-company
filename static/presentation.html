@@ -1400,6 +1400,33 @@
     }
 
     // ── PIPELINE ──
+    // The presentation runs the pitch_deck preset through the same graph
+    // executor as the playground: load the preset over the socket, send
+    // run_graph, then translate the graph events into the cinematic ones
+    // the stage understands (translateGraphEvent below).
+    const PRESET_ID = 'pitch_deck';
+    let currentBrief = '';
+    let nodeToChar = {};     // graph node_id -> sprite character id
+    let totalSteps = 0;      // number of agent nodes in the loaded graph
+    let stepsStarted = new Set();
+    let lastRawOutput = '';  // final graph output (for the RAW JSON fallback)
+
+    function slugify(s) {
+        return String(s || '').toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    }
+
+    function buildNodeMapping(graph) {
+        nodeToChar = {};
+        const charIds = new Set(CHARACTERS.map(c => c.id));
+        const agents = (graph.nodes || []).filter(n => n.type === 'agent');
+        for (const n of agents) {
+            const slug = slugify(n.label || n.id);
+            if (charIds.has(slug)) nodeToChar[n.id] = slug;
+        }
+        totalSteps = agents.length;
+    }
+
     function startPipeline() {
         if (!introComplete) return;
         const input = document.getElementById('briefInput');
@@ -1407,7 +1434,9 @@
         if (!brief || isRunning) return;
 
         isRunning = true;
+        currentBrief = brief;
         document.getElementById('runBtn').disabled = true;
+        document.getElementById('demoBtn').disabled = true;
         resetUI();
 
         // Connect WebSocket
@@ -1415,14 +1444,14 @@
         ws = new WebSocket(`${protocol}//${location.host}/ws`);
 
         ws.onopen = () => {
-            ws.send(JSON.stringify({ type: 'run', brief }));
-            setStatus('Pipeline starting...', 0);
+            ws.send(JSON.stringify({ type: 'load_preset', id: PRESET_ID }));
+            setStatus('Assembling the production team...', 0);
             addLog('pipeline_start', `Brief: "${brief}"`);
         };
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            handleEvent(data);
+            translateGraphEvent(data);
         };
 
         ws.onclose = () => {
@@ -1442,44 +1471,87 @@
         };
     }
 
-    // ── DEMO MODE (server-side, with PPTX generation) ──
+    // Translate graph-executor events into the cinematic vocabulary.
+    function translateGraphEvent(data) {
+        switch (data.type) {
+            case 'graph':
+                buildNodeMapping(data.graph);
+                stepsStarted = new Set();
+                lastRawOutput = '';
+                ws.send(JSON.stringify({
+                    type: 'run_graph', graph: data.graph, brief: currentBrief,
+                }));
+                break;
+
+            case 'graph_run_start':
+                handleEvent({ type: 'pipeline_start' });
+                break;
+
+            case 'node_started':
+                stepsStarted.add(data.node_id);
+                handleEvent({
+                    type: 'agent_start',
+                    agent: nodeToChar[data.node_id] || slugify(data.label),
+                    phase: data.model_tier || '',
+                    step: Math.min(stepsStarted.size, totalSteps || 1),
+                    total_steps: totalSteps || 1,
+                    message: `${data.label || 'Agent'} is working...`,
+                });
+                break;
+
+            case 'tool_call':
+                handleEvent({
+                    type: 'tool_call',
+                    agent: nodeToChar[data.node_id] || slugify(data.agent),
+                    tool: data.tool,
+                    args: data.args,
+                    message: data.message,
+                });
+                break;
+
+            case 'node_finished':
+                handleEvent({
+                    type: 'agent_done',
+                    agent: nodeToChar[data.node_id] || slugify(data.label),
+                    message: data.output_preview || 'Done.',
+                });
+                break;
+
+            case 'edge_fired':
+                break; // the stage has no edge visual; the playground does
+
+            case 'graph_run_complete':
+                lastRawOutput = data.output || '';
+                // Wait for run_summary — it carries the parsed deck + PPTX.
+                break;
+
+            case 'run_summary':
+                handleEvent({
+                    type: 'pipeline_complete',
+                    pitch_deck: data.pitch_deck
+                        || { raw_output: lastRawOutput || '(no output)' },
+                    download_url: data.download_url,
+                    evidence: null,
+                });
+                break;
+
+            case 'graph_run_error':
+                handleEvent({ type: 'pipeline_error', error: data.error });
+                break;
+
+            case 'validation':
+                break;
+
+            case 'error':
+                handleEvent({ type: 'pipeline_error', error: data.message });
+                break;
+        }
+    }
+
+    // ── DEMO MODE (client-side scripted replay, zero API calls) ──
     function startDemo() {
         if (!introComplete || isRunning) return;
-
-        isRunning = true;
-        document.getElementById('runBtn').disabled = true;
-        document.getElementById('demoBtn').disabled = true;
-        resetUI();
-
-        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${protocol}//${location.host}/ws`);
-
-        ws.onopen = () => {
-            ws.send(JSON.stringify({ type: 'demo' }));
-            setStatus('Demo pipeline starting...', 0);
-            addLog('pipeline_start', 'Demo mode — no API calls');
-        };
-
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            handleEvent(data);
-        };
-
-        ws.onclose = () => {
-            if (isRunning) {
-                setStatus('Connection lost.', 0, true);
-                isRunning = false;
-                document.getElementById('runBtn').disabled = false;
-                document.getElementById('demoBtn').disabled = false;
-            }
-        };
-
-        ws.onerror = () => {
-            setStatus('Unable to connect for demo.', 0, true);
-            isRunning = false;
-            document.getElementById('runBtn').disabled = false;
-            document.getElementById('demoBtn').disabled = false;
-        };
+        runDemo();
     }
 
     function handleEvent(event) {
@@ -1524,7 +1596,7 @@
 
             case 'pipeline_complete':
                 setStatus('Pitch deck complete!', 100);
-                setStep(9, 9);
+                setStep(totalSteps || 9, totalSteps || 9);
                 addLog('agent_done', 'Pipeline complete!');
                 isRunning = false;
                 document.getElementById('runBtn').disabled = false;
@@ -2287,6 +2359,9 @@
     // ── DEMO MODE (for testing without backend) ──
     function runDemo() {
         resetUI();
+        isRunning = true;
+        document.getElementById('runBtn').disabled = true;
+        document.getElementById('demoBtn').disabled = true;
         const demoEvents = [
             { type: 'pipeline_start', brief: 'Demo run' },
             { type: 'agent_start', agent: 'series_producer', phase: 'phase_a', step: 1, total_steps: 9, message: 'Reading the brief and shaping editorial vision...' },
@@ -2321,20 +2396,10 @@
         next();
     }
 
-    // Config-driven feature flags
-    (async function loadConfig() {
-        try {
-            const resp = await fetch('/config');
-            if (resp.ok) {
-                const config = await resp.json();
-                if (config.demo_enabled) {
-                    document.getElementById('demoBtn').style.display = '';
-                }
-            }
-        } catch (e) {
-            // Server unreachable — demo button stays hidden
-        }
-    })();
+    // The demo is a client-side scripted replay — no API keys spent — so
+    // the button is always available. (It used to be gated on a /config
+    // endpoint that no longer exists.)
+    document.getElementById('demoBtn').style.display = '';
 
     // Boot
     init();

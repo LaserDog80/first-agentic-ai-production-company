@@ -9,7 +9,7 @@
 
 <!-- Update this section when the project scope changes -->
 
-[Project name and one-line description]
+**Agentic Playground** — a node-based canvas (FastAPI + vanilla-JS Canvas2D) where users compose teams of AI agents, wire up delegation and skills, and run the graph live over a WebSocket. One graph executor powers both the playground editor (`/playground`) and the cinematic presentation view (`/present`).
 
 ---
 
@@ -26,10 +26,10 @@ Before building anything, do a quick check:
 
 ## Tech Stack
 
-- **Language:** Python 3.x (default — but suggest alternatives if genuinely better suited to the task)
-- **Web framework:** [Flask/FastAPI/None—update as needed]
-- **Testing:** pytest (or equivalent for the chosen language)
-- **Package manager:** pip (use requirements.txt) — adapt if using a different language/ecosystem
+- **Language:** Python 3.11+
+- **Web framework:** FastAPI (WebSocket-driven; frontend is framework-free vanilla JS)
+- **Testing:** pytest
+- **Package manager:** pip (use requirements.txt)
 
 ---
 

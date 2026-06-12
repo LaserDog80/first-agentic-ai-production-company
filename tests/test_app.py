@@ -164,3 +164,46 @@ def test_ws_run_graph_blocked_by_rate_limit(client):
             assert "limit" in resp["message"].lower()
     finally:
         app_module.rate_limiter.hourly_limit = original
+
+
+def test_ws_stop_run_without_active_run(client):
+    with client.websocket_connect("/ws") as ws:
+        ws.send_json({"type": "stop_run"})
+        resp = ws.receive_json()
+        assert resp["type"] == "error"
+        assert "no run" in resp["message"].lower()
+
+
+def test_ws_run_graph_executes_and_streams(client, monkeypatch):
+    """Full run over the socket: background task streams events and the
+    summary carries token totals (stubbed LLM client, no network)."""
+    from types import SimpleNamespace as NS
+
+    def fake_create_client(config):
+        def create(**kwargs):
+            return NS(
+                choices=[NS(message=NS(content="final answer", tool_calls=None))],
+                usage=NS(prompt_tokens=7, completion_tokens=3),
+            )
+        return NS(chat=NS(completions=NS(create=create)))
+
+    monkeypatch.setattr(app_module, "create_client", fake_create_client)
+    with client.websocket_connect("/ws") as ws:
+        ws.send_json({"type": "load_preset", "id": "research_assistant"})
+        graph = ws.receive_json()["graph"]
+        ws.send_json({"type": "run_graph", "brief": "test brief", "graph": graph})
+        types = []
+        summary = None
+        for _ in range(50):
+            msg = ws.receive_json()
+            types.append(msg["type"])
+            if msg["type"] == "run_summary":
+                summary = msg
+                break
+        assert "graph_run_start" in types
+        assert "node_started" in types
+        assert "node_finished" in types
+        assert "graph_run_complete" in types
+        assert summary is not None and summary["ok"] is True
+        assert summary["tokens"]["prompt"] >= 7
+        assert summary["cost_usd"] is not None  # pricing block in config.yaml

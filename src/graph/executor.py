@@ -10,23 +10,16 @@ Edge semantics:
 from __future__ import annotations
 
 import json
+import threading
 from typing import Any, Callable
 
-from src.agent import AgentRuntime
+from src.agent import AgentRuntime, RunCancelled
 from src.graph.schema import Edge, Graph, Node
-from src.graph.skills import build_skill_tool
+from src.graph.skills import _slug, build_skill_tool
 from src.provider import get_model_name
 from src.tools import tool
 
-
-def _slug(s: str) -> str:
-    out = []
-    for ch in s.lower():
-        if ch.isalnum():
-            out.append(ch)
-        elif out and out[-1] != "_":
-            out.append("_")
-    return "".join(out).strip("_") or "x"
+DEFAULT_MAX_ITERATIONS = 5
 
 
 class GraphExecutor:
@@ -39,13 +32,22 @@ class GraphExecutor:
         config: dict,
         emit: Callable[[dict], None] | None = None,
         run_id: str = "",
+        cancel_event: threading.Event | None = None,
     ) -> None:
         self.graph = graph
         self.client = client
         self.config = config
         self.emit = emit or (lambda _ev: None)
         self.run_id = run_id
+        self.cancel_event = cancel_event
         self.nodes_by_id: dict[str, Node] = {n.id: n for n in graph.nodes}
+        # Final output of every agent node that ran (last run wins if a node
+        # is delegated to more than once). Lets the output edge mean what it
+        # says: the graph result is the output of the node wired to OUTPUT.
+        self.node_outputs: dict[str, str] = {}
+        self.total_usage: dict = {"prompt": 0, "completion": 0}
+        self.total_cost_usd: float = 0.0
+        self._has_pricing = bool(config.get("pricing"))
 
     # ── edge index helpers ──────────────────────────────────────────────────
     def _edges(self, kind: str) -> list[Edge]:
@@ -60,9 +62,9 @@ class GraphExecutor:
     def _input_targets(self) -> list[str]:
         return [e.to for e in self._edges("input")]
 
-    def _output_source(self) -> str | None:
+    def _output_edge(self) -> Edge | None:
         outs = self._edges("output")
-        return outs[0].from_ if outs else None
+        return outs[0] if outs else None
 
     # ── tool factories ──────────────────────────────────────────────────────
     def _delegate_tool(self, parent_id: str, child_id: str, parents: list[str]) -> Callable:
@@ -83,9 +85,10 @@ class GraphExecutor:
 
         fn.__name__ = f"delegate_to_{_slug(child.label or child.id)}"
         fn.__doc__ = (
-            f"Delegate a task to {child.label}. "
-            "Pass a clear, self-contained message describing what you need them to do. "
-            "Their full response is returned to you."
+            f"Delegate a task to {child.label}.\n\n"
+            "Args:\n"
+            "    message: A clear, self-contained description of what you "
+            "need them to do. Their full response is returned to you."
         )
         return fn
 
@@ -107,6 +110,13 @@ class GraphExecutor:
 
         try:
             output = self._run_node(entry_id, brief, parents=[])
+        except RunCancelled:
+            self.emit({
+                "type": "graph_run_error",
+                "error": "Run stopped.",
+                "cancelled": True,
+            })
+            return {"ok": False, "error": "Run stopped.", "cancelled": True}
         except Exception as exc:
             self.emit({
                 "type": "graph_run_error",
@@ -114,29 +124,51 @@ class GraphExecutor:
             })
             return {"ok": False, "error": str(exc)}
 
-        # Determine the graph-level output: prefer node feeding the output edge.
-        out_src = self._output_source()
+        # The graph result is the output of the agent wired to the OUTPUT
+        # node. If that agent never ran (disconnected wiring), fall back to
+        # the entry agent's output rather than failing the whole run.
+        out_edge = self._output_edge()
         final_output = output
         out_subtype = ""
-        if out_src is not None:
-            # If the output-feeding agent ran on the entry path, its return is
-            # already in `output`. Otherwise, fall back to the entry output.
-            if out_src == entry_id:
-                final_output = output
-            outs = [n for n in self.graph.nodes if n.type == "output"]
-            if outs:
-                out_subtype = outs[0].subtype
+        if out_edge is not None:
+            final_output = self.node_outputs.get(out_edge.from_, output)
+            out_node = self.nodes_by_id.get(out_edge.to)
+            if out_node is not None:
+                out_subtype = out_node.subtype
 
-        self.emit({
+        complete = {
             "type": "graph_run_complete",
             "output": final_output,
             "output_subtype": out_subtype,
-        })
+            "tokens": dict(self.total_usage),
+        }
+        if self._has_pricing:
+            complete["cost_usd"] = round(self.total_cost_usd, 6)
+        self.emit(complete)
         return {
             "ok": True,
             "output": final_output,
             "output_subtype": out_subtype,
+            "tokens": dict(self.total_usage),
+            "cost_usd": round(self.total_cost_usd, 6) if self._has_pricing else None,
         }
+
+    def _max_iterations_for(self, node: Node) -> int:
+        limit = (
+            self.config.get("limits", {}).get("max_iterations_per_node", 15)
+        )
+        wanted = node.max_iterations or DEFAULT_MAX_ITERATIONS
+        return max(1, min(wanted, limit))
+
+    def _cost_usd(self, tier: str, usage: dict) -> float | None:
+        """Estimated cost of a node run from the per-tier pricing config."""
+        pricing = self.config.get("pricing", {}).get(tier)
+        if not pricing:
+            return None
+        return (
+            usage.get("prompt", 0) / 1e6 * pricing.get("prompt", 0.0)
+            + usage.get("completion", 0) / 1e6 * pricing.get("completion", 0.0)
+        )
 
     def _run_node(self, node_id: str, message: str, parents: list[str]) -> str:
         if node_id in parents:
@@ -168,29 +200,44 @@ class GraphExecutor:
             ev = {**ev, "node_id": node_id}
             emit(ev)
 
-        agent_max_tokens = (
-            self.config.get("pipeline", {}).get("agent_max_tokens")
-        )
+        pipeline_cfg = self.config.get("pipeline", {})
         runtime = AgentRuntime(
             name=node.label or node.id,
             system_prompt=node.system_prompt or "You are a helpful assistant.",
             tools=tools,
             client=self.client,
             model=get_model_name(self.config, node.model_tier),
-            max_iterations=node.max_iterations or 5,
+            max_iterations=self._max_iterations_for(node),
+            timeout=pipeline_cfg.get("agent_timeout_seconds"),
             event_callback=per_node_event,
-            max_tokens=agent_max_tokens,
+            max_tokens=pipeline_cfg.get("agent_max_tokens"),
+            tool_result_max_chars=(
+                self.config.get("limits", {}).get("tool_result_max_chars")
+            ),
+            cancel_event=self.cancel_event,
         )
         result = runtime.run(message)
+        self.node_outputs[node_id] = result.output
 
-        self.emit({
+        usage = result.token_usage
+        self.total_usage["prompt"] += usage.get("prompt", 0)
+        self.total_usage["completion"] += usage.get("completion", 0)
+        cost = self._cost_usd(node.model_tier, usage)
+        if cost is not None:
+            self.total_cost_usd += cost
+
+        finished = {
             "type": "node_finished",
             "node_id": node_id,
             "output_preview": (result.output or "")[:200],
-            "tokens": result.token_usage,
+            "tokens": usage,
             "iterations": result.iterations,
             "hit_max_iterations": result.hit_max_iterations,
-        })
+            "model_tier": node.model_tier,
+        }
+        if cost is not None:
+            finished["cost_usd"] = round(cost, 6)
+        self.emit(finished)
         return result.output
 
 

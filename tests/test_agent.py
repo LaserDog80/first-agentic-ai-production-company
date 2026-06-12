@@ -156,3 +156,116 @@ def test_agent_tracks_token_usage():
     result = agent.run(user_message="Test.")
     assert result.token_usage["prompt"] == 100
     assert result.token_usage["completion"] == 50
+
+
+def test_agent_recovers_from_malformed_tool_args():
+    """Malformed arguments JSON from the model must surface as a tool-result
+    error the loop can recover from, not crash the whole run (v3 fix)."""
+    client = MagicMock()
+
+    bad_call = MagicMock()
+    bad_call.id = "call_1"
+    bad_call.function.name = "mock_tool"
+    bad_call.function.arguments = '{"query": broken'
+    first = _make_mock_response(None, tool_calls=[bad_call])
+    second = _make_mock_response("recovered")
+    client.chat.completions.create.side_effect = [first, second]
+
+    agent = AgentRuntime(
+        name="t", system_prompt=".", tools=[mock_tool],
+        client=client, model="m", max_iterations=5,
+    )
+    result = agent.run("go")
+    assert result.output == "recovered"
+    assert "error" in result.tool_calls[0]["result"]
+    assert "Malformed" in result.tool_calls[0]["result"]["error"]
+
+
+def test_agent_executes_parallel_tool_calls_in_order():
+    """Several tool calls in one assistant turn all execute, and their
+    results land in the message history in request order."""
+    calls = []
+
+    @tool
+    def slow_tool(query: str) -> dict:
+        """Slow.
+
+        Args:
+            query: q.
+        """
+        import time as _t
+        if query == "first":
+            _t.sleep(0.05)  # finishes last despite being requested first
+        calls.append(query)
+        return {"echo": query}
+
+    client = MagicMock()
+    tc1 = MagicMock(); tc1.id = "c1"
+    tc1.function.name = "slow_tool"; tc1.function.arguments = '{"query": "first"}'
+    tc2 = MagicMock(); tc2.id = "c2"
+    tc2.function.name = "slow_tool"; tc2.function.arguments = '{"query": "second"}'
+    first = _make_mock_response(None, tool_calls=[tc1, tc2])
+    second = _make_mock_response("done")
+    client.chat.completions.create.side_effect = [first, second]
+
+    agent = AgentRuntime(
+        name="t", system_prompt=".", tools=[slow_tool],
+        client=client, model="m", max_iterations=5,
+    )
+    result = agent.run("go")
+    assert result.output == "done"
+    assert [t["result"]["echo"] for t in result.tool_calls] == ["first", "second"]
+    # Both actually ran (order of *execution* may interleave).
+    assert sorted(calls) == ["first", "second"]
+    # Tool messages in history are in request order with the right ids.
+    second_call_messages = client.chat.completions.create.call_args_list[1].kwargs["messages"]
+    tool_msgs = [m for m in second_call_messages if m["role"] == "tool"]
+    assert [m["tool_call_id"] for m in tool_msgs] == ["c1", "c2"]
+
+
+def test_agent_truncates_oversized_tool_results():
+    @tool
+    def big_tool(query: str) -> dict:
+        """Big.
+
+        Args:
+            query: q.
+        """
+        return {"blob": "x" * 5000}
+
+    client = MagicMock()
+    tc = MagicMock(); tc.id = "c1"
+    tc.function.name = "big_tool"; tc.function.arguments = '{"query": "q"}'
+    client.chat.completions.create.side_effect = [
+        _make_mock_response(None, tool_calls=[tc]),
+        _make_mock_response("done"),
+    ]
+    agent = AgentRuntime(
+        name="t", system_prompt=".", tools=[big_tool],
+        client=client, model="m", max_iterations=5,
+        tool_result_max_chars=200,
+    )
+    result = agent.run("go")
+    messages = client.chat.completions.create.call_args_list[1].kwargs["messages"]
+    tool_msg = [m for m in messages if m["role"] == "tool"][0]
+    assert len(tool_msg["content"]) < 300
+    assert "truncated" in tool_msg["content"]
+    # The full result is still available in the log.
+    assert len(result.tool_calls[0]["result"]["blob"]) == 5000
+
+
+def test_agent_cancellation_raises():
+    import threading
+    from src.agent import RunCancelled
+
+    client = MagicMock()
+    client.chat.completions.create.return_value = _make_mock_response("never")
+    cancel = threading.Event()
+    cancel.set()
+    agent = AgentRuntime(
+        name="t", system_prompt=".", tools=[], client=client,
+        model="m", max_iterations=5, cancel_event=cancel,
+    )
+    with pytest.raises(RunCancelled):
+        agent.run("go")
+    client.chat.completions.create.assert_not_called()

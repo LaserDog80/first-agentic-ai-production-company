@@ -12,34 +12,34 @@ providers:
       research: "Qwen/Qwen3-235B-A22B-Instruct-2507"
       utility: "Qwen/Qwen3-30B-A3B-Instruct-2507"
 
-agents:
-  series_producer:
-    model_tier: "strong"
-    max_iterations: 5
-  producer:
-    model_tier: "strong"
-    max_iterations: 5
-  researcher:
-    model_tier: "research"
-    max_iterations: 8
-  director:
-    model_tier: "strong"
-    max_iterations: 5
-  production_manager:
-    model_tier: "strong"
-    max_iterations: 5
-  artist:
-    model_tier: "strong"
-    max_iterations: 1
-
 pipeline:
-  max_rework_cycles: 2  # TOTAL pipeline-wide cap (legacy orchestrator field, retained for future presets that want rework loops)
+  # Per-LLM-call timeout (seconds). Without this a hung provider call
+  # holds its worker thread forever.
   agent_timeout_seconds: 300
   # Default completion-tokens budget per LLM call across every graph node.
   # Researcher's ResearchPack output is ~3KB of JSON; without an explicit
   # cap, providers can default to 2-4K tokens and truncate to an empty
   # final message — which then poisons every downstream agent.
   agent_max_tokens: 8192
+
+# Server-side guardrails for client-supplied graphs. Graphs run with the
+# server's API keys, so size and iteration budgets are enforced both at
+# validation time and (defensively) at execution time.
+limits:
+  max_nodes: 40
+  max_agent_nodes: 12
+  max_iterations_per_node: 15
+  # Tool results longer than this are truncated before entering the
+  # model's message history (full result still reaches the UI/log).
+  tool_result_max_chars: 8000
+
+# Approximate USD per 1M tokens, used only for the run cost meter.
+# EDIT THESE to match your provider's current price list — they are
+# estimates, not billing data. Remove the block to hide the meter.
+pricing:
+  strong:   { prompt: 0.20, completion: 0.60 }
+  research: { prompt: 0.20, completion: 0.60 }
+  utility:  { prompt: 0.10, completion: 0.30 }
 
 rate_limiting:
   hourly_limit: 10    # Max pipeline runs per hour (global, all users)
