@@ -25,6 +25,7 @@
             toolKindsSeen: new Set(),
             captionsSeen: new Set(),
             openChildren: new Set(),
+            lastWave: null,      // current .wave column — parallel hires stack here
         };
     }
 
@@ -268,7 +269,7 @@
 
     function resetWorld() {
         world = freshWorld();
-        actorsEl.innerHTML = '';
+        actorsEl.innerHTML = '<div class="wave" id="mainSlot"></div><div class="ensemble" id="ensemble"></div>';
         feedEl.innerHTML = '';
         el('todoCard').classList.remove('visible');
         setCaption('', '');
@@ -283,7 +284,20 @@
                  agent_type: id === 'main' ? 'orchestrator' : 'agent', parent: 'main' };
     }
 
-    function addActor(id, animate) {
+    // A "wave" is one column of the ensemble. Agents hired while others are
+    // still in flight (a parallel burst) stack vertically in the same wave;
+    // a hire made with nobody in flight starts a fresh column.
+    function waveFor(sameWave) {
+        let col = world.lastWave;
+        if (sameWave && col && col.isConnected && col.childElementCount < 2) return col;
+        col = document.createElement('div');
+        col.className = 'wave';
+        el('ensemble').appendChild(col);
+        world.lastWave = col;
+        return col;
+    }
+
+    function addActor(id, animate, sameWave) {
         if (world.agents.has(id)) return world.agents.get(id);
         const def = agentDef(id);
         const sprite = id === 'main' ? S.CLAUDE_SPRITE
@@ -295,12 +309,13 @@
         elm.style.setProperty('--actor-tint', sprite.tint);
         elm.innerHTML =
             `<div class="bubble"></div>` +
+            `<div class="toolchip"><span class="ticon"></span><span class="tname"></span></div>` +
             `<div class="sprite-wrap"><canvas class="sprite" width="${8 * px}" height="${12 * px}"></canvas></div>` +
             `<div class="platform"></div>` +
             `<div class="badge">${esc(def.name)}<span class="role">${esc(def.agent_type || '')}</span></div>` +
             `<div class="ctxbar"><div class="fill"></div></div>` +
             `<div class="tokens">0 tok</div>`;
-        actorsEl.appendChild(elm);
+        (id === 'main' ? el('mainSlot') : waveFor(sameWave)).appendChild(elm);
         S.drawSprite(elm.querySelector('canvas.sprite'), sprite, px);
         if (animate) requestAnimationFrame(() => requestAnimationFrame(() => elm.classList.remove('entering')));
 
@@ -352,8 +367,36 @@
     const TOOL_ICONS = {
         Read: '📄', Write: '✏️', Edit: '✏️', MultiEdit: '✏️', NotebookEdit: '✏️',
         Bash: '⌨️', Grep: '🔍', Glob: '🔍', WebSearch: '🌐', WebFetch: '🌐',
+        Task: '🤝', Agent: '🤝', TodoWrite: '📋', ToolSearch: '🔍', Skill: '✨',
     };
     const iconFor = tool => TOOL_ICONS[tool] || '⚙️';
+
+    // Persistent current-tool chip at the agent's shoulder. Counts overlapping
+    // calls so parallel tool use doesn't hide the chip early.
+    function setToolChip(id, tool) {
+        const a = world.agents.get(id);
+        if (!a) return;
+        const chip = a.elm.querySelector('.toolchip');
+        if (tool) {
+            a.openTools = (a.openTools || 0) + 1;
+            chip.querySelector('.ticon').textContent = iconFor(tool);
+            chip.querySelector('.tname').textContent = String(tool).toUpperCase().slice(0, 12);
+            chip.classList.add('visible');
+            chip.classList.remove('pop');
+            void chip.offsetWidth; // restart the pop animation
+            chip.classList.add('pop');
+        } else {
+            a.openTools = Math.max(0, (a.openTools || 0) - 1);
+            if (!a.openTools) chip.classList.remove('visible');
+        }
+    }
+
+    function clearToolChip(id) {
+        const a = world.agents.get(id);
+        if (!a) return;
+        a.openTools = 0;
+        a.elm.querySelector('.toolchip').classList.remove('visible');
+    }
 
     function applyEvent(ev, animate) {
         world.clock = ev.t || world.clock;
@@ -364,7 +407,7 @@
             case 'user_message': {
                 setActorState('main', 'thinking');
                 feed(ev, 'user', `<span class="who">YOU</span> ${esc(ev.text)}`);
-                caption(ev, animate, 'THE BRIEF', ev.text, 'brief:' + ev.t);
+                caption(ev, animate, 'THE BRIEF', clip(ev.text, 240), 'brief:' + ev.t);
                 break;
             }
             case 'thinking': {
@@ -402,12 +445,14 @@
                 const a = world.agents.get(id);
                 if (a) a.tools++;
                 world.totals.tools++;
+                setToolChip(id, ev.tool || 'TOOL');
                 setBubble(id, `<span class="tool-tag">${iconFor(ev.tool)} ${esc(ev.tool || 'TOOL')}</span>${esc(ev.summary || '')}`, { ms: 4500 });
                 feed(ev, '', `<span class="who">${who(id)}</span> ${esc(ev.summary || ev.tool)}`);
                 captionToolStart(ev, animate);
                 break;
             }
             case 'tool_end': {
+                setToolChip(id, null);
                 if (ev.ok === false) {
                     setActorState(id, 'error');
                     setBubble(id, `<span class="tool-tag">✗ FAILED</span>${esc(clip(ev.summary, 120))}`, { error: true, ms: 3500 });
@@ -423,8 +468,9 @@
             }
             case 'spawn': {
                 world.spawnsSeen++;
+                const sameWave = world.openChildren.size > 0;
                 world.openChildren.add(ev.child);
-                addActor(ev.child, animate);
+                addActor(ev.child, animate, sameWave);
                 setActorState(ev.child, 'working');
                 setBubble(id, `<span class="tool-tag">🤝 DELEGATE</span>${esc(ev.task || '')}`, { ms: 4000 });
                 feed(ev, 'spawn', `<span class="who">${who(id)}</span> hired <span class="who">${who(ev.child)}</span> — ${esc(ev.task || '')}`);
@@ -448,6 +494,7 @@
                 world.openChildren.delete(ev.child);
                 const childName = who(ev.child);
                 setActorState(ev.child, null);
+                clearToolChip(ev.child);
                 const childActor = world.agents.get(ev.child);
                 if (childActor) childActor.elm.classList.add('retired');
                 setBubble(id, `<span class="tool-tag">📥 REPORT IN</span>${esc(clip(ev.summary, 130))}`, { ms: 5000 });
@@ -459,7 +506,7 @@
                 break;
             }
             case 'done': {
-                world.agents.forEach((_, aid) => setActorState(aid, null));
+                world.agents.forEach((_, aid) => { setActorState(aid, null); clearToolChip(aid); });
                 caption(ev, animate, 'CURTAIN',
                     `Run complete — ${world.agents.size} agent${world.agents.size > 1 ? 's' : ''}, ` +
                     `${world.totals.tools} tool calls, ${fmtTokens(world.totals.tokens)} tokens generated in ${fmtClock(world.clock)}.`,
@@ -512,9 +559,11 @@
         clearInterval(typeInterval);
         if (!text) { captionTextEl.innerHTML = ''; return; }
         let i = 0;
-        const speed = Math.max(8, Math.min(24, 2600 / text.length));
+        // One char at a time, ~2-3.5s per caption regardless of length —
+        // calm enough to read along with, still done before the beat moves on.
+        const speed = Math.max(14, Math.min(36, 3400 / text.length));
         typeInterval = setInterval(() => {
-            i += 2;
+            i += 1;
             captionTextEl.innerHTML = esc(text.slice(0, i)) + '<span class="caption-cursor"></span>';
             if (i >= text.length) {
                 clearInterval(typeInterval);

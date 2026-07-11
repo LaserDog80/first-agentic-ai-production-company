@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agent Theatre</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -23,6 +23,7 @@
     --text: #e8eaf2;
     --text-dim: #8892b0;
     --pixel: 'Press Start 2P', monospace;
+    --terminal: 'VT323', ui-monospace, monospace;
     --body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
   }
@@ -108,8 +109,32 @@
   .actors {
     position: absolute; inset: 0 0 26% 0;
     display: flex; align-items: flex-end; justify-content: center;
-    gap: clamp(18px, 4vw, 64px);
-    padding: 0 40px;
+    gap: clamp(22px, 4vw, 60px);
+    padding: 0 32px;
+  }
+  /* The team: parallel hires stack vertically in a shared .wave column;
+     when the front row is full, whole columns wrap UP to a back row. */
+  .ensemble {
+    display: flex; flex-wrap: wrap-reverse;
+    align-content: flex-end; align-items: flex-end; justify-content: center;
+    column-gap: clamp(14px, 2.5vw, 44px); row-gap: 18px;
+    min-width: 0; max-width: 100%;
+  }
+  .wave {
+    display: flex; flex-direction: column-reverse; align-items: center;
+    gap: 18px;
+  }
+  /* In a stacked pair the bottom actor's bubble would fire straight up into
+     the actor above it — swing it out to the side instead. */
+  .wave .actor:first-child:not(:only-child) .bubble {
+    left: calc(100% - 14px); bottom: 55%;
+    transform: translateY(6px);
+  }
+  .wave .actor:first-child:not(:only-child) .bubble.visible { transform: translateY(0); }
+  .wave .actor:first-child:not(:only-child) .bubble::after {
+    top: 50%; right: 100%; left: auto;
+    transform: translateY(-50%);
+    border: 6px solid transparent; border-right-color: var(--hairline);
   }
 
   .actor {
@@ -119,7 +144,10 @@
     transition: opacity 0.6s, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .actor.entering { opacity: 0; transform: translateX(120px); }
-  .actor.retired { opacity: 0.45; filter: saturate(0.4); }
+  .actor.retired {
+    opacity: 0.45; filter: saturate(0.4);
+    transform: scale(0.88); transform-origin: bottom center;
+  }
 
   .actor .sprite-wrap {
     position: relative;
@@ -197,17 +225,37 @@
   .actor .bubble.err { border-color: rgba(233, 69, 96, 0.6); }
   .actor .bubble.err .tool-tag { color: var(--red); }
 
+  /* current-tool chip at the agent's shoulder */
+  .actor .toolchip {
+    position: absolute; top: -2px; left: calc(50% + 24px);
+    display: flex; align-items: center; gap: 5px;
+    font-family: var(--pixel); font-size: 6px; color: var(--gold);
+    letter-spacing: 0.5px; white-space: nowrap;
+    background: var(--panel); border: 1px solid var(--hairline);
+    border-radius: 6px; padding: 4px 6px;
+    opacity: 0; transform: translateY(4px) scale(0.8);
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 9; pointer-events: none;
+  }
+  .actor .toolchip.visible { opacity: 1; transform: translateY(0) scale(1); }
+  .actor .toolchip .ticon { font-size: 11px; font-family: var(--body); }
+  @keyframes chipPop { 0% { transform: scale(0.7); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+  .actor .toolchip.pop { animation: chipPop 0.25s ease-out; }
+
   /* ── caption bar ─────────────────────────────────────────────────────── */
   .caption {
-    position: absolute; left: 50%; bottom: 5%;
+    position: absolute; left: 50%; bottom: 4.5%;
     transform: translateX(-50%);
-    width: min(860px, 86%);
+    width: min(760px, 82%);
     text-align: center;
-    font-size: clamp(14px, 1.7vw, 19px);
-    line-height: 1.55;
+    font-family: var(--terminal);
+    font-size: clamp(16px, 1.8vw, 21px);
+    line-height: 1.4;
+    letter-spacing: 0.4px;
     color: var(--text);
     text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
-    min-height: 3.2em;
+    min-height: 3em;
+    max-height: 5.6em; overflow: hidden; /* never climb into the sprites */
     z-index: 20;
     pointer-events: none;
   }
@@ -217,7 +265,7 @@
     letter-spacing: 2px; margin-bottom: 8px;
   }
   .caption-cursor {
-    display: inline-block; width: 9px; height: 1.05em;
+    display: inline-block; width: 7px; height: 0.95em;
     background: var(--gold); vertical-align: text-bottom;
     animation: blink 0.9s steps(1) infinite; margin-left: 3px;
   }
