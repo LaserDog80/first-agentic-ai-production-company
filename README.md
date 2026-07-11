@@ -75,7 +75,7 @@ Open `/theatre`. Anything under `~/.claude/projects` is listed automatically (ov
 
 ### The demo
 
-**PLAY THE DEMO** replays a bundled sample transcript (`static/demo/demo_session.jsonl`, regenerable via `python scripts/make_demo_transcript.py`): Claude debugs a flaky test, hires two research agents in parallel, fixes the root cause, and verifies. It's the reliable classroom mode — no keys, no network, same every time.
+**PLAY THE DEMO** replays a bundled sample transcript (`static/demo/demo_session.jsonl`, regenerable via `python scripts/make_demo_transcript.py`) telling the original production-company story: a one-line commissioning brief becomes a broadcastable pitch deck. Claude sets the editorial vision, hires a **Researcher**, **Director** and **Production Manager** in parallel (drawn with the presentation view's hand-made character sprites), then a **Producer** to assemble and fact-check the deck. It's the reliable classroom mode — no keys, no network, same every time.
 
 ## Configuration
 

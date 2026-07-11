@@ -1,9 +1,11 @@
 """Generate the bundled demo transcript for the Theatre.
 
 Writes ``static/demo/demo_session.jsonl`` — a realistic Claude Code session
-transcript (same line format as ``~/.claude/projects/*/*.jsonl``) telling a
-small multi-agent story: Claude investigates flaky checkout tests, spawns
-two subagents to research in parallel, applies a fix, and verifies it.
+transcript (same line format as ``~/.claude/projects/*/*.jsonl``) telling the
+production-company story from the original pitch-deck pipeline: a one-line
+commissioning brief comes in, Claude sets the editorial vision, hires a
+Researcher, a Director and a Production Manager in parallel, then a Producer
+to assemble the deck — and ships a broadcastable pitch.
 
 Run from the repo root:  python scripts/make_demo_transcript.py
 """
@@ -15,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 SESSION = "d3m0aaaa-1111-2222-3333-444455556666"
-CWD = "/home/demo/shop-backend"
+CWD = "/home/demo/pitch-factory"
 MODEL = "claude-fable-5"
 START = datetime(2026, 7, 8, 14, 3, 12, tzinfo=timezone.utc)
 
@@ -87,163 +89,219 @@ def bash_result(stdout: str) -> dict:
 
 def main() -> None:
     # ── The brief ────────────────────────────────────────────────────────
-    user(0, "Our checkout tests have been flaky all week — sometimes "
-            "test_payment_retry passes, sometimes it times out. Find the root "
-            "cause and fix it.")
+    user(0, "The commissioning round closes Friday. Pitch me 'The Last "
+            "Lighthouse Keepers' — a 3-part factual series about the final "
+            "generation of UK lighthouse keepers. I need a broadcastable pitch "
+            "deck: editorial vision, key facts and access, a visual treatment, "
+            "and a realistic budget.")
 
-    # ── Claude reads the ground first ────────────────────────────────────
+    # ── Claude puts on the series-producer hat ───────────────────────────
     assistant(4, [
         {"type": "thinking", "thinking": ""},
-        {"type": "text", "text": "I'll investigate the flaky checkout tests. First "
-         "let me map out where the payment retry logic and its tests live, then "
-         "I'll dig into the failure pattern."},
+        {"type": "text", "text": "I'll run this like a commissioning pitch. "
+         "First the editorial vision, then I'll hire a crew in parallel — "
+         "research, treatment and budget — and assemble the deck from their "
+         "reports."},
     ], ctx=9800, out=210)
 
     tw, tw_id = tool_use("TodoWrite", {"todos": [
-        {"content": "Locate the flaky test and retry logic", "status": "in_progress"},
-        {"content": "Find the root cause of the timeout", "status": "pending"},
-        {"content": "Fix and verify with the test suite", "status": "pending"},
+        {"content": "Set the editorial vision", "status": "in_progress"},
+        {"content": "Research facts, archive and access", "status": "pending"},
+        {"content": "Define the visual treatment", "status": "pending"},
+        {"content": "Cost a 3-part shoot", "status": "pending"},
+        {"content": "Assemble the pitch deck", "status": "pending"},
     ]})
-    assistant(7, [tw], ctx=10100, out=90)
+    assistant(7, [tw], ctx=10100, out=110)
     tool_result(7.4, tw_id, "Todos have been modified successfully")
 
-    g1, g1_id = tool_use("Grep", {"pattern": "test_payment_retry", "glob": "tests/**"})
-    assistant(11, [g1], ctx=10400, out=70)
-    tool_result(12, g1_id, "tests/checkout/test_payments.py",
-                tur=bash_result("tests/checkout/test_payments.py"))
+    r1, r1_id = tool_use("Read", {"file_path": f"{CWD}/briefs/lighthouse_keepers.md"})
+    assistant(11, [r1], ctx=10400, out=60)
+    tool_result(11.5, r1_id, "1\t# The Last Lighthouse Keepers — one-line brief\n2\t…",
+                tur={"type": "file", "file": {"filePath": "briefs/lighthouse_keepers.md", "numLines": 42}})
 
-    r1, r1_id = tool_use("Read", {"file_path": f"{CWD}/tests/checkout/test_payments.py"})
-    assistant(16, [r1], ctx=10800, out=60)
-    tool_result(16.5, r1_id, "1\timport pytest\n2\tfrom checkout.payments import charge_with_retry\n…",
-                tur={"type": "file", "file": {"filePath": "tests/checkout/test_payments.py", "numLines": 184}})
+    g1, g1_id = tool_use("Grep", {"pattern": "lighthouse|coastal", "path": "archive/"})
+    assistant(16, [g1], ctx=10900, out=70)
+    tool_result(17, g1_id, "archive/2019_coastal_lives.md",
+                tur=bash_result("archive/2019_coastal_lives.md"))
 
-    # ── Delegation: two subagents in parallel ────────────────────────────
+    # ── Delegation: three crew hires in parallel ─────────────────────────
     assistant(24, [
         {"type": "thinking", "thinking": ""},
-        {"type": "text", "text": "The test wraps charge_with_retry with a 5s "
-         "timeout. Two threads to pull on — the retry/backoff maths, and the "
-         "mock payment gateway's latency config. I'll delegate both "
-         "investigations so they run in parallel."},
-    ], ctx=14200, out=180)
+        {"type": "text", "text": "Vision: obsolescence and devotion — the last "
+         "people who kept the lights while the world automated around them. "
+         "We pitched coastal before (2019) but never got access; that's the "
+         "gap to close. I'll hire the crew in parallel: a researcher on facts "
+         "and access, a director on the visual treatment, a production "
+         "manager on the budget."},
+    ], ctx=14200, out=230)
 
-    p1 = ("Audit the retry/backoff implementation in checkout/payments.py. "
-          "Work out the worst-case total wall-clock time of charge_with_retry "
-          "with default settings, and report the numbers.")
-    t1, t1_id = tool_use("Task", {"description": "Audit retry backoff timing",
-                                  "prompt": p1, "subagent_type": "Explore"})
-    p2 = ("Investigate the mock payment gateway used by the checkout tests "
-          "(tests/checkout/conftest.py and fixtures). Find any injected latency, "
-          "jitter, or randomness that could make timing nondeterministic.")
-    t2, t2_id = tool_use("Task", {"description": "Trace mock gateway latency",
-                                  "prompt": p2, "subagent_type": "Explore"})
-    assistant(28, [t1, t2], ctx=14500, out=260)
+    p1 = ("Research 'The Last Lighthouse Keepers': how many manned lighthouses "
+          "remain in the UK, when automation completed, which former keepers "
+          "are alive and interviewable, and what archive footage exists. "
+          "Confirm who controls access to the towers.")
+    t1, t1_id = tool_use("Task", {"description": "Researcher",
+                                  "prompt": p1, "subagent_type": "Fact Finder"})
+    p2 = ("Define the visual treatment for a 3-part factual series 'The Last "
+          "Lighthouse Keepers': episode arc, visual grammar, tone references. "
+          "Check archive/2019_coastal_lives.md for what we pitched before and "
+          "deliberately depart from it.")
+    t2, t2_id = tool_use("Task", {"description": "Director",
+                                  "prompt": p2, "subagent_type": "Creative Visionary"})
+    p3 = ("Cost a 3x60-minute factual series shot at three remote UK "
+          "lighthouse locations: core crew day rates, 18 shoot days, kit, "
+          "travel and access boats, archive licensing. Give a realistic range.")
+    t3, t3_id = tool_use("Task", {"description": "Production Manager",
+                                  "prompt": p3, "subagent_type": "Logistics & Budget"})
+    assistant(28, [t1, t2, t3], ctx=14600, out=320)
 
-    # ── Sidechain 1: retry auditor ───────────────────────────────────────
+    # ── Sidechain 1: the researcher ──────────────────────────────────────
     _last_uuid["s1"] = None
     user(29, p1, chain="s1")
-    s1r, s1r_id = tool_use("Read", {"file_path": f"{CWD}/checkout/payments.py"})
-    assistant(33, [s1r], chain="s1", ctx=4200, out=60)
-    tool_result(33.5, s1r_id, "1\tMAX_RETRIES = 4\n2\tBASE_DELAY = 0.4\n…", chain="s1",
-                tur={"type": "file", "file": {"filePath": "checkout/payments.py", "numLines": 96}})
-    s1b, s1b_id = tool_use("Bash", {
-        "command": "python -c \"print(sum(0.4 * 2**i for i in range(4)))\"",
-        "description": "Sum worst-case exponential backoff"})
-    assistant(39, [s1b], chain="s1", ctx=5100, out=80)
-    tool_result(40, s1b_id, "6.0", chain="s1", tur=bash_result("6.0"))
+    s1w, s1w_id = tool_use("WebSearch", {"query": "how many manned lighthouses remain UK Trinity House"})
+    assistant(33, [s1w], chain="s1", ctx=4200, out=70)
+    tool_result(35, s1w_id,
+                "UK lighthouse automation completed 26 November 1998 (North "
+                "Foreland, Kent). All 200+ Trinity House lighthouses now "
+                "automated and monitored from Harwich.",
+                chain="s1", tur={"type": "text"})
+    s1f, s1f_id = tool_use("WebFetch", {"url": "https://www.trinityhouse.co.uk/lighthouses/access",
+                                        "prompt": "Who controls filming access to the towers?"})
+    assistant(40, [s1f], chain="s1", ctx=4900, out=80)
+    tool_result(41.5, s1f_id, "403 Forbidden — the site refused the request.",
+                chain="s1", is_error=True)
     assistant(46, [{"type": "text", "text":
-        "Worst case: 4 retries with exponential backoff (0.4s base, factor 2) "
-        "= 0.4+0.8+1.6+3.2 = 6.0s of sleep alone, before request time. The "
-        "test's 5s timeout is mathematically beatable only when an early "
-        "attempt succeeds — that's the flake."}], chain="s1", ctx=5600, out=140)
+        "Direct fetch blocked — pivoting to press coverage and the keepers' "
+        "association instead."}], chain="s1", ctx=5300, out=90)
+    s1w2, s1w2_id = tool_use("WebSearch", {"query": "last UK lighthouse keepers interviews Association of Lighthouse Keepers"})
+    assistant(50, [s1w2], chain="s1", ctx=5600, out=70)
+    tool_result(52, s1w2_id,
+                "Association of Lighthouse Keepers maintains a register of "
+                "former keepers; several gave 25th-anniversary interviews in "
+                "2023. BBC Archive and BFI hold automation-era footage.",
+                chain="s1", tur={"type": "text"})
+    assistant(58, [{"type": "text", "text":
+        "Automation completed 26 Nov 1998 at North Foreland — the anniversary "
+        "is our news hook. Former keepers are alive, organised and on the "
+        "record via the Association of Lighthouse Keepers. Archive exists at "
+        "BBC and BFI. Access to towers runs through Trinity House press "
+        "office — a relationship to build, not a blocker."}],
+        chain="s1", ctx=6200, out=160)
 
-    # ── Sidechain 2: gateway tracer ──────────────────────────────────────
+    # ── Sidechain 2: the director ────────────────────────────────────────
     _last_uuid["s2"] = None
     user(29.5, p2, chain="s2")
-    s2g, s2g_id = tool_use("Grep", {"pattern": "sleep|latency|random", "path": "tests/checkout"})
-    assistant(34, [s2g], chain="s2", ctx=4100, out=70)
-    tool_result(35, s2g_id,
-                "tests/checkout/conftest.py:41: time.sleep(random.uniform(0.1, 0.9))",
-                chain="s2", tur=bash_result(
-                    "tests/checkout/conftest.py:41: time.sleep(random.uniform(0.1, 0.9))"))
-    s2r, s2r_id = tool_use("Read", {"file_path": f"{CWD}/tests/checkout/conftest.py"})
-    assistant(41, [s2r], chain="s2", ctx=4900, out=60)
-    tool_result(41.5, s2r_id, "1\t@pytest.fixture\n2\tdef mock_gateway():\n…", chain="s2",
-                tur={"type": "file", "file": {"filePath": "tests/checkout/conftest.py", "numLines": 88}})
-    assistant(52, [{"type": "text", "text":
-        "The mock gateway injects random latency: time.sleep(random.uniform(0.1, "
-        "0.9)) per call, unseeded. Combined with retries, total test time swings "
-        "by several seconds run-to-run. That randomness is the nondeterminism."}],
-        chain="s2", ctx=5400, out=130)
+    s2r, s2r_id = tool_use("Read", {"file_path": f"{CWD}/archive/2019_coastal_lives.md"})
+    assistant(34, [s2r], chain="s2", ctx=4100, out=60)
+    tool_result(35.5, s2r_id, "1\t# Coastal Lives (2019 pitch, not commissioned)\n2\t…",
+                chain="s2", tur={"type": "file", "file": {"filePath": "archive/2019_coastal_lives.md", "numLines": 120}})
+    assistant(48, [{"type": "text", "text":
+        "Treatment: one keeper per episode, one tower each — intimacy over "
+        "geography. Slow cinema pacing, locked-off frames like the lamp "
+        "itself, night interiors lit only by the rotating beam. The 2019 "
+        "pitch was drone-heavy postcard coastline; we go the other way — "
+        "inside the tower, faces and hands. Ep1 the last shift, Ep2 the "
+        "automation, Ep3 what remains."}], chain="s2", ctx=5200, out=180)
+
+    # ── Sidechain 3: the production manager ──────────────────────────────
+    _last_uuid["s3"] = None
+    user(30, p3, chain="s3")
+    s3b, s3b_id = tool_use("Bash", {
+        "command": "python -c \"print((450+400+350+250)*18)\"",
+        "description": "Total core crew day rates x 18 shoot days"})
+    assistant(36, [s3b], chain="s3", ctx=4300, out=80)
+    tool_result(38, s3b_id, "26100", chain="s3", tur=bash_result("26100"))
+    s3b2, s3b2_id = tool_use("Bash", {
+        "command": "python -c \"print(26100+38000+21000+14500)\"",
+        "description": "Crew + kit + travel/boats + archive licensing"})
+    assistant(44, [s3b2], chain="s3", ctx=4800, out=80)
+    tool_result(46, s3b2_id, "99600", chain="s3", tur=bash_result("99600"))
+    assistant(55, [{"type": "text", "text":
+        "Core crew (director/camera, sound, AP, runner) at standard day rates "
+        "x 18 days = £26.1k. Kit £38k, remote travel and access boats £21k, "
+        "archive licensing £14.5k. With post, insurance and 12% contingency: "
+        "£310k–£380k for 3x60'. The boats are the swing item — weather days "
+        "at sea rock the schedule."}], chain="s3", ctx=5500, out=170)
 
     # ── Reports land back with the orchestrator ──────────────────────────
-    tool_result(47, t1_id,
-                "Worst-case charge_with_retry wall-clock is 6.0s of backoff sleep "
-                "alone (4 retries, base 0.4s, factor 2) — already over the test's "
-                "5s timeout before any request time is counted.",
+    tool_result(50, t2_id,
+                "Treatment: one keeper, one tower per episode — slow cinema, "
+                "locked-off frames, night interiors lit by the rotating beam. "
+                "Deliberately departs from the 2019 drone-postcard approach. "
+                "Ep1 the last shift, Ep2 the automation, Ep3 what remains.",
                 tur={"type": "text"})
-    tool_result(53, t2_id,
-                "Mock gateway adds unseeded random latency of 0.1–0.9s per call "
-                "(tests/checkout/conftest.py:41). With up to 5 calls per test, "
-                "total runtime varies by ~4s between runs.",
+    tool_result(57, t3_id,
+                "Realistic range £310k–£380k for 3x60': crew £26.1k (18 days), "
+                "kit £38k, travel/boats £21k, archive £14.5k, plus post and "
+                "12% contingency. Boats/weather are the main schedule risk.",
+                tur={"type": "text"})
+    tool_result(60, t1_id,
+                "Automation completed 26 Nov 1998 (North Foreland) — "
+                "anniversary is the news hook. Former keepers organised and "
+                "interviewable via the Association of Lighthouse Keepers; "
+                "archive at BBC/BFI; tower access via Trinity House press "
+                "office.",
                 tur={"type": "text"})
 
-    assistant(60, [
+    assistant(66, [
         {"type": "thinking", "thinking": ""},
-        {"type": "text", "text": "Both reports agree: the 5s timeout can never "
-         "safely contain worst-case backoff (6s) plus random gateway latency "
-         "(up to 4.5s). The test only ever passed when early attempts succeeded. "
-         "The right fix is to make backoff configurable and have the test inject "
-         "a fast schedule, rather than raising the timeout and slowing CI."},
-    ], ctx=21400, out=240)
+        {"type": "text", "text": "All three reports agree this is pitchable: "
+         "a hard news hook (the automation anniversary), living access to "
+         "the last keepers, a distinctive visual grammar, and a credible "
+         "budget. One more hire — a producer to assemble the deck in house "
+         "style and fact-check the claims."},
+    ], ctx=21800, out=220)
 
-    e1, e1_id = tool_use("Edit", {"file_path": f"{CWD}/checkout/payments.py",
-                                  "old_string": "BASE_DELAY = 0.4",
-                                  "new_string": "BASE_DELAY = 0.4  # overridable"})
-    assistant(66, [e1], ctx=21900, out=150)
-    tool_result(66.5, e1_id, "The file has been updated.", tur={"type": "text"})
+    # ── Second wave: the producer assembles ──────────────────────────────
+    p4 = ("Assemble the pitch deck for 'The Last Lighthouse Keepers' from the "
+          "research, treatment and budget reports. House style: six slides — "
+          "logline, why now, the keepers, the look, access & archive, budget. "
+          "Flag any claim that lacks a source.")
+    t4, t4_id = tool_use("Task", {"description": "Producer",
+                                  "prompt": p4, "subagent_type": "Creative Coordinator"})
+    assistant(70, [t4], ctx=22200, out=140)
 
-    e2, e2_id = tool_use("Edit", {"file_path": f"{CWD}/tests/checkout/test_payments.py",
-                                  "old_string": "charge_with_retry(order)",
-                                  "new_string": "charge_with_retry(order, base_delay=0.01)"})
-    assistant(70, [e2], ctx=22300, out=140)
-    tool_result(70.4, e2_id, "The file has been updated.", tur={"type": "text"})
+    _last_uuid["s4"] = None
+    user(71, p4, chain="s4")
+    s4r, s4r_id = tool_use("Read", {"file_path": f"{CWD}/templates/house_style.md"})
+    assistant(75, [s4r], chain="s4", ctx=3900, out=60)
+    tool_result(76, s4r_id, "1\t# Deck house style — six slides, one idea per slide\n2\t…",
+                chain="s4", tur={"type": "file", "file": {"filePath": "templates/house_style.md", "numLines": 31}})
+    assistant(84, [{"type": "text", "text":
+        "Deck assembled to house style — six slides, one idea per slide. "
+        "Logline leads with the anniversary hook. One claim flagged and cut: "
+        "'most visited heritage sites in the UK' had no source. Budget slide "
+        "shows the range with the boats risk called out honestly."}],
+        chain="s4", ctx=4800, out=150)
 
-    b1, b1_id = tool_use("Bash", {"command": "pytest tests/checkout -q",
-                                  "description": "Run the checkout test suite"})
-    assistant(75, [b1], ctx=22800, out=80)
-    tool_result(83, b1_id, "F..................\n1 failed, 18 passed",
-                tur=bash_result("F..................\n1 failed, 18 passed"), is_error=True)
+    tool_result(86, t4_id,
+                "Six-slide deck assembled in house style. Cut one unsourced "
+                "claim (visitor numbers). Logline: 'For 500 years someone "
+                "kept the light. In 1998 we switched them off.'",
+                tur={"type": "text"})
 
-    assistant(90, [{"type": "text", "text": "One test still fails — it asserts on "
-        "the old default delay. The seed fixture also needs pinning so the mock "
-        "gateway is deterministic."}], ctx=24100, out=120)
-
-    e3, e3_id = tool_use("Edit", {"file_path": f"{CWD}/tests/checkout/conftest.py",
-                                  "old_string": "time.sleep(random.uniform(0.1, 0.9))",
-                                  "new_string": "time.sleep(0.01)"})
-    assistant(94, [e3], ctx=24600, out=130)
-    tool_result(94.5, e3_id, "The file has been updated.", tur={"type": "text"})
-
-    b2, b2_id = tool_use("Bash", {"command": "pytest tests/checkout -q",
-                                  "description": "Re-run the checkout test suite"})
-    assistant(98, [b2], ctx=25000, out=70)
-    tool_result(107, b2_id, "...................\n19 passed in 3.41s",
-                tur=bash_result("...................\n19 passed in 3.41s"))
+    # ── The deck ships ───────────────────────────────────────────────────
+    w1, w1_id = tool_use("Write", {"file_path": f"{CWD}/decks/last_lighthouse_keepers.md",
+                                   "content": "# The Last Lighthouse Keepers — pitch deck\n…"})
+    assistant(92, [w1], ctx=23400, out=180)
+    tool_result(92.6, w1_id, "File created successfully.", tur={"type": "text"})
 
     tw2, tw2_id = tool_use("TodoWrite", {"todos": [
-        {"content": "Locate the flaky test and retry logic", "status": "completed"},
-        {"content": "Find the root cause of the timeout", "status": "completed"},
-        {"content": "Fix and verify with the test suite", "status": "completed"},
+        {"content": "Set the editorial vision", "status": "completed"},
+        {"content": "Research facts, archive and access", "status": "completed"},
+        {"content": "Define the visual treatment", "status": "completed"},
+        {"content": "Cost a 3-part shoot", "status": "completed"},
+        {"content": "Assemble the pitch deck", "status": "completed"},
     ]})
-    assistant(110, [tw2], ctx=25400, out=90)
-    tool_result(110.3, tw2_id, "Todos have been modified successfully")
+    assistant(103, [tw2], ctx=23800, out=110)
+    tool_result(103.3, tw2_id, "Todos have been modified successfully")
 
-    assistant(116, [{"type": "text", "text":
-        "Fixed. Root cause was two compounding timing problems: worst-case "
-        "retry backoff (6.0s) already exceeded the test's 5s timeout, and the "
-        "mock gateway injected unseeded random latency of up to 0.9s per call. "
-        "The tests now inject a fast backoff schedule and a deterministic "
-        "gateway delay — 19/19 passing in 3.4s."}], ctx=26200, out=220)
+    assistant(112, [{"type": "text", "text":
+        "Pitch deck ready: decks/last_lighthouse_keepers.md. Six slides — "
+        "logline built on the 26 Nov 1998 automation anniversary, living "
+        "keepers on the record, a slow-cinema treatment that departs from "
+        "our 2019 miss, and an honest £310k–£380k budget. Researcher, "
+        "director and production manager worked in parallel; the producer "
+        "assembled and fact-checked the deck."}], ctx=24600, out=240)
 
     out_path = Path(__file__).resolve().parent.parent / "static" / "demo" / "demo_session.jsonl"
     out_path.parent.mkdir(parents=True, exist_ok=True)

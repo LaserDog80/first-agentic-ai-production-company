@@ -303,6 +303,7 @@
         const sprite = id === 'main' ? S.CLAUDE_SPRITE
                                      : S.makeAgentSprite(id, def.name, def.agent_type);
         const px = id === 'main' ? 9 : 7;
+        const rows = sprite.rows || 12;
 
         const elm = document.createElement('div');
         elm.className = 'actor' + (animate ? ' entering' : '');
@@ -310,7 +311,7 @@
         elm.innerHTML =
             `<div class="bubble"></div>` +
             `<div class="toolchip"><span class="ticon"></span><span class="tname"></span></div>` +
-            `<div class="sprite-wrap"><canvas class="sprite" width="${8 * px}" height="${12 * px}"></canvas></div>` +
+            `<div class="sprite-wrap"><canvas class="sprite" width="${8 * px}" height="${rows * px}"></canvas></div>` +
             `<div class="platform"></div>` +
             `<div class="badge">${esc(def.name)}<span class="role">${esc(def.agent_type || '')}</span></div>` +
             `<div class="ctxbar"><div class="fill"></div></div>` +

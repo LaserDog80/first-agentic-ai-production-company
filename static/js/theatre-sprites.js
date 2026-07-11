@@ -140,9 +140,50 @@
         }));
     }
 
+    // ── The hand-drawn cast ──────────────────────────────────────────────
+    // The presentation view ships hand-drawn production-company characters
+    // (sprites.js, global CHARACTERS). When an agent's name or role matches
+    // one — researcher, director, producer, … — use the real character art
+    // instead of a generated template.
+    const CAST_TINTS = {
+        series_producer: '#6a5acd',
+        producer: '#8d6e63',
+        researcher: '#4fc3f7',
+        director: '#e94560',
+        production_manager: '#ff9800',
+    };
+
+    const normKey = s => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+
+    function castSprite(label) {
+        // sprites.js declares `const CHARACTERS` — a lexical global that never
+        // lands on window — so probe the bare identifier, not window.CHARACTERS.
+        const chars = typeof CHARACTERS !== 'undefined' ? CHARACTERS : null;
+        if (!Array.isArray(chars)) return null;
+        const key = normKey(label);
+        if (!key) return null;
+        const ch = chars.find(c => normKey(c.id) === key || normKey(c.name) === key);
+        if (!ch) return null;
+        // Character grids may start above row 0 (hats, hair) — shift every
+        // pixel onto the canvas and report the true row count.
+        let minY = Infinity, maxY = -Infinity;
+        ch.pixels.forEach(g => g.coords.forEach(([, y]) => {
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+        }));
+        const pixels = ch.pixels.map(g => ({
+            color: g.color,
+            coords: g.coords.map(([x, y]) => [x, y - minY]),
+        }));
+        return { pixels, tint: CAST_TINTS[ch.id] || '#f5c542',
+                 template: 'cast', rows: maxY - minY + 1 };
+    }
+
     // Build a sprite for a dynamically-spawned agent. Deterministic in
     // (id + name), so replays and scrubbing always redraw the same person.
     function makeAgentSprite(id, name, agentType) {
+        const cast = castSprite(name) || castSprite(agentType);
+        if (cast) return cast;
         const h = hashString(String(id) + '|' + String(name));
         const keys = Object.keys(TEMPLATES);
         const tplKey = templateFor(agentType) || keys[h % keys.length];
@@ -159,13 +200,15 @@
             e: '#ffe082',
             r: '#e94560',
         };
-        return { pixels: gridToPixels(TEMPLATES[tplKey], colors), tint: top, template: tplKey };
+        return { pixels: gridToPixels(TEMPLATES[tplKey], colors), tint: top,
+                 template: tplKey, rows: TEMPLATES[tplKey].length };
     }
 
     const CLAUDE_SPRITE = {
         pixels: gridToPixels(CLAUDE_GRID, CLAUDE_COLORS),
         tint: '#d97757',
         template: 'claude',
+        rows: CLAUDE_GRID.length,
     };
 
     // Render a sprite's pixel groups into a canvas at the given pixel size.

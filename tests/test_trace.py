@@ -43,11 +43,14 @@ def test_load_transcript_ignores_junk_lines():
 
 def test_demo_trace_shape(demo_trace):
     assert demo_trace["version"] == 1
-    assert demo_trace["title"].startswith("Our checkout tests")
+    assert demo_trace["title"].startswith("The commissioning round")
     assert demo_trace["duration_s"] > 100
     ids = [a["id"] for a in demo_trace["agents"]]
-    assert ids == ["main", "a1", "a2"]
+    assert ids == ["main", "a1", "a2", "a3", "a4"]
     assert all(a["parent"] == "main" for a in demo_trace["agents"][1:])
+    # The demo casts the original production-company crew.
+    names = {a["name"] for a in demo_trace["agents"][1:]}
+    assert names == {"RESEARCHER", "DIRECTOR", "PRODUCTION MANAGER", "PRODUCER"}
 
 
 def test_demo_trace_events_ordered_and_terminated(demo_trace):
@@ -62,8 +65,8 @@ def test_spawn_and_return_pair_up(demo_trace):
     events = demo_trace["events"]
     spawns = [ev for ev in events if ev["type"] == "spawn"]
     returns = [ev for ev in events if ev["type"] == "return"]
-    assert {s["child"] for s in spawns} == {"a1", "a2"}
-    assert {r["child"] for r in returns} == {"a1", "a2"}
+    assert {s["child"] for s in spawns} == {"a1", "a2", "a3", "a4"}
+    assert {r["child"] for r in returns} == {"a1", "a2", "a3", "a4"}
     for s in spawns:  # every spawn precedes its matching return
         r = next(r for r in returns if r["child"] == s["child"])
         assert s["t"] < r["t"]
@@ -214,11 +217,11 @@ def test_demo_trace_endpoint(client):
     resp = client.get("/api/trace/demo")
     assert resp.status_code == 200
     trace = resp.json()
-    assert [a["id"] for a in trace["agents"]] == ["main", "a1", "a2"]
+    assert [a["id"] for a in trace["agents"]] == ["main", "a1", "a2", "a3", "a4"]
 
 
 def test_sessions_listing_and_trace(client, demo_text, tmp_path, monkeypatch):
-    proj = tmp_path / "-home-demo-shop-backend"
+    proj = tmp_path / "-home-demo-pitch-factory"
     proj.mkdir(parents=True)
     (proj / "abc.jsonl").write_text(demo_text, encoding="utf-8")
     monkeypatch.setenv("CLAUDE_PROJECTS_DIR", str(tmp_path))
@@ -226,11 +229,11 @@ def test_sessions_listing_and_trace(client, demo_text, tmp_path, monkeypatch):
     resp = client.get("/api/sessions")
     sessions = resp.json()["sessions"]
     assert len(sessions) == 1
-    assert sessions[0]["snippet"].startswith("Our checkout tests")
+    assert sessions[0]["snippet"].startswith("The commissioning round")
 
     resp = client.get(f"/api/sessions/{sessions[0]['id']}/trace")
     assert resp.status_code == 200
-    assert resp.json()["title"].startswith("Our checkout tests")
+    assert resp.json()["title"].startswith("The commissioning round")
 
     assert client.get("/api/sessions/ffffffffffff/trace").status_code == 404
     assert client.get("/api/sessions/NOT-VALID/trace").status_code == 400
