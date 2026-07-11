@@ -98,7 +98,7 @@ The UI piece is choosing direction at edge-creation time (or by clicking the edg
 - Structured outputs (`response_format: json_schema`) for the pitch deck instead of parsing fenced JSON — pending provider support check.
 - Token streaming into the log panel (watch agents "think" live).
 - Theatre: adapters for other agent frameworks (LangGraph, OpenAI Agents SDK) — the normalized trace schema in `src/trace/claude_adapter.py` was designed to be source-agnostic.
-- Theatre: walk-on/walk-off sprite animations (legs actually moving) and a "commentary desk" corner set-piece.
+- Theatre: walk-on/walk-off sprite animations (legs actually moving) and a "commentary desk" corner set-piece. The asset pipeline now exists — the pixel-art-animator skill's `render.py --export-groups` emits per-frame `{color, coords}` groups that `drawSprite` already consumes; the theatre needs a small frame-cycler (swap the actor's canvas content on a timer per the spec's `durations_ms`) and per-state animation selection (idle/working → idle loop, spawn → walk-on, error → flinch, done → wave).
 - Theatre: export a replay as a shareable video/GIF for talks.
 - Theatre: headless `claude -p --output-format stream-json` relay script as an alternative live source (hooks already cover both interactive and -p runs).
 

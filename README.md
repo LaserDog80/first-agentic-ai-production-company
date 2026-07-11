@@ -93,6 +93,10 @@ Covers the trace adapter (sidechain attribution, token dedupe, tool humanization
 
 Works as before (Docker Space + secrets for the sandbox modes). Note the Theatre's "previous runs" panel lists transcripts on the *server*, so on a hosted Space use drag-and-drop upload or the demo instead.
 
+## Pixel-art animator skill
+
+`.claude/skills/pixel-art-animator/` is a reusable Claude Code skill for creating **animated pixel characters** — from a text description or a supplied image — at any grid size and aspect ratio. Characters are authored as editable ASCII-grid JSON specs; the bundled `render.py` produces labelled contact sheets, animated GIFs, and `--export-groups` output that drops straight into this repo's `theatre-sprites.js` renderer. `references/` holds the distilled craft (grids/palettes/cluster hygiene; walk/jump/idle/laugh cycle recipes and timing), and `examples/courier.json` is a complete worked character (16×22, four animations). The skill's core rule: never trust an unrendered grid — render, look, critique against the checklists, iterate. Copy the directory to `~/.claude/skills/` to use it in other projects.
+
 ## Development notes
 
 - v4 pivot: the app originally taught agentic AI by making *you* build the pipeline. Real agentic work is the AI spinning off and delegating agents itself — so the Theatre watches real runs, and the node builder was demoted to a sandbox. One event vocabulary powers both.
