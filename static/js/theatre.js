@@ -279,8 +279,13 @@
     }
 
     function agentDef(id) {
-        if (player.agentDefs.has(id)) return player.agentDefs.get(id);
-        return { id, name: id === 'main' ? 'CLAUDE' : id.toUpperCase(),
+        // The orchestrator always appears as the SERIES PRODUCER, whatever
+        // the trace calls it — the theatre casts the run as a production.
+        if (player.agentDefs.has(id)) {
+            const def = player.agentDefs.get(id);
+            return id === 'main' ? { ...def, name: 'SERIES PRODUCER' } : def;
+        }
+        return { id, name: id === 'main' ? 'SERIES PRODUCER' : id.toUpperCase(),
                  agent_type: id === 'main' ? 'orchestrator' : 'agent', parent: 'main' };
     }
 
@@ -478,7 +483,7 @@
                 mapSpark(id, ev.child, 'forward');
                 if (world.spawnsSeen === 1) {
                     caption(ev, animate, null,
-                        `Claude just hired a specialist for “${clip(ev.task, 60)}”. Nobody drew this org chart — the AI decided, mid-run, that delegation was worth it.`,
+                        `The series producer just hired a specialist for “${clip(ev.task, 60)}”. Nobody drew this org chart — the AI decided, mid-run, that delegation was worth it.`,
                         'spawn-1');
                 } else if (world.openChildren.size > 1) {
                     caption(ev, animate, null,
@@ -502,7 +507,7 @@
                 feed(ev, 'return', `<span class="who">${childName}</span> reported back — ${esc(clip(ev.summary, 260))}`);
                 mapSpark(ev.child, ev.agent || 'main', 'back');
                 caption(ev, animate, null,
-                    `${childName} reports back. Only the summary survives — the subagent's whole working context is thrown away, keeping Claude's own head clear.`,
+                    `${childName} reports back. Only the summary survives — the subagent's whole working context is thrown away, keeping the series producer's own head clear.`,
                     'return-1');
                 break;
             }
@@ -622,7 +627,7 @@
     function mapAddNode(id, def, tint) {
         if (mapNodes.has(id)) { mapNodes.get(id).tint = tint; return; }
         if (id === 'main') {
-            mapNodes.set(id, { x: 0.16, y: 0.5, tint, label: 'CLAUDE', active: false });
+            mapNodes.set(id, { x: 0.16, y: 0.5, tint, label: 'SERIES PRODUCER', active: false });
             return;
         }
         const children = [...mapNodes.keys()].filter(k => k !== 'main').length;

@@ -204,12 +204,15 @@
                  template: tplKey, rows: TEMPLATES[tplKey].length };
     }
 
-    const CLAUDE_SPRITE = {
-        pixels: gridToPixels(CLAUDE_GRID, CLAUDE_COLORS),
-        tint: '#d97757',
-        template: 'claude',
-        rows: CLAUDE_GRID.length,
-    };
+    // The orchestrator is the SERIES PRODUCER from the hand-drawn cast,
+    // wearing the star's gold glow. The robot grid above stays as a
+    // fallback for pages that load without sprites.js.
+    const CLAUDE_SPRITE = (function () {
+        const sp = castSprite('series producer');
+        if (sp) return Object.assign(sp, { tint: '#f5c542', template: 'series_producer' });
+        return { pixels: gridToPixels(CLAUDE_GRID, CLAUDE_COLORS),
+                 tint: '#d97757', template: 'claude', rows: CLAUDE_GRID.length };
+    })();
 
     // Render a sprite's pixel groups into a canvas at the given pixel size.
     function drawSprite(canvas, sprite, px) {
