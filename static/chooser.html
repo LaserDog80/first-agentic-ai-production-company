@@ -46,9 +46,11 @@
 
   .choices {
     display: grid;
-    grid-template-columns: repeat(2, minmax(240px, 320px));
+    grid-template-columns: repeat(3, minmax(220px, 300px));
     gap: 24px;
   }
+  a.card.star { border-color: var(--gold); }
+  a.card.star .label { color: var(--gold); }
 
   a.card {
     display: block;
@@ -86,11 +88,18 @@
   <div class="subtitle">choose your mode</div>
 
   <div class="choices">
-    <a class="card" href="/playground">
-      <div class="label">▣ PLAYGROUND</div>
+    <a class="card star" href="/theatre">
+      <div class="label">✦ THEATRE</div>
       <div class="desc">
-        Node-based graph editor. Load a preset, edit the graph, run it,
-        and inspect the output.
+        Watch a REAL agentic run — Claude hires its own team, animated
+        and narrated. Replay past runs or go live from your terminal.
+      </div>
+    </a>
+    <a class="card" href="/playground">
+      <div class="label">▣ SANDBOX</div>
+      <div class="desc">
+        Now YOU be the orchestrator: build an agent graph by hand and run
+        it. Notice how much harder it is than watching Claude do it.
       </div>
     </a>
     <a class="card" href="/present">
@@ -102,6 +111,6 @@
     </a>
   </div>
 
-  <footer>v3 — one engine, two views</footer>
+  <footer>v4 — watch real agents work · one engine, three views</footer>
 </body>
 </html>

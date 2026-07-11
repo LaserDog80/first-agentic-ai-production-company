@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Theatre</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-0: #0b0d17;
+    --bg-1: #131629;
+    --bg-2: #1b1f38;
+    --panel: rgba(19, 22, 41, 0.72);
+    --hairline: rgba(140, 150, 200, 0.18);
+    --gold: #f5c542;
+    --coral: #d97757;
+    --green: #4ecca3;
+    --red: #e94560;
+    --blue: #4fc3f7;
+    --text: #e8eaf2;
+    --text-dim: #8892b0;
+    --pixel: 'Press Start 2P', monospace;
+    --terminal: 'VT323', ui-monospace, monospace;
+    --body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+  }
+
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: radial-gradient(1200px 700px at 30% -10%, #1e2342 0%, var(--bg-1) 45%, var(--bg-0) 100%);
+    color: var(--text);
+    font-family: var(--body);
+    display: grid;
+    grid-template-rows: 52px 1fr 92px;
+    grid-template-columns: 1fr 340px;
+    grid-template-areas:
+      "topbar topbar"
+      "stage  side"
+      "timeline timeline";
+  }
+
+  /* ── top bar ─────────────────────────────────────────────────────────── */
+  .topbar {
+    grid-area: topbar;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 18px;
+    border-bottom: 1px solid var(--hairline);
+    background: rgba(11, 13, 23, 0.6);
+    backdrop-filter: blur(8px);
+    z-index: 30;
+  }
+  .topbar .logo {
+    font-family: var(--pixel); font-size: 11px; color: var(--gold);
+    text-shadow: 0 0 18px rgba(245, 197, 66, 0.45);
+    white-space: nowrap;
+  }
+  .topbar .run-title {
+    flex: 1; min-width: 0;
+    font-size: 13px; color: var(--text-dim);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .mode-badge {
+    font-family: var(--pixel); font-size: 8px;
+    padding: 6px 10px; border-radius: 4px;
+    border: 1px solid var(--hairline); color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .mode-badge.live { color: #ff5c5c; border-color: rgba(255, 92, 92, 0.5); animation: livepulse 1.6s infinite; }
+  @keyframes livepulse { 0%,100% { box-shadow: 0 0 0 rgba(255,92,92,0); } 50% { box-shadow: 0 0 14px rgba(255,92,92,0.5); } }
+  .topbar button, .loader button {
+    font-family: var(--pixel); font-size: 8px;
+    background: transparent; color: var(--text);
+    border: 1px solid var(--hairline); border-radius: 4px;
+    padding: 8px 12px; cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
+  }
+  .topbar button:hover, .loader button:hover { border-color: var(--gold); color: var(--gold); }
+  .topbar a.home {
+    color: var(--text-dim); text-decoration: none; font-size: 15px;
+    border: 1px solid var(--hairline); border-radius: 4px; padding: 5px 9px;
+  }
+  .topbar a.home:hover { color: var(--gold); border-color: var(--gold); }
+
+  /* ── stage ───────────────────────────────────────────────────────────── */
+  .stage {
+    grid-area: stage;
+    position: relative;
+    overflow: hidden;
+  }
+  .stage::before { /* soft floor */
+    content: '';
+    position: absolute; left: 0; right: 0; bottom: 0; height: 34%;
+    background: linear-gradient(180deg, transparent, rgba(30, 35, 66, 0.55));
+    pointer-events: none;
+  }
+  .stage-grid { /* subtle perspective grid on the floor */
+    position: absolute; left: 0; right: 0; bottom: 0; height: 30%;
+    background:
+      repeating-linear-gradient(90deg, rgba(140,150,200,0.06) 0 1px, transparent 1px 90px),
+      repeating-linear-gradient(0deg, rgba(140,150,200,0.05) 0 1px, transparent 1px 34px);
+    mask-image: linear-gradient(180deg, transparent, black 60%);
+    pointer-events: none;
+  }
+
+  .actors {
+    position: absolute; inset: 0 0 26% 0;
+    display: flex; align-items: flex-end; justify-content: center;
+    gap: clamp(22px, 4vw, 60px);
+    padding: 0 32px;
+  }
+  /* The team: parallel hires stack vertically in a shared .wave column;
+     when the front row is full, whole columns wrap UP to a back row. */
+  .ensemble {
+    display: flex; flex-wrap: wrap-reverse;
+    align-content: flex-end; align-items: flex-end; justify-content: center;
+    column-gap: clamp(14px, 2.5vw, 44px); row-gap: 18px;
+    min-width: 0; max-width: 100%;
+  }
+  .wave {
+    display: flex; flex-direction: column-reverse; align-items: center;
+    gap: 18px;
+  }
+  /* In a stacked pair the bottom actor's bubble would fire straight up into
+     the actor above it — swing it out to the side instead. */
+  .wave .actor:first-child:not(:only-child) .bubble {
+    left: calc(100% - 14px); bottom: 55%;
+    transform: translateY(6px);
+  }
+  .wave .actor:first-child:not(:only-child) .bubble.visible { transform: translateY(0); }
+  .wave .actor:first-child:not(:only-child) .bubble::after {
+    top: 50%; right: 100%; left: auto;
+    transform: translateY(-50%);
+    border: 6px solid transparent; border-right-color: var(--hairline);
+  }
+
+  .actor {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center;
+    width: 130px;
+    transition: opacity 0.6s, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .actor.entering { opacity: 0; transform: translateX(120px); }
+  .actor.retired {
+    opacity: 0.45; filter: saturate(0.4);
+    transform: scale(0.88); transform-origin: bottom center;
+  }
+
+  .actor .sprite-wrap {
+    position: relative;
+    animation: idlebob 3.2s ease-in-out infinite;
+  }
+  @keyframes idlebob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  .actor.working .sprite-wrap { animation-duration: 1.1s; }
+  .actor canvas.sprite {
+    image-rendering: pixelated;
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
+    transition: filter 0.3s;
+  }
+  .actor.working canvas.sprite { filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55)) drop-shadow(0 0 16px var(--actor-tint, var(--gold))); }
+  .actor.thinking canvas.sprite { filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55)) drop-shadow(0 0 10px rgba(255,255,255,0.25)); }
+  .actor.error canvas.sprite { filter: drop-shadow(0 0 16px var(--red)); }
+
+  .actor .platform {
+    width: 84px; height: 14px; margin-top: -4px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, var(--actor-tint, #55608a) 0%, transparent 68%);
+    opacity: 0.5;
+    transition: opacity 0.3s;
+  }
+  .actor.working .platform { opacity: 0.95; }
+
+  .actor .badge {
+    margin-top: 8px;
+    font-family: var(--pixel); font-size: 7px; letter-spacing: 0.5px;
+    color: var(--text); text-align: center; line-height: 1.7;
+    max-width: 128px;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+  }
+  .actor .badge .role { color: var(--text-dim); font-size: 6px; display: block; }
+
+  .actor .ctxbar {
+    margin-top: 6px; width: 92px; height: 5px;
+    border-radius: 3px; overflow: hidden;
+    background: rgba(140, 150, 200, 0.14);
+  }
+  .actor .ctxbar .fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--blue), var(--gold));
+    transition: width 0.6s;
+  }
+  .actor .tokens {
+    margin-top: 4px;
+    font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  }
+
+  .actor .bubble {
+    position: absolute; bottom: calc(100% + 12px); left: 50%;
+    transform: translateX(-50%) translateY(6px);
+    min-width: 150px; max-width: 230px;
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 9px 11px;
+    font-size: 12px; line-height: 1.45; color: var(--text);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(10px);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s;
+    z-index: 10;
+  }
+  .actor .bubble.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .actor .bubble::after {
+    content: ''; position: absolute; top: 100%; left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: var(--hairline);
+  }
+  .actor .bubble .tool-tag {
+    display: block; font-family: var(--pixel); font-size: 6px;
+    color: var(--gold); margin-bottom: 5px; letter-spacing: 1px;
+  }
+  .actor .bubble.err { border-color: rgba(233, 69, 96, 0.6); }
+  .actor .bubble.err .tool-tag { color: var(--red); }
+
+  /* current-tool chip at the agent's shoulder */
+  .actor .toolchip {
+    position: absolute; top: -2px; left: calc(50% + 24px);
+    display: flex; align-items: center; gap: 5px;
+    font-family: var(--pixel); font-size: 6px; color: var(--gold);
+    letter-spacing: 0.5px; white-space: nowrap;
+    background: var(--panel); border: 1px solid var(--hairline);
+    border-radius: 6px; padding: 4px 6px;
+    opacity: 0; transform: translateY(4px) scale(0.8);
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 9; pointer-events: none;
+  }
+  .actor .toolchip.visible { opacity: 1; transform: translateY(0) scale(1); }
+  .actor .toolchip .ticon { font-size: 11px; font-family: var(--body); }
+  @keyframes chipPop { 0% { transform: scale(0.7); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+  .actor .toolchip.pop { animation: chipPop 0.25s ease-out; }
+
+  /* ── caption bar ─────────────────────────────────────────────────────── */
+  .caption {
+    position: absolute; left: 50%; bottom: 4.5%;
+    transform: translateX(-50%);
+    width: min(760px, 82%);
+    text-align: center;
+    font-family: var(--terminal);
+    font-size: clamp(16px, 1.8vw, 21px);
+    line-height: 1.4;
+    letter-spacing: 0.4px;
+    color: var(--text);
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+    min-height: 3em;
+    max-height: 5.6em; overflow: hidden; /* never climb into the sprites */
+    z-index: 20;
+    pointer-events: none;
+  }
+  .caption .who {
+    display: block;
+    font-family: var(--pixel); font-size: 8px; color: var(--gold);
+    letter-spacing: 2px; margin-bottom: 8px;
+  }
+  .caption-cursor {
+    display: inline-block; width: 7px; height: 0.95em;
+    background: var(--gold); vertical-align: text-bottom;
+    animation: blink 0.9s steps(1) infinite; margin-left: 3px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── todo overlay ────────────────────────────────────────────────────── */
+  .todo-card {
+    position: absolute; top: 18px; left: 18px;
+    background: var(--panel); border: 1px solid var(--hairline);
+    border-radius: 10px; padding: 12px 16px;
+    backdrop-filter: blur(10px);
+    max-width: 300px;
+    box-shadow: 0 10px 34px rgba(0,0,0,0.4);
+    opacity: 0; transform: translateY(-8px);
+    transition: opacity 0.4s, transform 0.4s;
+    z-index: 15;
+  }
+  .todo-card.visible { opacity: 1; transform: translateY(0); }
+  .todo-card h3 {
+    font-family: var(--pixel); font-size: 7px; color: var(--gold);
+    letter-spacing: 1px; margin-bottom: 9px;
+  }
+  .todo-card li {
+    list-style: none; font-size: 12px; color: var(--text-dim);
+    padding: 3px 0; display: flex; gap: 8px; align-items: baseline;
+  }
+  .todo-card li.completed { color: var(--green); text-decoration: line-through; opacity: 0.75; }
+  .todo-card li.in_progress { color: var(--text); }
+  .todo-card li .tick { font-family: var(--mono); flex: none; }
+
+  /* ── side panel ──────────────────────────────────────────────────────── */
+  .side {
+    grid-area: side;
+    display: flex; flex-direction: column;
+    border-left: 1px solid var(--hairline);
+    background: rgba(11, 13, 23, 0.55);
+    backdrop-filter: blur(8px);
+    min-height: 0;
+  }
+  .side h2 {
+    font-family: var(--pixel); font-size: 8px; color: var(--gold);
+    letter-spacing: 1px; padding: 12px 14px 8px;
+  }
+  .map-wrap { padding: 0 10px; }
+  #mapCanvas { width: 100%; height: 170px; display: block; border-radius: 8px; }
+
+  .stats {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px; padding: 10px 14px;
+  }
+  .stat {
+    background: var(--bg-2); border: 1px solid var(--hairline);
+    border-radius: 8px; padding: 8px 10px;
+  }
+  .stat .v { font-family: var(--mono); font-size: 16px; color: var(--text); }
+  .stat .k { font-size: 10px; color: var(--text-dim); letter-spacing: 0.5px; margin-top: 2px; text-transform: uppercase; }
+
+  .feed {
+    flex: 1; min-height: 0; overflow-y: auto;
+    padding: 4px 14px 14px;
+    font-family: var(--mono); font-size: 11px; line-height: 1.55;
+  }
+  .feed::-webkit-scrollbar { width: 8px; }
+  .feed::-webkit-scrollbar-thumb { background: var(--bg-2); border-radius: 4px; }
+  .feed .entry {
+    padding: 5px 8px; margin-bottom: 4px;
+    border-left: 2px solid var(--hairline);
+    border-radius: 0 6px 6px 0;
+    color: var(--text-dim);
+    word-wrap: break-word;
+    animation: feedin 0.3s ease-out;
+  }
+  @keyframes feedin { from { opacity: 0; transform: translateX(8px); } }
+  .feed .entry .who { color: var(--text); font-weight: 600; }
+  .feed .entry.say { border-left-color: var(--green); color: var(--text); background: rgba(78, 204, 163, 0.06); }
+  .feed .entry.user { border-left-color: var(--gold); color: var(--text); background: rgba(245, 197, 66, 0.07); }
+  .feed .entry.spawn, .feed .entry.return { border-left-color: var(--coral); color: var(--text); }
+  .feed .entry.error { border-left-color: var(--red); color: #ffb3c0; }
+
+  /* ── timeline ────────────────────────────────────────────────────────── */
+  .timeline {
+    grid-area: timeline;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 20px;
+    border-top: 1px solid var(--hairline);
+    background: rgba(11, 13, 23, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 30;
+  }
+  .timeline button {
+    font-family: var(--pixel); font-size: 10px;
+    background: transparent; color: var(--gold);
+    border: 2px solid var(--gold); border-radius: 6px;
+    width: 46px; height: 42px; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .timeline button:hover { background: var(--gold); color: var(--bg-0); }
+  .timeline button:disabled { opacity: 0.3; cursor: default; }
+  .scrub-wrap { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  input[type=range].scrubber {
+    -webkit-appearance: none; width: 100%; height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--gold) var(--progress, 0%), var(--bg-2) var(--progress, 0%));
+    outline: none; cursor: pointer;
+  }
+  input[type=range].scrubber::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 12px rgba(245, 197, 66, 0.7);
+    cursor: grab;
+  }
+  .scrub-labels {
+    display: flex; justify-content: space-between;
+    font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  }
+  .speed { display: flex; gap: 4px; }
+  .speed button {
+    width: auto; height: auto; padding: 7px 9px;
+    font-size: 7px; border-width: 1px; border-color: var(--hairline); color: var(--text-dim);
+  }
+  .speed button.active { border-color: var(--gold); color: var(--gold); }
+  .live-indicator {
+    display: none; align-items: center; gap: 10px; flex: 1;
+    font-family: var(--pixel); font-size: 9px; color: #ff5c5c;
+  }
+  .live-indicator .dot {
+    width: 10px; height: 10px; border-radius: 50%; background: #ff5c5c;
+    animation: livepulse 1.2s infinite;
+  }
+  .live-indicator .sub { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+  body.live .scrub-wrap, body.live .speed, body.live #playBtn { display: none; }
+  body.live .live-indicator { display: flex; }
+
+  /* ── loader overlay ──────────────────────────────────────────────────── */
+  .loader {
+    position: fixed; inset: 0; z-index: 100;
+    background: radial-gradient(900px 600px at 50% 20%, #1e2342 0%, var(--bg-0) 75%);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 7vh 24px 24px;
+    overflow-y: auto;
+    transition: opacity 0.5s;
+  }
+  .loader.hidden { opacity: 0; pointer-events: none; }
+  .loader h1 {
+    font-family: var(--pixel); font-size: clamp(16px, 3vw, 26px);
+    color: var(--gold); letter-spacing: 3px;
+    text-shadow: 0 0 30px rgba(245, 197, 66, 0.4), 3px 3px 0 #000;
+    margin-bottom: 10px;
+  }
+  .loader .tagline { color: var(--text-dim); font-size: 14px; margin-bottom: 40px; text-align: center; }
+  .loader .panels {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 340px));
+    gap: 18px; justify-content: center; width: 100%; max-width: 1120px;
+  }
+  .lpanel {
+    background: var(--panel); border: 1px solid var(--hairline);
+    border-radius: 12px; padding: 18px;
+    backdrop-filter: blur(10px);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .lpanel h2 { font-family: var(--pixel); font-size: 9px; color: var(--text); letter-spacing: 1px; }
+  .lpanel p { font-size: 12.5px; color: var(--text-dim); line-height: 1.55; }
+  .lpanel .big {
+    font-size: 10px; padding: 14px; border-width: 2px; border-color: var(--gold); color: var(--gold);
+  }
+  .lpanel .big:hover { background: var(--gold); color: var(--bg-0); }
+  .session-list { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .session-item {
+    text-align: left; font-family: var(--body) !important;
+    border: 1px solid var(--hairline); border-radius: 8px;
+    background: var(--bg-2); color: var(--text);
+    padding: 10px 12px; cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .session-item:hover { border-color: var(--gold); }
+  .session-item .snip { font-size: 12.5px; display: block; margin-bottom: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .session-item .meta2 { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+  .dropzone {
+    border: 2px dashed var(--hairline); border-radius: 10px;
+    padding: 18px; text-align: center; color: var(--text-dim); font-size: 12px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .dropzone.over { border-color: var(--gold); background: rgba(245, 197, 66, 0.06); color: var(--gold); }
+  .lpanel .hint { font-family: var(--mono); font-size: 10.5px; color: var(--text-dim);
+    background: var(--bg-0); border-radius: 6px; padding: 10px; line-height: 1.6;
+    white-space: pre-wrap; word-break: break-all; }
+  .lpanel .empty { font-size: 12px; color: var(--text-dim); font-style: italic; }
+  .loader .back { margin-top: 28px; }
+  .loader .back a { color: var(--text-dim); font-size: 12px; text-decoration: none; }
+  .loader .back a:hover { color: var(--gold); }
+
+  @media (max-width: 900px) {
+    body { grid-template-columns: 1fr 0; }
+    .side { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <span class="logo">✦ AGENT THEATRE</span>
+    <span class="run-title" id="runTitle"></span>
+    <span class="mode-badge" id="modeBadge">NO RUN LOADED</span>
+    <button id="loadBtn" onclick="Theatre.openLoader()">⏏ LOAD RUN</button>
+    <a class="home" href="/" title="Mode chooser">⌂</a>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="stage-grid"></div>
+    <div class="actors" id="actors"></div>
+    <div class="todo-card" id="todoCard"><h3>THE PLAN</h3><ul id="todoList"></ul></div>
+    <div class="caption" id="caption"><span class="who" id="captionWho"></span><span id="captionText"></span></div>
+  </div>
+
+  <div class="side">
+    <h2>DELEGATION MAP</h2>
+    <div class="map-wrap"><canvas id="mapCanvas"></canvas></div>
+    <div class="stats">
+      <div class="stat"><div class="v" id="statAgents">1</div><div class="k">agents</div></div>
+      <div class="stat"><div class="v" id="statTools">0</div><div class="k">tool calls</div></div>
+      <div class="stat"><div class="v" id="statTokens">0</div><div class="k">tokens out</div></div>
+      <div class="stat"><div class="v" id="statClock">0:00</div><div class="k">run clock</div></div>
+    </div>
+    <h2>ACTIVITY</h2>
+    <div class="feed" id="feed"></div>
+  </div>
+
+  <div class="timeline">
+    <button id="playBtn" onclick="Theatre.togglePlay()" title="Space">▶</button>
+    <div class="live-indicator"><span class="dot"></span> LIVE <span class="sub" id="liveSub"></span></div>
+    <div class="scrub-wrap">
+      <input type="range" class="scrubber" id="scrubber" min="0" max="0" value="0" step="1">
+      <div class="scrub-labels"><span id="timeNow">0:00</span><span id="eventCount"></span><span id="timeTotal">0:00</span></div>
+    </div>
+    <div class="speed" id="speedBtns">
+      <button data-speed="0.5">0.5×</button>
+      <button data-speed="1" class="active">1×</button>
+      <button data-speed="2">2×</button>
+      <button data-speed="4">4×</button>
+    </div>
+  </div>
+
+  <div class="loader" id="loader">
+    <h1>✦ AGENT THEATRE</h1>
+    <div class="tagline">Watch a real AI agent hire its own team — animated, measured, and narrated.</div>
+    <div class="panels">
+      <div class="lpanel">
+        <h2>▶ DEMO RUN</h2>
+        <p>A bundled real-format run: a one-line brief becomes a broadcastable
+           pitch deck — the series producer hires a researcher, director and
+           production manager in parallel, then a producer to assemble. Zero
+           API calls.</p>
+        <button class="big" onclick="Theatre.loadDemo()">PLAY THE DEMO</button>
+      </div>
+      <div class="lpanel">
+        <h2>⏮ CLAUDE'S PREVIOUS RUNS</h2>
+        <p>Session transcripts found on this machine (<span class="hint" style="display:inline;padding:2px 6px">~/.claude/projects</span>). Pick one to replay it.</p>
+        <div class="session-list" id="sessionList"><div class="empty">Scanning…</div></div>
+        <div class="dropzone" id="dropzone">…or drop a session <b>.jsonl</b> here</div>
+        <input type="file" id="fileInput" accept=".jsonl,.json,application/jsonl" style="display:none">
+      </div>
+      <div class="lpanel">
+        <h2>⦿ LIVE FROM YOUR TERMINAL</h2>
+        <p>Run Claude Code with theatre hooks enabled and watch the run unfold
+           here in real time. Add this to <b>.claude/settings.json</b> hooks
+           (see README) — every event POSTs to:</p>
+        <div class="hint">curl -sf -m 2 -X POST http://localhost:8000/ingest -H 'Content-Type: application/json' -d @-</div>
+        <div class="session-list" id="liveList"><div class="empty">No live sessions right now.</div></div>
+        <button onclick="Theatre.refreshLive()">↻ CHECK FOR LIVE SESSIONS</button>
+      </div>
+    </div>
+    <div class="back"><a href="/">⌂ back to mode chooser</a></div>
+  </div>
+
+  <script src="/static/js/sprites.js"></script>
+  <script src="/static/js/theatre-sprites.js"></script>
+  <script src="/static/js/theatre.js"></script>
+</body>
+</html>
