@@ -6,6 +6,20 @@ Living document. Items move up when we decide to do them; new ideas land at the 
 
 ## Sooner (this session or next)
 
+### 0d. Theatre: LLM colour commentator (tier 2 narration)
+
+**What.** The Theatre's caption bar is currently rule-based (deterministic teaching beats keyed on event type — free, instant, always on). Add an optional second tier: a cheap `utility`-tier model receives batched trace events plus a rolling summary every few seconds and produces one-liner colour commentary in a persona (sports commentator, nature documentary). Rendered as a sixth pixel character at a commentary desk.
+
+**Why.** Rule-based captions teach; a live commentator entertains. The "entertaining" leg of the simple/measurable/entertaining brief.
+
+**Design intent.** Server-side: a small `/api/commentary` WebSocket or the existing live broker; reuse `src/provider.py` tiers. Client: a `commentary` event type already conceptually exists (presentation view has one). Keep tier 1 as fallback when no API key is configured — the Theatre must stay zero-key.
+
+### 0e. Theatre: sharpen live-mode agent attribution
+
+**What.** Hook payloads carry no agent identity, so live mode attributes tool events to the most recently spawned open subagent (see `src/trace/live.py`). Improve: correlate against the session transcript file (`transcript_path` arrives in every hook payload — tail it server-side to know which sidechain is active), or at minimum track multiple open Tasks as a set with round-robin hints.
+
+**Why.** Parallel delegations are exactly the moment the Theatre is most impressive — and currently the moment live badges are least accurate.
+
 ### 0c. Run-output tray UX upgrades (thumbnails, resizable, image-strip view)
 
 **What.** Three related improvements to the bottom run-output panel that became obvious as soon as the `cd_artist` preset shipped real images into it.
@@ -83,6 +97,10 @@ The UI piece is choosing direction at edge-creation time (or by clicking the edg
 - Blackboard / artifact store: `write_artifact`/`read_artifact` tools (opt-in skill node) so deep graphs stop relaying full payloads through every parent's context.
 - Structured outputs (`response_format: json_schema`) for the pitch deck instead of parsing fenced JSON — pending provider support check.
 - Token streaming into the log panel (watch agents "think" live).
+- Theatre: adapters for other agent frameworks (LangGraph, OpenAI Agents SDK) — the normalized trace schema in `src/trace/claude_adapter.py` was designed to be source-agnostic.
+- Theatre: walk-on/walk-off sprite animations (legs actually moving) and a "commentary desk" corner set-piece.
+- Theatre: export a replay as a shareable video/GIF for talks.
+- Theatre: headless `claude -p --output-format stream-json` relay script as an alternative live source (hooks already cover both interactive and -p runs).
 
 ---
 

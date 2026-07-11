@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -27,6 +27,8 @@ from src.graph.schema import Graph, validate_graph
 from src.graph.skills import list_available_skills
 from src.pptx_exporter import export_pitch_deck
 from src.provider import create_client, load_config
+from src.trace import LiveBroker, normalize_transcript
+from src.trace.sessions import list_sessions, read_session
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -94,6 +96,11 @@ async def present():
     return FileResponse("static/presentation.html", headers=_NO_STORE)
 
 
+@app.get("/theatre")
+async def theatre():
+    return FileResponse("static/theatre.html", headers=_NO_STORE)
+
+
 @app.get("/health")
 async def health():
     return JSONResponse({"status": "ok"})
@@ -127,6 +134,115 @@ async def output_image(run_id: str, name: str):
     if not path.resolve().is_relative_to(_OUTPUT_ROOT.resolve()):
         return JSONResponse(status_code=400, content={"error": "Invalid path"})
     return FileResponse(str(path), media_type="image/png")
+
+
+# ── Theatre: traces of real agentic runs ─────────────────────────────────────
+
+live_broker = LiveBroker()
+_MAX_UPLOAD_BYTES = 30 * 1024 * 1024
+_DEMO_TRANSCRIPT = Path("static/demo/demo_session.jsonl")
+
+
+@app.get("/api/sessions")
+async def api_sessions():
+    """List Claude Code transcripts found on this machine."""
+    return JSONResponse({"sessions": list_sessions()})
+
+
+@app.get("/api/sessions/{session_id}/trace")
+async def api_session_trace(session_id: str):
+    if not re.match(r"^[a-f0-9]{12}$", session_id):
+        return JSONResponse(status_code=400, content={"error": "Invalid session ID"})
+    text = read_session(session_id)
+    if text is None:
+        return JSONResponse(status_code=404, content={"error": "Session not found"})
+    return JSONResponse(normalize_transcript(text))
+
+
+@app.get("/api/trace/demo")
+async def api_trace_demo():
+    """Bundled sample run, so the theatre works with zero setup."""
+    if not _DEMO_TRANSCRIPT.is_file():
+        return JSONResponse(status_code=404, content={"error": "No demo transcript bundled"})
+    text = _DEMO_TRANSCRIPT.read_text(encoding="utf-8")
+    return JSONResponse(normalize_transcript(text, source="claude-code-demo"))
+
+
+@app.post("/api/trace/upload")
+async def api_trace_upload(request: Request):
+    """Normalize an uploaded transcript JSONL (drag-and-drop in the theatre)."""
+    body = await request.body()
+    if len(body) > _MAX_UPLOAD_BYTES:
+        return JSONResponse(status_code=413, content={"error": "Transcript too large"})
+    trace = normalize_transcript(body.decode("utf-8", errors="replace"),
+                                 source="claude-code-upload")
+    if len(trace["events"]) <= 1:
+        return JSONResponse(status_code=400, content={
+            "error": "No events found — is this a Claude Code session .jsonl?"
+        })
+    return JSONResponse(trace)
+
+
+@app.get("/api/live")
+async def api_live_sessions():
+    """Live sessions currently streaming hook events into /ingest."""
+    return JSONResponse({"sessions": live_broker.list_active()})
+
+
+@app.post("/ingest")
+async def ingest(request: Request):
+    """Receive a Claude Code hook payload and broadcast to live viewers."""
+    try:
+        payload = json.loads(await request.body())
+    except json.JSONDecodeError:
+        return JSONResponse(status_code=400, content={"error": "Invalid JSON"})
+    if not isinstance(payload, dict):
+        return JSONResponse(status_code=400, content={"error": "Expected an object"})
+    events = live_broker.ingest(payload)
+    session_id = str(payload.get("session_id") or "unknown")
+    state = live_broker.session(session_id)
+    dead = []
+    for ws in state.subscribers:
+        for ev in events:
+            try:
+                await ws.send_json({"type": "trace_event", "event": ev})
+            except Exception:
+                dead.append(ws)
+                break
+    for ws in dead:
+        state.subscribers.discard(ws)
+    return JSONResponse({"ok": True, "events": len(events)})
+
+
+@app.websocket("/ws/live")
+async def ws_live(websocket: WebSocket):
+    """Theatre clients subscribe here to watch a live session."""
+    await websocket.accept()
+    session_id = websocket.query_params.get("session", "latest")
+    if session_id == "latest":
+        active = live_broker.list_active()
+        if not active:
+            await websocket.send_json({
+                "type": "error",
+                "message": "No live session yet — start Claude with theatre hooks enabled.",
+            })
+            await websocket.close()
+            return
+        session_id = active[0]["session_id"]
+    state = live_broker.session(session_id)
+    state.subscribers.add(websocket)
+    try:
+        await websocket.send_json({
+            "type": "backlog",
+            "session_id": session_id,
+            "events": state.events,
+        })
+        while True:
+            await websocket.receive_text()  # keepalive pings; content ignored
+    except WebSocketDisconnect:
+        pass
+    finally:
+        state.subscribers.discard(websocket)
 
 
 def _prune_run_artefacts(keep: int = _KEEP_RUN_ARTEFACTS) -> None:

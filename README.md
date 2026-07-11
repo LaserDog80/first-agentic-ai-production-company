@@ -7,34 +7,31 @@ sdk: docker
 pinned: false
 ---
 
-# Agentic Playground
+# Agent Theatre (+ Agentic Playground)
 
-> A node-based canvas where you build a team of AI agents, draw delegation lines between them, attach skills, and run the whole graph live. Pixel-art aesthetic. Like ComfyUI, but for agents.
+> A teaching tool for how agentic AI actually works. The star mode is the **Theatre**: watch a *real* Claude Code run — replayed from a transcript or live from your terminal — as an animated, narrated show where pixel-art agents hire each other, use tools, fail, adapt, and finish the job. Nobody draws the org chart; the AI does.
 
 ## What it does
 
-You compose AI agents on a canvas. Each agent is a node with its own system prompt and model tier. You connect agents to each other to set up delegation (who can ask whom to do work), and you connect skill nodes (web search, lookup tools, static text sources, image generation) to grant agents abilities. Then you type a brief into the input, click **RUN**, and watch the graph execute live — nodes light up gold while running, gold sparks travel along edges as one agent delegates to another. A meter in the log bar tracks tokens and estimated cost as the run progresses, **■ STOP** cancels a run mid-flight, and **↻ REPLAY** re-plays the last run's animation without spending a token.
+**✦ Theatre (`/theatre`)** — the main event. Feed it a real agentic run and it becomes a stage play:
 
-Presets that ship with the app:
+- **Replay Claude's previous runs.** The server scans `~/.claude/projects` for Claude Code session transcripts; pick one and watch it back. You can also drag-and-drop any session `.jsonl`, or press **PLAY THE DEMO** for a bundled sample run (zero API calls).
+- **Go live from your terminal.** Enable the theatre hooks (one copy-paste, see below), run Claude Code as you normally would, and the run appears on stage in real time.
+- **The cast assembles itself.** The run starts with one character — Claude, the orchestrator. When it delegates (a `Task` call), a new pixel person walks on stage, works with its own tools and its own context, then reports back and retires. The delegation map (smooth glowing edges, not pixel steps) draws itself as the run unfolds — that emergent structure *is* the lesson.
+- **Narrated.** A caption bar explains each teaching beat in plain English: why the agent reads before it writes, what delegation buys, why a failed command is information, why only the subagent's summary survives.
+- **Measured.** Per-agent token counters and context bars, run clock, tool-call and agent counts, a scrubbable timeline with play/pause and 0.5×–4× speed.
 
-- **Pitch Deck Pipeline** — five agents (Series Producer → Producer → Researcher / Director / Production Manager) collaborating to turn a one-line TV idea into a broadcast-ready pitch deck, exported as PPTX. Originally the proof-of-concept for this engine.
-- **Research Assistant** — a single agent with web search. The simplest possible playground graph; useful as a starting template.
-- **Creative Director → Artist** — a Creative Director delegates a brief to a Visual Artist, who generates an image via fal.ai (`fal-ai/flux/schnell`) and replies with the URL and a description. The CD reviews and either approves or sends feedback for another attempt. The final image renders in the OUTPUT tab with earlier attempts kept as history. Requires `FAL_KEY` in `.env`.
-- **News Brief Builder**, **Short Film Budget Quote**, **Quick Trip Planner**, **Two-Sided Take** — smaller multi-agent workflows showing different graph shapes.
+**▣ Sandbox (`/playground`)** — the original node-based canvas, reframed: now *you* try being the orchestrator. Compose agents, wire delegation and skills, run the graph live. (Presets: Pitch Deck Pipeline, Research Assistant, Creative Director → Artist, and more.)
 
-You can save your own graphs to localStorage, swap presets in and out, and build new agents from the library panel.
+**▶ Present (`/present`)** — cinematic view of the pitch-deck pipeline with hand-drawn characters.
 
 ## How it works
 
-Three layers:
+Everything hangs off one idea: an agentic run is just a stream of events. Three layers:
 
-- **Graph runtime** (`src/graph/`) — a graph is a JSON document of `nodes` and `edges`. The `GraphExecutor` walks the graph by recursion: each agent node becomes an `AgentRuntime` (a generic ReAct loop) whose tool list is built dynamically from its incoming edges. A `delegate` edge from A → B becomes a `delegate_to_b` tool on agent A; calling it runs B and returns its output. A `skill` edge from a web-search node to an agent becomes the `web_search` tool on that agent. The graph result is the output of whichever agent is wired to the OUTPUT node.
-- **Agent runtime** (`src/agent.py`) — generic ReAct loop. Calls the LLM, executes tool calls (in parallel when the model requests several at once — a producer fanning out to three specialists really does run them concurrently), feeds results back, loops until done. Oversized tool results are truncated before re-entering the context; malformed tool calls from the model are reported back as recoverable errors instead of crashing the run.
-- **Provider client** (`src/provider.py`) — config-driven OpenAI-compatible client. Three model tiers (`strong`/`research`/`utility`) are mapped to concrete model IDs in `config.yaml`.
-
-Because graphs run server-side with the server's API keys, `config.yaml` enforces guardrails: per-call timeouts, a cap on iterations per agent, limits on graph size, and a global rate limit. Runs can be cancelled from the UI (or by disconnecting — an abandoned run stops burning tokens).
-
-The frontend is a custom Canvas2D node editor in `static/js/editor.js` (no external library). It renders nodes as bordered rectangles with stepped 90° edges, animates running nodes with a pulsing gold border, and listens to a WebSocket for `node_started` / `edge_fired` / `node_finished` events emitted by the executor.
+- **Trace adapters** (`src/trace/`) — normalize real runs into one event vocabulary (`user_message`, `thinking`, `say`, `tool_start/end`, `spawn`, `return`, `todo`, `done`). `claude_adapter.py` parses Claude Code session transcripts (including sidechains — subagent conversations — and token usage, deduped per API request). `live.py` normalizes Claude Code *hook* payloads for live mode and fans them out to WebSocket subscribers.
+- **Theatre frontend** (`static/theatre.html` + `static/js/theatre.js`) — a pacing engine turns the event stream into watchable beats (real runs are bursty: quiet thinking, then six tool calls at once). Scrubbing rebuilds world state deterministically from event 0. Sprites are pixel-crunchy (`theatre-sprites.js` generates a tinted character per agent from ASCII templates, deterministic per agent); everything around them — edges, glows, panels, type — is smooth and antialiased.
+- **Graph runtime** (`src/graph/`, `src/agent.py`) — the sandbox's executor: each agent node is a ReAct loop whose tools come from its edges; a delegate edge becomes a `delegate_to_x` tool. Unchanged from v3, and still the no-API-key event source for the Present view's demo.
 
 ## Installation
 
@@ -44,50 +41,45 @@ cd first-agentic-ai-production-company
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-
-cp .env.example .env
-# Edit .env with NEBIUS_API_KEY (LLM provider)
-# and TAVILY_API_KEY or LINKUP_API_KEY (web search)
-# and FAL_KEY (image generation — only needed for the Creative Director → Artist preset)
 ```
 
-**macOS shortcut:** double-click `start.command`. It creates the venv, installs dependencies, starts the server, and opens the app in your browser. On first run it copies `.env.example` to `.env` and opens it so you can paste in your keys.
+The Theatre needs **no API keys** — it replays transcripts. Keys are only needed for the sandbox/present modes that execute real graphs:
+
+```bash
+cp .env.example .env
+# NEBIUS_API_KEY (LLM provider), TAVILY_API_KEY or LINKUP_API_KEY (web search),
+# FAL_KEY (image generation preset only)
+```
+
+**macOS shortcut:** double-click `start.command`.
 
 ## Usage
 
 ```bash
 python app.py
-# Open http://localhost:8000
+# Open http://localhost:8000  →  choose THEATRE
 ```
 
-The root URL is a mode chooser:
+### Replaying a previous Claude run
 
-- **`/playground`** — node-based canvas editor (the default working surface). Loads the **Pitch Deck Pipeline** preset by default. Type a brief into the top input and click **RUN**.
-- **`/present`** — cinematic view of the pitch-deck pipeline. Pixel-art characters animate as each agent works; runs go through the same graph executor as the playground. The **DEMO** button plays a scripted run with zero API calls.
+Open `/theatre`. Anything under `~/.claude/projects` is listed automatically (override the location with the `CLAUDE_PROJECTS_DIR` env var). Click a run to replay it. Space = play/pause, ←/→ = step, drag the timeline to scrub — scrubbing is free, nothing re-executes.
 
-Both modes have a persistent **mode switch** affordance — a "▶ PRESENT" button on `/playground` and a "▣ PLAYGROUND" button on `/present`, plus a small "⌂" link back to the chooser.
+### Watching a live run from your terminal
 
-Building your own graph:
+1. Merge the `hooks` block from `scripts/theatre-hooks.settings.json` into your `.claude/settings.json` (project or `~/.claude/settings.json` global). Each hook is a fire-and-forget `curl` to `http://localhost:8000/ingest` — if the theatre isn't running, Claude Code is unaffected.
+2. Start the theatre server and open `/theatre`.
+3. Run `claude` in your terminal and give it a task.
+4. Click **CHECK FOR LIVE SESSIONS** → your session appears → watch.
 
-1. Drop an **INPUT** and an **OUTPUT** node from the left library panel.
-2. Add an **AGENT**. The wizard prompts for a name and system prompt.
-3. Drag from the agent's bottom slot to another agent's top slot to set up delegation. Drag from a skill node to an agent to grant it that skill. Connect input → root agent and the deck-producing agent → output to complete the graph. **The OUTPUT edge decides which agent's response is the run result.**
-4. Type a brief, click **RUN**. Click **■ STOP** to cancel, **↻ REPLAY** to watch it again for free.
+*Live-mode caveat:* hook payloads carry no agent identity, so while a subagent is in flight its parent's parallel tool calls can be mis-badged. Replay-from-transcript is exact.
 
-Controls: click a library item to add a node, drag nodes to position, drag bottom-slot to top-slot to connect, double-click an edge to delete it, **DEL** to delete the selected node, scroll to zoom, shift+drag to pan, **F** to fit to view.
+### The demo
 
-The pitch deck preset has an output node with `subtype: "pitch_deck"` — when its run completes, the server tries to parse the output as a pitch deck JSON and exposes a **↓ PPTX** download in the bottom log bar.
+**PLAY THE DEMO** replays a bundled sample transcript (`static/demo/demo_session.jsonl`, regenerable via `python scripts/make_demo_transcript.py`): Claude debugs a flaky test, hires two research agents in parallel, fixes the root cause, and verifies. It's the reliable classroom mode — no keys, no network, same every time.
 
 ## Configuration
 
-Everything tunable lives in `config.yaml`:
-
-- `providers` — model IDs per tier and the API base URL.
-- `pipeline` — per-LLM-call timeout and completion-token budget.
-- `limits` — graph guardrails: max nodes, max agents, iteration cap per node, tool-result truncation length.
-- `pricing` — approximate per-tier USD per 1M tokens, used only for the cost meter. Edit to match your provider's price list, or remove the block to hide the meter.
-- `rate_limiting` — global runs-per-hour/day caps.
-- `tools` — search provider selection and per-provider search depth.
+`config.yaml` governs the sandbox graph runtime (model tiers, limits, pricing meter, rate limits) — see comments in the file. The Theatre has one knob: `CLAUDE_PROJECTS_DIR` for where to find transcripts.
 
 ## Tests
 
@@ -95,20 +87,16 @@ Everything tunable lives in `config.yaml`:
 pytest -q
 ```
 
-The suite covers the graph schema and validator (including the size/iteration guardrails), the executor with stubbed LLM clients (output-edge selection, cancellation, token/cost accounting, timeout wiring), preset integrity, the FastAPI/WebSocket protocol end-to-end (including a full stubbed run and the stop message), the agent runtime (parallel tool calls, malformed-argument recovery, result truncation), the tool registry (docstring → schema parameter descriptions), the PPTX exporter, and rate limiting.
+Covers the trace adapter (sidechain attribution, token dedupe, tool humanization), live hook normalization and Task attribution, the Theatre API routes (session listing, upload, ingest → WebSocket broadcast) — plus the whole v3 suite for the graph runtime, executor, presets, WebSocket protocol, PPTX exporter, and rate limiting.
 
 ## Deployment (Hugging Face Spaces)
 
-1. Create a new Docker Space.
-2. Add secrets `NEBIUS_API_KEY` and `TAVILY_API_KEY` (or `LINKUP_API_KEY`), plus `FAL_KEY` if you want image generation.
-3. `git push` to the Space remote.
-
-Run artefacts (PPTX files, generated images) are pruned automatically — only the most recent 40 runs are kept on disk.
+Works as before (Docker Space + secrets for the sandbox modes). Note the Theatre's "previous runs" panel lists transcripts on the *server*, so on a hosted Space use drag-and-drop upload or the demo instead.
 
 ## Development notes
 
-- The original linear orchestrator is gone. Its logic lives on entirely as `src/graph/presets/pitch_deck.json` plus the generic `GraphExecutor` — and as of v3 the presentation view runs through that same executor, so there is exactly one runtime.
-- The frontend is intentionally framework-free. Vanilla JS, single canvas. If you find yourself reaching for React or a graph library, ask whether the pixel aesthetic survives.
+- v4 pivot: the app originally taught agentic AI by making *you* build the pipeline. Real agentic work is the AI spinning off and delegating agents itself — so the Theatre watches real runs, and the node builder was demoted to a sandbox. One event vocabulary powers both.
+- The frontend is intentionally framework-free. Vanilla JS, Canvas2D. Pixel characters, smooth stage.
 
 ## Licence
 

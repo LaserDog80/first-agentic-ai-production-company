@@ -1,0 +1,185 @@
+// Pixel-art sprite factory for the Theatre's dynamic cast.
+//
+// Unlike the presentation view's hand-drawn CHARACTERS (sprites.js), the
+// Theatre can't know its cast in advance — subagents are hired mid-run by
+// the AI. Sprites are therefore built from small ASCII-grid templates with
+// colour slots, tinted deterministically from the agent's name, so the
+// same agent always looks the same.
+//
+// Exposes globals: THEATRE_SPRITES.{makeAgentSprite, CLAUDE_SPRITE, drawSprite}
+(function () {
+    'use strict';
+
+    // Each row is exactly 8 chars. Slot chars:
+    //   s skin  h hair  t top  b bottom  x shoes  a accent
+    //   w secondary  k dark  e eye-glow  r accent2  . empty
+    const TEMPLATES = {
+        // Hooded developer with a laptop.
+        dev: [
+            '.tttttt.',
+            'tthhhhtt',
+            'thssssht',
+            'thskskht',
+            'thssssht',
+            '.tttttt.',
+            'tttaattt',
+            't.taat.t',
+            '.twwwwt.',
+            '..bbbb..',
+            '..b..b..',
+            '.xx..xx.',
+        ],
+        // Field researcher: cap, satchel straps, magnifier in hand.
+        scout: [
+            '.aaaaaa.',
+            'aahhhhaa',
+            '.hssssh.',
+            '.hskskh.',
+            '.hssssh.',
+            '.tttttt.',
+            'wttttttw',
+            't.tttt.a',
+            '.tbbbbt.',
+            '..b..b..',
+            '.xx..xx.',
+        ],
+        // Planner/reviewer: blazer, shirt, clipboard.
+        suit: [
+            '..hhhh..',
+            '.hhhhhh.',
+            '.hssssh.',
+            '.hskskh.',
+            '.hssssh.',
+            '.tttttt.',
+            'ttwwwwtt',
+            't.tttt.w',
+            '.tttttt.',
+            '..bbbb..',
+            '..b..b..',
+            '.xx..xx.',
+        ],
+        // Little worker robot.
+        bot: [
+            '...a....',
+            '.tttttt.',
+            '.tettet.',
+            '.tttttt.',
+            '..aaaa..',
+            '.wwwwww.',
+            'w.waaw.w',
+            'w.wwww.w',
+            '..w..w..',
+            '.xx..xx.',
+        ],
+    };
+
+    // The orchestrator: ivory robot-conductor with gold headset, glowing
+    // eyes and a coral scarf. Always the same — the star of the show.
+    const CLAUDE_GRID = [
+        '..aaaa..',
+        '.atttta.',
+        '.tettet.',
+        '.tttttt.',
+        '.rrrrrr.',
+        't.tttt.t',
+        'tttttttt',
+        't.raar.t',
+        '.tttttt.',
+        '..t..t..',
+        '.xx..xx.',
+    ];
+    const CLAUDE_COLORS = {
+        t: '#e8e3da', a: '#f5c542', e: '#ff9d52', r: '#d97757',
+        w: '#ffffff', k: '#2a2a35', x: '#4a4440', b: '#c9c2b4',
+        s: '#e8e3da', h: '#e8e3da',
+    };
+
+    const SKINS = ['#f4c089', '#d4a574', '#c9956b', '#fdd9b5', '#e8b88a', '#a9714b'];
+    const HAIRS = ['#2c1810', '#8b4513', '#b33a2d', '#1a1a1a', '#5d4037', '#e8c26e'];
+    const TOPS = ['#7c5cff', '#4ecca3', '#4fc3f7', '#ff8a5c', '#e94560',
+                  '#f5c542', '#64dd88', '#b06ee8', '#5c9dff', '#ff6ea0'];
+    const BOTTOMS = ['#37474f', '#455a64', '#0d1b4a', '#3a3a4a'];
+
+    function hashString(str) {
+        let h = 2166136261;
+        for (let i = 0; i < str.length; i++) {
+            h ^= str.charCodeAt(i);
+            h = Math.imul(h, 16777619);
+        }
+        return h >>> 0;
+    }
+
+    function lighten(hex, amt) {
+        const n = parseInt(hex.slice(1), 16);
+        const r = Math.min(255, ((n >> 16) & 255) + amt);
+        const g = Math.min(255, ((n >> 8) & 255) + amt);
+        const b = Math.min(255, (n & 255) + amt);
+        return `rgb(${r},${g},${b})`;
+    }
+
+    function templateFor(agentType) {
+        const t = (agentType || '').toLowerCase();
+        if (/explore|research|search|scout|web/.test(t)) return 'scout';
+        if (/review|plan|architect|critic|judge/.test(t)) return 'suit';
+        if (/bot|general|worker|code/.test(t)) return 'dev';
+        return null; // caller picks by hash
+    }
+
+    function gridToPixels(grid, colors) {
+        const bySlot = {};
+        grid.forEach((row, y) => {
+            for (let x = 0; x < row.length; x++) {
+                const ch = row[x];
+                if (ch === '.' || ch === ' ') continue;
+                (bySlot[ch] = bySlot[ch] || []).push([x, y]);
+            }
+        });
+        return Object.entries(bySlot).map(([slot, coords]) => ({
+            color: colors[slot] || '#888888',
+            coords,
+        }));
+    }
+
+    // Build a sprite for a dynamically-spawned agent. Deterministic in
+    // (id + name), so replays and scrubbing always redraw the same person.
+    function makeAgentSprite(id, name, agentType) {
+        const h = hashString(String(id) + '|' + String(name));
+        const keys = Object.keys(TEMPLATES);
+        const tplKey = templateFor(agentType) || keys[h % keys.length];
+        const top = TOPS[h % TOPS.length];
+        const colors = {
+            s: SKINS[(h >> 3) % SKINS.length],
+            h: HAIRS[(h >> 6) % HAIRS.length],
+            t: top,
+            a: lighten(top, 60),
+            w: '#eceff1',
+            b: BOTTOMS[(h >> 9) % BOTTOMS.length],
+            x: '#3e2723',
+            k: '#1a1a1a',
+            e: '#ffe082',
+            r: '#e94560',
+        };
+        return { pixels: gridToPixels(TEMPLATES[tplKey], colors), tint: top, template: tplKey };
+    }
+
+    const CLAUDE_SPRITE = {
+        pixels: gridToPixels(CLAUDE_GRID, CLAUDE_COLORS),
+        tint: '#d97757',
+        template: 'claude',
+    };
+
+    // Render a sprite's pixel groups into a canvas at the given pixel size.
+    function drawSprite(canvas, sprite, px) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = false;
+        sprite.pixels.forEach(group => {
+            ctx.fillStyle = group.color;
+            group.coords.forEach(([x, y]) => {
+                ctx.fillRect(x * px, y * px, px, px);
+            });
+        });
+    }
+
+    window.THEATRE_SPRITES = { makeAgentSprite, CLAUDE_SPRITE, drawSprite, hashString };
+})();

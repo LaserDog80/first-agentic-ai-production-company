@@ -1,0 +1,66 @@
+{
+  "//": "Claude Code hooks that stream a live session into the Agent Theatre.",
+  "//howto": "Merge the 'hooks' block below into .claude/settings.json (project) or ~/.claude/settings.json (global). Start the theatre server (python app.py), open http://localhost:8000/theatre, run Claude Code in your terminal, then click 'CHECK FOR LIVE SESSIONS'. The curl is fire-and-forget: -m 2 caps it at 2s and '|| true' means Claude is never slowed or blocked if the theatre server isn't running.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -sf -m 2 -X POST http://localhost:8000/ingest -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -sf -m 2 -X POST http://localhost:8000/ingest -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -sf -m 2 -X POST http://localhost:8000/ingest -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -sf -m 2 -X POST http://localhost:8000/ingest -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -sf -m 2 -X POST http://localhost:8000/ingest -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -sf -m 2 -X POST http://localhost:8000/ingest -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ]
+  }
+}
