@@ -219,19 +219,27 @@ def test_demo_trace(client):
 
 
 def test_casting_demo_trace(client):
-    """'The Casting' cut renders the full Workflow team as on-stage delegation."""
+    """'The Casting' cut renders the Workflow team as on-stage delegation.
+
+    Demo simplification: the Producer/Exec-Producer loop is collapsed to one
+    sprite each, so the cast is Head of Development + Researcher + Producer +
+    Exec Producer + Deck Producer, and each role is hired exactly once.
+    """
     r = client.get("/api/trace/demo/casting")
     assert r.status_code == 200
     trace = r.json()
-    # Series Producer + Trend Scout + Concept Architect x3 + Sense-Checker x3 + Deck Producer
-    assert len(trace["agents"]) == 9
+    assert trace["mainName"] == "HEAD OF DEVELOPMENT"
+    assert len(trace["agents"]) == 5
     names = [a["name"] for a in trace["agents"]]
-    assert "TREND SCOUT" in names and "DECK PRODUCER" in names
-    assert names.count("CONCEPT ARCHITECT") == 3  # the adversarial revise loop
-    assert names.count("SENSE-CHECKER") == 3
+    for role in ("RESEARCHER", "PRODUCER", "EXEC PRODUCER", "DECK PRODUCER"):
+        assert names.count(role) == 1  # each role appears once — no duplicate sprites
     spawns = [e for e in trace["events"] if e["type"] == "spawn"]
     returns = [e for e in trace["events"] if e["type"] == "return"]
-    assert len(spawns) == 8 and len(returns) == 8
+    assert len(spawns) == 4 and len(returns) == 4
+    # The Producer and Exec Producer each speak across the interleaved rounds.
+    prod = next(a["id"] for a in trace["agents"] if a["name"] == "PRODUCER")
+    prod_says = [e for e in trace["events"] if e["type"] == "say" and e["agent"] == prod]
+    assert len(prod_says) == 3
     # Finale reveal carries the real deck + three cover images.
     reveal = trace["reveal"]
     assert reveal["deck"].endswith("pitch-deck.html")

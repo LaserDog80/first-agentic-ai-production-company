@@ -52,6 +52,7 @@
         player.mode = 'replay';
         player.trace = trace;
         player.reveal = trace.reveal || null;   // finale deck/images, if any
+        player.mainName = trace.mainName || 'SERIES PRODUCER';  // orchestrator's cast title
         if (player.reveal) {                     // warm the cache so the reveal is instant
             (player.reveal.images || []).forEach(img => { new Image().src = img.src; });
         }
@@ -279,18 +280,21 @@
         el('todoCard').classList.remove('visible');
         setCaption('', '');
         mapParticles.length = 0;
+        mapNodes.clear();
         addActor('main');
         updateStats(0);
     }
 
     function agentDef(id) {
-        // The orchestrator always appears as the SERIES PRODUCER, whatever
-        // the trace calls it — the theatre casts the run as a production.
+        // The orchestrator is cast under one title — SERIES PRODUCER by default,
+        // or whatever the trace names it (trace.mainName) — the theatre casts the
+        // run as a production.
+        const mainName = player.mainName || 'SERIES PRODUCER';
         if (player.agentDefs.has(id)) {
             const def = player.agentDefs.get(id);
-            return id === 'main' ? { ...def, name: 'SERIES PRODUCER' } : def;
+            return id === 'main' ? { ...def, name: mainName } : def;
         }
-        return { id, name: id === 'main' ? 'SERIES PRODUCER' : id.toUpperCase(),
+        return { id, name: id === 'main' ? mainName : id.toUpperCase(),
                  agent_type: id === 'main' ? 'orchestrator' : 'agent', parent: 'main' };
     }
 
@@ -633,7 +637,8 @@
     function mapAddNode(id, def, tint) {
         if (mapNodes.has(id)) { mapNodes.get(id).tint = tint; return; }
         if (id === 'main') {
-            mapNodes.set(id, { x: 0.16, y: 0.5, tint, label: 'SERIES PRODUCER', active: false });
+            mapNodes.set(id, { x: 0.16, y: 0.5, tint,
+                label: clip(def.name || 'SERIES PRODUCER', 18), active: false });
             return;
         }
         const children = [...mapNodes.keys()].filter(k => k !== 'main').length;

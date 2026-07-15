@@ -195,6 +195,7 @@ async def api_trace_demo_casting():
     text = _CASTING_TRANSCRIPT.read_text(encoding="utf-8")
     trace = normalize_transcript(text, source="claude-code-casting")
     trace["title"] = "THE CASTING · a real production run"
+    trace["mainName"] = "HEAD OF DEVELOPMENT"  # demo cast: the orchestrator's title
     trace["reveal"] = _CASTING_REVEAL
     return JSONResponse(trace)
 
