@@ -207,3 +207,41 @@ def test_ws_run_graph_executes_and_streams(client, monkeypatch):
         assert summary is not None and summary["ok"] is True
         assert summary["tokens"]["prompt"] >= 7
         assert summary["cost_usd"] is not None  # pricing block in config.yaml
+
+
+def test_demo_trace(client):
+    """The bundled sample run normalizes into a playable trace."""
+    r = client.get("/api/trace/demo")
+    assert r.status_code == 200
+    trace = r.json()
+    assert len(trace["events"]) > 1
+    assert any(e["type"] == "spawn" for e in trace["events"])
+
+
+def test_casting_demo_trace(client):
+    """'The Casting' cut renders the full Workflow team as on-stage delegation."""
+    r = client.get("/api/trace/demo/casting")
+    assert r.status_code == 200
+    trace = r.json()
+    # Series Producer + Trend Scout + Concept Architect x3 + Sense-Checker x3 + Deck Producer
+    assert len(trace["agents"]) == 9
+    names = [a["name"] for a in trace["agents"]]
+    assert "TREND SCOUT" in names and "DECK PRODUCER" in names
+    assert names.count("CONCEPT ARCHITECT") == 3  # the adversarial revise loop
+    assert names.count("SENSE-CHECKER") == 3
+    spawns = [e for e in trace["events"] if e["type"] == "spawn"]
+    returns = [e for e in trace["events"] if e["type"] == "return"]
+    assert len(spawns) == 8 and len(returns) == 8
+    # Finale reveal carries the real deck + three cover images.
+    reveal = trace["reveal"]
+    assert reveal["deck"].endswith("pitch-deck.html")
+    assert len(reveal["images"]) == 3
+
+
+def test_casting_demo_assets_served(client):
+    """The real deck and its cover images are served as static files."""
+    assert client.get("/static/demo/the-casting/pitch-deck.html").status_code == 200
+    for name in ("page1-hero", "page2-format", "page3-whynow"):
+        r = client.get(f"/static/demo/the-casting/images/{name}.jpg")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("image/")

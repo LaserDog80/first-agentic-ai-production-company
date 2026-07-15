@@ -51,6 +51,10 @@
         stopLive();
         player.mode = 'replay';
         player.trace = trace;
+        player.reveal = trace.reveal || null;   // finale deck/images, if any
+        if (player.reveal) {                     // warm the cache so the reveal is instant
+            (player.reveal.images || []).forEach(img => { new Image().src = img.src; });
+        }
         player.events = trace.events || [];
         player.agentDefs = new Map((trace.agents || []).map(a => [a.id, a]));
         player.idx = 0;
@@ -269,6 +273,7 @@
 
     function resetWorld() {
         world = freshWorld();
+        hideReveal();
         actorsEl.innerHTML = '<div class="wave" id="mainSlot"></div><div class="ensemble" id="ensemble"></div>';
         feedEl.innerHTML = '';
         el('todoCard').classList.remove('visible');
@@ -518,6 +523,7 @@
                     `${world.totals.tools} tool calls, ${fmtTokens(world.totals.tokens)} tokens generated in ${fmtClock(world.clock)}.`,
                     'done:' + ev.t);
                 feed(ev, 'say', `<span class="who">■</span> run complete`);
+                if (player.reveal && animate) showReveal(player.reveal);
                 break;
             }
             case 'session_start':
@@ -740,6 +746,7 @@
     scrubber.addEventListener('input', () => {
         if (player.mode !== 'replay') return;
         setPlaying(false);
+        hideReveal();
         rebuildTo(parseInt(scrubber.value, 10));
     });
 
@@ -766,10 +773,38 @@
     function openLoader() {
         setPlaying(false);
         stopLive();
+        hideReveal();
         document.body.classList.remove('live');
         el('loader').classList.remove('hidden');
         loadSessions();
         refreshLive();
+    }
+
+    // ── Finale reveal: the real deck + cover images for demos that carry them ─
+    function showReveal(reveal) {
+        const card = el('revealCard');
+        if (!card) return;
+        el('revealTitle').textContent = reveal.title || 'THE FINISHED DECK';
+        el('revealTagline').textContent = reveal.tagline || '';
+        const strip = el('revealImages');
+        strip.innerHTML = '';
+        (reveal.images || []).forEach(img => {
+            const fig = document.createElement('figure');
+            fig.className = 'reveal-shot';
+            fig.innerHTML = `<img src="${esc(img.src)}" alt="${esc(img.caption || '')}" loading="lazy">` +
+                            `<figcaption>${esc(img.caption || '')}</figcaption>`;
+            fig.onclick = () => window.open(img.src, '_blank', 'noopener');
+            strip.appendChild(fig);
+        });
+        const deckBtn = el('revealDeckBtn');
+        if (reveal.deck) { deckBtn.href = reveal.deck; deckBtn.style.display = ''; }
+        else { deckBtn.style.display = 'none'; }
+        card.classList.remove('hidden');
+    }
+
+    function hideReveal() {
+        const card = el('revealCard');
+        if (card) card.classList.add('hidden');
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -794,8 +829,9 @@
     }
 
     window.Theatre = {
-        openLoader, togglePlay, refreshLive,
+        openLoader, togglePlay, refreshLive, closeReveal: hideReveal,
         loadDemo: () => fetchTrace('/api/trace/demo', 'REPLAY · DEMO'),
+        loadCasting: () => fetchTrace('/api/trace/demo/casting', 'REPLAY · THE CASTING'),
     };
 
     resetWorld();
