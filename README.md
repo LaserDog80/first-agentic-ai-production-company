@@ -15,7 +15,7 @@ pinned: false
 
 **✦ Theatre (`/theatre`)** — the main event. Feed it a real agentic run and it becomes a stage play:
 
-- **Replay Claude's previous runs.** The server scans `~/.claude/projects` for Claude Code session transcripts; pick one and watch it back. You can also drag-and-drop any session `.jsonl`, or press **PLAY THE DEMO** for a bundled sample run (zero API calls).
+- **Replay Claude's previous runs.** The server scans `~/.claude/projects` for Claude Code session transcripts; pick one and watch it back. You can also drag-and-drop any session `.jsonl`, or play a bundled run with zero API calls — **PLAY "THE CASTING"** (a real production run, re-staged, ending on the finished deck) or **PLAY THE SAMPLE**.
 - **Go live from your terminal.** Enable the theatre hooks (one copy-paste, see below), run Claude Code as you normally would, and the run appears on stage in real time.
 - **The cast assembles itself.** The run starts with one character — Claude, the orchestrator. When it delegates (a `Task` call), a new pixel person walks on stage, works with its own tools and its own context, then reports back and retires. The delegation map (smooth glowing edges, not pixel steps) draws itself as the run unfolds — that emergent structure *is* the lesson.
 - **Narrated.** A caption bar explains each teaching beat in plain English: why the agent reads before it writes, what delegation buys, why a failed command is information, why only the subagent's summary survives.
@@ -73,9 +73,13 @@ Open `/theatre`. Anything under `~/.claude/projects` is listed automatically (ov
 
 *Live-mode caveat:* hook payloads carry no agent identity, so while a subagent is in flight its parent's parallel tool calls can be mis-badged. Replay-from-transcript is exact.
 
-### The demo
+### The demos
 
-**PLAY THE DEMO** replays a bundled sample transcript (`static/demo/demo_session.jsonl`, regenerable via `python scripts/make_demo_transcript.py`) telling the original production-company story: a one-line commissioning brief becomes a broadcastable pitch deck. The AI — starring as the **Series Producer** — sets the editorial vision, hires a **Researcher**, **Director** and **Production Manager** in parallel (all drawn with the presentation view's hand-made character sprites), then a **Producer** to assemble and fact-check the deck. It's the reliable classroom mode — no keys, no network, same every time.
+Two bundled runs play with zero API calls — the reliable classroom mode, no keys, no network, same every time.
+
+**PLAY "THE CASTING"** is the headline demo: a stage-ready cut of a *real* production run (3 July 2026). The AI, as the **Head of Development**, hires a **Researcher** to find what's genuinely hot, a **Producer** to turn the strongest seed into a returnable format, and an **Exec Producer** to pressure-test it adversarially — the two go back and forth across **three rounds** until the concept survives — then a **Deck Producer** to ship a 3-page deck. The real run used the Workflow orchestrator (its team lived in separate `subagents/workflows/*` files the theatre couldn't fold in), so `scripts/make_casting_demo.py` re-expresses it as `Task` spawns the adapter renders on stage. For a lay audience the Producer/Exec-Producer loop is collapsed so each of those roles is one on-stage sprite that the spotlight returns to each round, rather than a new person arriving. It ends on a **finale reveal**: the three real Magnific cover images and a button to open the finished deck (`static/demo/the-casting/pitch-deck.html`). Regenerate the transcript with `python scripts/make_casting_demo.py`.
+
+**PLAY THE SAMPLE** replays a synthetic transcript (`static/demo/demo_session.jsonl`, regenerable via `python scripts/make_demo_transcript.py`) telling the original production-company story: a one-line commissioning brief becomes a broadcastable pitch deck. The Series Producer hires a **Researcher**, **Director** and **Production Manager** in parallel, then a **Producer** to assemble and fact-check the deck — a cleaner look at *parallel* fan-out, where The Casting shows an *iterative critique loop*.
 
 ## Configuration
 

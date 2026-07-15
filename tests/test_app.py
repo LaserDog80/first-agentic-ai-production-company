@@ -207,3 +207,49 @@ def test_ws_run_graph_executes_and_streams(client, monkeypatch):
         assert summary is not None and summary["ok"] is True
         assert summary["tokens"]["prompt"] >= 7
         assert summary["cost_usd"] is not None  # pricing block in config.yaml
+
+
+def test_demo_trace(client):
+    """The bundled sample run normalizes into a playable trace."""
+    r = client.get("/api/trace/demo")
+    assert r.status_code == 200
+    trace = r.json()
+    assert len(trace["events"]) > 1
+    assert any(e["type"] == "spawn" for e in trace["events"])
+
+
+def test_casting_demo_trace(client):
+    """'The Casting' cut renders the Workflow team as on-stage delegation.
+
+    Demo simplification: the Producer/Exec-Producer loop is collapsed to one
+    sprite each, so the cast is Head of Development + Researcher + Producer +
+    Exec Producer + Deck Producer, and each role is hired exactly once.
+    """
+    r = client.get("/api/trace/demo/casting")
+    assert r.status_code == 200
+    trace = r.json()
+    assert trace["mainName"] == "HEAD OF DEVELOPMENT"
+    assert len(trace["agents"]) == 5
+    names = [a["name"] for a in trace["agents"]]
+    for role in ("RESEARCHER", "PRODUCER", "EXEC PRODUCER", "DECK PRODUCER"):
+        assert names.count(role) == 1  # each role appears once — no duplicate sprites
+    spawns = [e for e in trace["events"] if e["type"] == "spawn"]
+    returns = [e for e in trace["events"] if e["type"] == "return"]
+    assert len(spawns) == 4 and len(returns) == 4
+    # The Producer and Exec Producer each speak across the interleaved rounds.
+    prod = next(a["id"] for a in trace["agents"] if a["name"] == "PRODUCER")
+    prod_says = [e for e in trace["events"] if e["type"] == "say" and e["agent"] == prod]
+    assert len(prod_says) == 3
+    # Finale reveal carries the real deck + three cover images.
+    reveal = trace["reveal"]
+    assert reveal["deck"].endswith("pitch-deck.html")
+    assert len(reveal["images"]) == 3
+
+
+def test_casting_demo_assets_served(client):
+    """The real deck and its cover images are served as static files."""
+    assert client.get("/static/demo/the-casting/pitch-deck.html").status_code == 200
+    for name in ("page1-hero", "page2-format", "page3-whynow"):
+        r = client.get(f"/static/demo/the-casting/images/{name}.jpg")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("image/")

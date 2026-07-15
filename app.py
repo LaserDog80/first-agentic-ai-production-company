@@ -141,6 +141,20 @@ async def output_image(run_id: str, name: str):
 live_broker = LiveBroker()
 _MAX_UPLOAD_BYTES = 30 * 1024 * 1024
 _DEMO_TRANSCRIPT = Path("static/demo/demo_session.jsonl")
+_CASTING_TRANSCRIPT = Path("static/demo/the_casting_run.jsonl")
+
+# Real deliverables from the 3 July 2026 production run, surfaced by the
+# Theatre as a finale reveal once "The Casting" demo finishes playing.
+_CASTING_REVEAL = {
+    "title": "THE CASTING",
+    "tagline": "Creators run the real casting gauntlet — for actual jobs on the network's next show.",
+    "deck": "/static/demo/the-casting/pitch-deck.html",
+    "images": [
+        {"src": "/static/demo/the-casting/images/page1-hero.jpg", "caption": "THE CASTING — the room"},
+        {"src": "/static/demo/the-casting/images/page2-format.jpg", "caption": "The wired house"},
+        {"src": "/static/demo/the-casting/images/page3-whynow.jpg", "caption": "The finale soundstage"},
+    ],
+}
 
 
 @app.get("/api/sessions")
@@ -166,6 +180,24 @@ async def api_trace_demo():
         return JSONResponse(status_code=404, content={"error": "No demo transcript bundled"})
     text = _DEMO_TRANSCRIPT.read_text(encoding="utf-8")
     return JSONResponse(normalize_transcript(text, source="claude-code-demo"))
+
+
+@app.get("/api/trace/demo/casting")
+async def api_trace_demo_casting():
+    """'The Casting' — a stage-ready cut of a real 3 July 2026 production run.
+
+    Rebuilt so the Workflow team (Trend Scout, Concept Architect ⇄ Sense-Checker,
+    Deck Producer) renders as on-stage delegation. Carries a ``reveal`` payload
+    with the real deck and cover images for the finale.
+    """
+    if not _CASTING_TRANSCRIPT.is_file():
+        return JSONResponse(status_code=404, content={"error": "No casting transcript bundled"})
+    text = _CASTING_TRANSCRIPT.read_text(encoding="utf-8")
+    trace = normalize_transcript(text, source="claude-code-casting")
+    trace["title"] = "THE CASTING · a real production run"
+    trace["mainName"] = "HEAD OF DEVELOPMENT"  # demo cast: the orchestrator's title
+    trace["reveal"] = _CASTING_REVEAL
+    return JSONResponse(trace)
 
 
 @app.post("/api/trace/upload")
