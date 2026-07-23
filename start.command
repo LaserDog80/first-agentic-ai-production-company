@@ -30,4 +30,4 @@ URL="http://localhost:${PORT}"
 ( sleep 2; open "$URL" 2>/dev/null || xdg-open "$URL" 2>/dev/null || true ) &
 
 echo "Starting Agentic Playground on ${URL} (Ctrl+C to stop)..."
-PORT="$PORT" python app.py
+PORT="$PORT" exec withkeys @first-agentic -- python app.py
