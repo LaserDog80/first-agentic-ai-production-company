@@ -45,10 +45,20 @@ pip install -r requirements.txt
 
 The Theatre needs **no API keys** — it replays transcripts. Keys are only needed for the sandbox/present modes that execute real graphs:
 
+Those keys live in Locksmith (the macOS keychain), grouped for this project:
+
 ```bash
-cp .env.example .env
-# NEBIUS_API_KEY (LLM provider), TAVILY_API_KEY or LINKUP_API_KEY (web search),
-# FAL_KEY (image generation preset only)
+locksmith add NEBIUS_API_KEY     # LLM provider
+locksmith add TAVILY_API_KEY     # web search
+locksmith add LINKUP_API_KEY     # web search (alternative)
+locksmith add FAL_KEY            # image generation preset only
+locksmith group first-agentic NEBIUS_API_KEY TAVILY_API_KEY LINKUP_API_KEY FAL_KEY
+```
+
+Then run under `withkeys`, which injects them for that process only:
+
+```bash
+withkeys @first-agentic -- python app.py
 ```
 
 **macOS shortcut:** double-click `start.command`.
